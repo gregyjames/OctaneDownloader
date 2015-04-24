@@ -1,0 +1,5 @@
+C:\Users\Greg\Desktop\OctaneDownloader\OctaneDownloadEngine\bin\Debug\OctaneDownloadEngine.exe.config
+C:\Users\Greg\Desktop\OctaneDownloader\OctaneDownloadEngine\bin\Debug\OctaneDownloadEngine.exe
+C:\Users\Greg\Desktop\OctaneDownloader\OctaneDownloadEngine\bin\Debug\OctaneDownloadEngine.pdb
+C:\Users\Greg\Desktop\OctaneDownloader\OctaneDownloadEngine\obj\Debug\OctaneDownloadEngine.exe
+C:\Users\Greg\Desktop\OctaneDownloader\OctaneDownloadEngine\obj\Debug\OctaneDownloadEngine.pdb
