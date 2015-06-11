@@ -11,58 +11,20 @@ namespace OctaneDownloadEngine
     {
         static void Main()
         {
-            SplitDownload("http://s.imgur.com/images/logo-1200-630.jpg", "output.jpg");
+            SplitDownload("http://www.hdwallpapers.in/walls/tree_snake_hd-wide.jpg", "output.jpg");
             Console.ReadLine();
 
-        }
-
-        //Function that makes the name for each part of the file that was downloaded
-        static string GenerateName(int start)
-        {
-            String name = String.Format("{0:D6}.tmp", start);
-            return name;
-        }
-
-        //Stores the names of all the temp files
-        static public List<string> Files = new List<string>();
-
-        //Merges all the Temp files
-        static private void mergeClean(long partSize)
-        {
-            //Orders the array based on the name
-            Files.Sort();
-            using (var output = File.Create("output.jpg"))
-            {
-                Console.WriteLine("\n");
-                foreach (var file in Files)
-                {
-                    Console.WriteLine(file);
-                    using (var input = File.OpenRead(file))
-                    {
-                        var buffer = new byte[partSize];
-                        int bytesRead;
-                        while ((bytesRead = input.Read(buffer, 0, buffer.Length)) > 0)
-                        {
-                            output.Write(buffer, 0, bytesRead);
-                        }
-                    }
-                }
-            }
-
-            foreach (var file in Files)
-            {
-                File.Delete(file);
-            }
         }
 
         //Converts the Stream to a byte array
         public static byte[] ReadFully(Stream input)
         {
-            var buffer = new byte[16 * 1024];
+            var buffer = new byte[9000];
             using (var ms = new MemoryStream())
             {
                 int read;
-                while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+ 
+                while ((read = input.Read(buffer, 0, buffer.Length)) > 0) 
                 {
                     ms.Write(buffer, 0, read);
                 }
@@ -70,21 +32,10 @@ namespace OctaneDownloadEngine
             }
         }
 
-        //Save the file stream to a temp file
-        static private void SaveFileStream(String path, Stream stream)
-        {
-            var fileStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Write);
-            //var fileStream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
-
-            stream.CopyTo(fileStream);
-            //fileStream.Write();
-            fileStream.Dispose();
-        }
-
         static public void SplitDownload(string URL, string OUT)
         {
             var responseLength = WebRequest.Create(URL).GetResponse().ContentLength;
-            var partSize = (long)Math.Floor(responseLength / 3.00);
+            var partSize = (long)Math.Floor(responseLength / 2.00);
 
             Console.WriteLine(responseLength.ToString(CultureInfo.InvariantCulture) + " TOTAL SIZE");
             Console.WriteLine(partSize.ToString(CultureInfo.InvariantCulture) + " PART SIZE" + "\n");
@@ -97,35 +48,37 @@ namespace OctaneDownloadEngine
                 var previous2 = previous;
                 var i2 = i;
                 var t = new Thread(() => Download(URL, OUT, previous2, i2, (int)partSize));
+                t.Priority = ThreadPriority.Highest;
                 t.Start();
-                previous = i;
-
+                previous = i2;
             }
-
-
-
-
-            mergeClean(partSize);
         }
 
-        static private void Download(string URL, string OUT, int Start, int End, int partSize)
+        static async private void Download(string URL, string OUT, int Start, int End, int partSize)
         {
-            Console.WriteLine(String.Format("{0},{1}", Start, End));
+                Console.WriteLine(String.Format("{0},{1}", Start, End));
 
-            var myHttpWebRequest = (HttpWebRequest)WebRequest.Create(URL);
-            myHttpWebRequest.AddRange(Start, End);
-            var streamResponse = myHttpWebRequest.GetResponse().GetResponseStream();
+                var myHttpWebRequest = (HttpWebRequest)WebRequest.Create(URL);
+                myHttpWebRequest.AddRange(Start, End);
+                myHttpWebRequest.Proxy = null;
 
-            string name = GenerateName(Start);
-            //String name = OUT;
+                var stram = await myHttpWebRequest.GetResponseAsync();
 
-            //var array = ReadFully(streamResponse);
-
-            SaveFileStream(name, streamResponse);
-            Files.Add(name);
-            //Files.
-
-
+                var array = ReadFully(stram.GetResponseStream());
+                var fs = new FileStream(OUT, FileMode.Append, FileAccess.Write, FileShare.Write, partSize);
+                fs.Position = Start;
+                
+                try
+                {
+                    foreach (byte x in array)
+                    {
+                        if (fs.Position != End)
+                        {
+                            fs.WriteByte(x);
+                        }
+                    }
+                }
+                catch { }
         }
 
 
