@@ -8,3 +8,8 @@ C:\Users\Greg\Desktop\Octane\OctaneDownloader\OctaneDownloadEngine\obj\Debug\Oct
 C:\Users\Greg\Desktop\Octane\OctaneDownloader\OctaneDownloadEngine\obj\Debug\OctaneDownloadEngine.pdb
 C:\Users\Greg\Desktop\Octane\OctaneDownloader\OctaneDownloadEngine\bin\Debug\OctaneDownloadEngine.exe
 C:\Users\Greg\Desktop\Octane\OctaneDownloader\OctaneDownloadEngine\bin\Debug\OctaneDownloadEngine.pdb
+C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneDownloadEngine\bin\Debug\OctaneDownloadEngine.exe.config
+C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneDownloadEngine\bin\Debug\OctaneDownloadEngine.exe
+C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneDownloadEngine\bin\Debug\OctaneDownloadEngine.pdb
+C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneDownloadEngine\obj\Debug\OctaneDownloadEngine.exe
+C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneDownloadEngine\obj\Debug\OctaneDownloadEngine.pdb

@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Net;
-using System.Threading;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Threading.Tasks;
 
 namespace OctaneDownloadEngine
 {
@@ -11,76 +13,101 @@ namespace OctaneDownloadEngine
     {
         static void Main()
         {
-            SplitDownload("http://www.hdwallpapers.in/walls/tree_snake_hd-wide.jpg", "output.jpg");
-            Console.ReadLine();
+            SplitDownload("http://www.hdwallpapers.in/walls/tree_snake_hd-wide.jpg", "output.jpg", 4);
 
+            Console.ReadLine();
         }
 
-        //Converts the Stream to a byte array
-        public static byte[] ReadFully(Stream input)
+        public static void SplitDownload(string URL, string OUT, double Parts)
         {
-            var buffer = new byte[9000];
-            using (var ms = new MemoryStream())
+            try
             {
-                int read;
- 
-                while ((read = input.Read(buffer, 0, buffer.Length)) > 0) 
-                {
-                    ms.Write(buffer, 0, read);
-                }
-                return ms.ToArray();
+                // have to use this because you can't have async entrypoint
+                Task.WaitAll(Download(URL, OUT, Parts));
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(ex);
+                throw;
             }
         }
 
-        static public void SplitDownload(string URL, string OUT)
+        internal static async Task<string> Download(string URL, string OUT, double Parts)
         {
             var responseLength = WebRequest.Create(URL).GetResponse().ContentLength;
-            var partSize = (long)Math.Floor(responseLength / 2.00);
+            var partSize = (long)Math.Floor(responseLength / Parts);
 
             Console.WriteLine(responseLength.ToString(CultureInfo.InvariantCulture) + " TOTAL SIZE");
             Console.WriteLine(partSize.ToString(CultureInfo.InvariantCulture) + " PART SIZE" + "\n");
+
             var previous = 0;
 
-            FileStream fs = File.Create(OUT);
-            fs.Close();
-            for (var i = (int)partSize; i <= responseLength + partSize; i = (i + (int)partSize) + 1)
+            var fs = new FileStream(OUT, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None, (int)partSize);
+            try
             {
-                var previous2 = previous;
-                var i2 = i;
-                var t = new Thread(() => Download(URL, OUT, previous2, i2, (int)partSize));
-                t.Priority = ThreadPriority.Highest;
-                t.Start();
-                previous = i2;
-            }
-        }
+                fs.SetLength(responseLength);
 
-        static async private void Download(string URL, string OUT, int Start, int End, int partSize)
-        {
-                Console.WriteLine(String.Format("{0},{1}", Start, End));
+                List<Tuple<Task<byte[]>, int, int>> asyncTasks = new List<Tuple<Task<byte[]>, int, int>>();
 
-                var myHttpWebRequest = (HttpWebRequest)WebRequest.Create(URL);
-                myHttpWebRequest.AddRange(Start, End);
-                myHttpWebRequest.Proxy = null;
-
-                var stram = await myHttpWebRequest.GetResponseAsync();
-
-                var array = ReadFully(stram.GetResponseStream());
-                var fs = new FileStream(OUT, FileMode.Append, FileAccess.Write, FileShare.Write, partSize);
-                fs.Position = Start;
-                
-                try
+                for (var i = (int)partSize; i <= responseLength + partSize; i = (i + (int)partSize) + 1)
                 {
-                    foreach (byte x in array)
+                    var previous2 = previous;
+                    var i2 = i;
+
+                    // GetResponseAsync deadlocks for some reason so switched to HttpClient instead
+                    HttpClient client = new HttpClient() { MaxResponseContentBufferSize = 1000000 };
+                
+                    client.DefaultRequestHeaders.Range = new RangeHeaderValue(previous2, i2);
+                    byte[] urlContents = await client.GetByteArrayAsync(URL);
+
+                    // start each download task and keep track of them for later
+                    Console.WriteLine("start {0},{1}", previous2, i2);
+
+                    var downloadTask = client.GetByteArrayAsync(URL);
+                    asyncTasks.Add(new Tuple<Task<byte[]>, int, int>(downloadTask, previous2, i2));
+
+                    previous = i2;
+                }
+
+                // now that all the downloads are started, we can await the results
+                // loop through looking for a completed task in case they complete out of order
+                while (asyncTasks.Count > 0)
+                {
+                    Tuple<Task<byte[]>, int, int> completedTask = null;
+                    foreach (var task in asyncTasks)
                     {
-                        if (fs.Position != End)
+                        // as each task completes write the data to the file
+                        if (task.Item1.IsCompleted)
                         {
-                            fs.WriteByte(x);
+                            Console.WriteLine("await {0},{1}", task.Item2, task.Item3);
+                            var array = await task.Item1;
+
+                            Console.WriteLine("write to file {0},{1}", task.Item2, task.Item3);
+                            fs.Position = task.Item2;
+
+                            foreach (byte x in array)
+                            {
+                                if (fs.Position != task.Item3)
+                                {
+                                    fs.WriteByte(x);
+                                }
+                            }
+                            completedTask = task;
+                            break;
                         }
                     }
+                    asyncTasks.Remove(completedTask);
                 }
-                catch { }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            finally
+            {
+                fs.Close();
+            }
+            return OUT;
         }
-
-
     }
 }
