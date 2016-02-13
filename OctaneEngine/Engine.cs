@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
+using System.Collections.Concurrent;
 
 namespace OctaneDownloadEngine
 {
@@ -20,7 +21,7 @@ namespace OctaneDownloadEngine
         {
             try
             {
-                Download(URL, OUT, Parts);
+                Parallel.Invoke(() => Download(URL, OUT, Parts));
             }
             catch (Exception ex)
             {
@@ -47,10 +48,10 @@ namespace OctaneDownloadEngine
 
                 List<Tuple<Task<byte[]>, int, int>> asyncTasks = new List<Tuple<Task<byte[]>, int, int>>();
 
-                for (var i = (int)partSize; i <= responseLength + partSize; i = (i + (int)partSize) + 1)
-                {
+                //Parallel.For((int)partSize, responseLength + partSize, async index => {
+                for(int i = (int)partSize; i < responseLength + partSize; i++){
                     var previous2 = previous;
-                    var i2 = i;
+                    var i2 = (int)i;
 
                     // GetResponseAsync deadlocks for some reason so switched to HttpClient instead
                     HttpClient client = new HttpClient() { MaxResponseContentBufferSize = 10000000 };
@@ -65,6 +66,8 @@ namespace OctaneDownloadEngine
                     asyncTasks.Add(new Tuple<Task<byte[]>, int, int>(downloadTask, previous2, i2));
 
                     previous = i2;
+
+                    i = (i + (int)partSize) + 1;
                 }
 
                 // now that all the downloads are started, we can await the results
@@ -72,9 +75,8 @@ namespace OctaneDownloadEngine
                 while (asyncTasks.Count > 0)
                 {
                     Tuple<Task<byte[]>, int, int> completedTask = null;
-                    foreach (var task in asyncTasks)
-                    {
-                        
+
+                    Parallel.ForEach(asyncTasks, async (task, state) => {
                         // as each task completes write the data to the file
                         if (task.Item1.IsCompleted)
                         {
@@ -83,7 +85,7 @@ namespace OctaneDownloadEngine
 
                             Console.WriteLine("write to file {0},{1}", task.Item2, task.Item3);
                             fs.Position = task.Item2;
-                            
+
                             foreach (byte x in array)
                             {
                                 if (fs.Position != task.Item3)
@@ -91,10 +93,12 @@ namespace OctaneDownloadEngine
                                     fs.WriteByte(x);
                                 }
                             }
+
                             completedTask = task;
-                            break;
+                            state.Break();
                         }
-                    }
+                    });
+
                     asyncTasks.Remove(completedTask);
                 }
             }
