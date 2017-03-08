@@ -1,8 +1,0 @@
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneTester\obj\Debug\OctaneTester.csprojResolveAssemblyReference.cache
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneTester\bin\Debug\OctaneDownloadEngine.exe.config
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneTester\bin\Debug\OctaneDownloadEngine.exe
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneTester\bin\Debug\OctaneDownloadEngine.pdb
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneTester\obj\Debug\OctaneDownloadEngine.exe
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneTester\obj\Debug\OctaneDownloadEngine.pdb
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneTester\bin\Debug\OctaneEngine.dll
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneTester\bin\Debug\OctaneEngine.pdb

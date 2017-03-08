@@ -1,8 +1,0 @@
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneDownloadEngine\bin\Debug\OctaneDownloadEngine.dll
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneDownloadEngine\bin\Debug\OctaneDownloadEngine.pdb
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneDownloadEngine\obj\Debug\OctaneDownloadEngine.dll
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneDownloadEngine\obj\Debug\OctaneDownloadEngine.pdb
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneEngine\bin\Debug\OctaneEngine.dll
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneEngine\bin\Debug\OctaneEngine.pdb
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneEngine\obj\Debug\OctaneEngine.dll
-C:\Users\Greg\Desktop\Octance\OctaneDownloader\OctaneEngine\obj\Debug\OctaneEngine.pdb
