@@ -1,5 +1,6 @@
 ﻿using System;
 using OctaneDownloadEngine;
+using System.IO;
 
 namespace OctaneDownloadEngine
 {
@@ -8,8 +9,11 @@ namespace OctaneDownloadEngine
         static void Main()
         {
             var Engine = new OctaneEngine();
-            Engine.SplitDownload("http://www.hdwallpapers.in/walls/tree_snake_hd-wide.jpg", "output.jpg", 2);
-
+            
+            Engine.SplitDownloadArray("http://www.hdwallpapers.in/walls/tree_snake_hd-wide.jpg", 256, (x) => {
+                File.WriteAllBytes("image.jpg", x);
+                Console.WriteLine("Done!");
+            });
             
             Console.ReadLine();
         }
