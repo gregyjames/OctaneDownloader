@@ -13,16 +13,42 @@ namespace OctaneDownloadEngine
 {
     public class OctaneEngine
     {
+        public delegate void FileSizeChanged(long current, long total);
+
+        struct EventPublisher
+        {
+            private long total;
+            private long current;
+
+            public event FileSizeChanged valueChanged;
+
+            
+            public long CurrentValue
+            {
+                set
+                {
+                    this.current = value;
+                    this.valueChanged(current, total);
+                }
+            }
+            public long TotalSize
+            {
+                set
+                {
+                    this.total = value;
+                }
+            }
+        }
         public OctaneEngine()
         {
             ServicePointManager.DefaultConnectionLimit = 10000;
         }
 
-        public void SplitDownloadArray(string URL, double Parts, Action<byte[]> callback)
+        public void SplitDownloadArray(string URL, double Parts, string fileout, Action<byte[]> callback)
         {
             try
             {
-                Parallel.Invoke(() => DownloadByteArray(URL, Parts, callback));
+                Parallel.Invoke(() => DownloadByteArray(URL, Parts, fileout, callback));
             }
             catch (Exception ex)
             {
@@ -31,7 +57,7 @@ namespace OctaneDownloadEngine
             }
         }
 
-        internal async void DownloadByteArray(string URL, double Parts, Action<byte[]> callback)
+        internal async void DownloadByteArray(string URL, double Parts, string FileOut, Action<byte[]> callback)
         {
             var responseLength = WebRequest.Create(URL).GetResponse().ContentLength;
             var partSize = (long)Math.Floor(responseLength / Parts);
@@ -41,12 +67,16 @@ namespace OctaneDownloadEngine
 
             var previous = 0;
 
+            var bar = new tqdm();
+            bar.set_theme_basic();
+
             var ms = new MemoryStream();
             try
             {
                 ms.SetLength(responseLength);
                 
                 ConcurrentQueue<Tuple<Task<byte[]>, int, int>> asyncTasks = new ConcurrentQueue<Tuple<Task<byte[]>, int, int>>();
+                
                 // GetResponseAsync deadlocks for some reason so switched to HttpClient instead
                 HttpClient client = new HttpClient() { MaxResponseContentBufferSize = 1000000000 };
 
@@ -58,9 +88,11 @@ namespace OctaneDownloadEngine
                     
                     client.DefaultRequestHeaders.Range = new RangeHeaderValue(previous2, i2);
                     byte[] urlContents = await client.GetByteArrayAsync(URL);
-                    // start each download task and keep track of them for later
-                    Console.WriteLine("start {0},{1}", previous2, i2);
 
+                    // start each download task and keep track of them for later
+                    //Console.WriteLine("start {0},{1}", previous2, i2);
+
+                    bar.progress((int)i, (int)i + (int)(responseLength+partSize));
                     var downloadTask = client.GetByteArrayAsync(URL);
                     asyncTasks.Enqueue(new Tuple<Task<byte[]>, int, int>(downloadTask, previous2, i2));
                     previous = i2;
@@ -77,7 +109,7 @@ namespace OctaneDownloadEngine
                         {
                             var array = await task.Item1;
 
-                            Console.WriteLine("write to file {0},{1}", task.Item2, task.Item3);
+                            //Console.WriteLine("write to file {0},{1}", task.Item2, task.Item3);
 
                             lock (ms)
                             {
@@ -98,6 +130,7 @@ namespace OctaneDownloadEngine
             {
                 ms.Flush();
                 ms.Close();
+                bar.finish();
                 if (callback != null)
                 {
                     callback(ms.ToArray());
