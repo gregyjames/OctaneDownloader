@@ -28,8 +28,8 @@ class tqdm {
         float alpha_ema = 0.1;
 
         std::vector<const char*> bars = {" ", "▏", "▎", "▍", "▋", "▋", "▊", "▉", "▉"};
-        bool in_screen = (system("test $STY") == 0);
-        bool in_tmux = (system("test $TMUX") == 0);
+        bool in_screen = (system("test $STY >nul 2>&1") == 0);
+        bool in_tmux = (system("test $TMUX >nul 2>&1") == 0);
         bool is_tty = _isatty(1);
         bool use_colors = true;
         bool color_transition = true;
