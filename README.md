@@ -1,7 +1,7 @@
 ![alt tag](https://image.ibb.co/h2tK8v/Untitled_1.png)
 
 
-A high Performance C# file downloader that splits files into different parts and downloads each part asyncrounously. Made as a replacement to Microsoft's WebClient.Wanna see the library in action? Check out [Octane YouTube Extractor](https://github.com/gregyjames/OCTANE-YoutubeExtractor)
+A high Performance C# file downloader that asyncrounously downloads files as pieces. Made as a faster, more efficent replacement to Microsoft's WebClient.Want to see the library in action? Check out [Octane YouTube Extractor](https://github.com/gregyjames/OCTANE-YoutubeExtractor)
 
 The progress bar was implemented using my csharp-wrapper for [cpptqdm](https://github.com/aminnj/cpptqdm). It can be found [here](https://github.com/gregyjames/csharp-tqdm)
 
