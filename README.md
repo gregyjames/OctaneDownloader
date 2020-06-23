@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.com/gregyjames/OctaneDownloader.svg?branch=master)](https://travis-ci.com/gregyjames/OctaneDownloader)
+
+
 ![alt tag](https://image.ibb.co/h2tK8v/Untitled_1.png)
 
 
