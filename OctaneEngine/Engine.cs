@@ -17,11 +17,11 @@ namespace OctaneDownloadEngine
             ServicePointManager.DefaultConnectionLimit = 10000;
         }
 
-        public void SplitDownloadArray(string url, double parts, string fileOut, Action<byte[]> callback)
+        public static void SplitDownloadArray(string url, double parts, string fileOut, Action<byte[]> callback)
         {
             try
             {
-                Parallel.Invoke(async () => await DownloadByteArray(url, parts, fileOut, callback));
+                Parallel.Invoke(async () => await DownloadByteArray(url, parts, fileOut, callback).ConfigureAwait(false));
             }
             catch (Exception ex)
             {
@@ -32,7 +32,6 @@ namespace OctaneDownloadEngine
 
         private async static Task DownloadByteArray(string url, double parts, string fileOut, Action<byte[]> callback)
         {
-            if (fileOut == null){throw new ArgumentNullException(nameof(fileOut));}
             if (fileOut == null){throw new ArgumentNullException(nameof(fileOut));}
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
             var partSize = (long)Math.Floor(responseLength / parts);
@@ -78,9 +77,9 @@ namespace OctaneDownloadEngine
                         // as each task completes write the data to the file
                         if (task.Item1.IsCompleted)
                         {
-                            var array = await task.Item1.ConfigureAwait(false); ;
+                            var array = await task.Item1.ConfigureAwait(false);
 
-                            //Console.WriteLine("write to file {0},{1}", task.Item2, task.Item3);
+                            Console.WriteLine("write to file {0},{1}", task.Item2, task.Item3);
 
                             lock (ms)
                             {
