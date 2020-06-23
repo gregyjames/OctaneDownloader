@@ -12,7 +12,7 @@ namespace OctaneDownloadEngine
 {
     public class OctaneEngine
     {
-        public OctaneEngine()
+        protected OctaneEngine()
         {
             ServicePointManager.DefaultConnectionLimit = 10000;
         }
