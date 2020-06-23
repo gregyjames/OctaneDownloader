@@ -42,9 +42,6 @@ namespace OctaneDownloadEngine
 
             var previous = 0;
 
-            //var bar = new tqdm();
-            //bar.set_theme_basic();
-
             var ms = new MemoryStream();
             try
             {
@@ -53,7 +50,7 @@ namespace OctaneDownloadEngine
                 ConcurrentQueue<Tuple<Task<byte[]>, int, int>> asyncTasks = new ConcurrentQueue<Tuple<Task<byte[]>, int, int>>();
                 
                 // GetResponseAsync deadlocks for some reason so switched to HttpClient instead
-                var client = new HttpClient() { MaxResponseContentBufferSize = 1000000000 };
+                var client = new HttpClient{ MaxResponseContentBufferSize = 1000000000 };
 
                 await client.GetByteArrayAsync(url);
                 for (var i = (int)partSize; i < responseLength + partSize; i += (int)partSize)
@@ -65,9 +62,8 @@ namespace OctaneDownloadEngine
                     client.DefaultRequestHeaders.Range = new RangeHeaderValue(previous2, i2);
 
                     // start each download task and keep track of them for later
-                    //Console.WriteLine("start {0},{1}", previous2, i2);
+                    Console.WriteLine("start {0},{1}", previous2, i2);
 
-                    //bar.progress(i, i + (int)(responseLength+partSize));
                     var downloadTask = client.GetByteArrayAsync(url);
                     asyncTasks.Enqueue(new Tuple<Task<byte[]>, int, int>(downloadTask, previous2, i2));
                     previous = i2;
@@ -82,7 +78,7 @@ namespace OctaneDownloadEngine
                         // as each task completes write the data to the file
                         if (task.Item1.IsCompleted)
                         {
-                            var array = await task.Item1;
+                            var array = await task.Item1.ConfigureAwait(false); ;
 
                             //Console.WriteLine("write to file {0},{1}", task.Item2, task.Item3);
 
@@ -105,7 +101,6 @@ namespace OctaneDownloadEngine
             {
                 ms.Flush();
                 ms.Close();
-                //bar.finish();
                 callback?.Invoke(ms.ToArray());
             }
         }

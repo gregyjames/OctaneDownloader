@@ -3,7 +3,7 @@ using System.IO;
 
 namespace OctaneDownloadEngine
 {
-    class Program
+    static class Program
     {
         static void Main()
         {
