@@ -21,7 +21,7 @@ namespace OctaneDownloadEngine
         {
             try
             {
-                Parallel.Invoke(() => DownloadByteArray(url, parts, fileOut, callback));
+                Parallel.Invoke(async () => await DownloadByteArray(url, parts, fileOut, callback));
             }
             catch (Exception ex)
             {
@@ -30,10 +30,10 @@ namespace OctaneDownloadEngine
             }
         }
 
-        private async void DownloadByteArray(string url, double parts, string fileOut, Action<byte[]> callback)
+        private async static Task DownloadByteArray(string url, double parts, string fileOut, Action<byte[]> callback)
         {
-            if (fileOut == null) throw new ArgumentNullException(nameof(fileOut));
-            if (fileOut == null) throw new ArgumentNullException(nameof(fileOut));
+            if (fileOut == null){throw new ArgumentNullException(nameof(fileOut));}
+            if (fileOut == null){throw new ArgumentNullException(nameof(fileOut));}
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
             var partSize = (long)Math.Floor(responseLength / parts);
 
