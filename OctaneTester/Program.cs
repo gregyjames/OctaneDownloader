@@ -5,10 +5,13 @@ namespace OctaneDownloadEngine
 {
     static class Program
     {
+        
         static void Main(){
-        OctaneEngine.SplitDownloadArray("http://www.hdwallpapers.in/walls/tree_snake_hd-wide.jpg", 8, "image.jpg", (x) => {
+        
+        OctaneEngine.SplitDownloadArray("http://www.nasa.gov/sites/default/files/thumbnails/image/hs-2015-02-a-hires_jpg.jpg", 8, (x) => {
+                Console.WriteLine("Writing to file...");
                 File.WriteAllBytes("image.jpg", x);
-                Console.WriteLine("Done!");
+                Console.WriteLine("DONE!");
             });
             
             Console.ReadLine();

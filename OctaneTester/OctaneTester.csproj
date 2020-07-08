@@ -77,9 +77,6 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <AdditionalFiles Include="cpp.dll">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </AdditionalFiles>
     <Content Include="Itzikgur-My-Seven-Downloads-1 %281%29.ico" />
   </ItemGroup>
   <ItemGroup>
