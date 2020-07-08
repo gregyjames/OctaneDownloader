@@ -46,7 +46,7 @@ namespace OctaneDownloadEngine
 
         static int TasksDone = 0;
 
-        private async static Task DownloadByteArray(string url, double parts, Action<byte[]> callback)
+        private async static Task DownloadByteArray(string url, double parts, Action<byte[]> callback, Action<int> progressCallback = null)
         {
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
             var partSize = (long)Math.Floor(responseLength / parts);
@@ -70,15 +70,29 @@ namespace OctaneDownloadEngine
                     {
                         //Tasks done holds the count of the tasks done
                         //Parts *2 because there are parts number of Enqueue AND Dequeue operations
-                        progress.Report(TasksDone / (parts*2));
-                        Thread.Sleep(20);
+                        if (progressCallback == null)
+                        {
+                            progress.Report(TasksDone / (parts * 2));
+                            Thread.Sleep(20);
+                        }
+                        else
+                        {
+                            progressCallback?.Invoke(Convert.ToInt32(TasksDone / (parts * 2)));
+                        }
                     };
 
                     //Delagate for Enqueue
                     asyncTasks.ItemEnqueued += delegate
                     {
-                        progress.Report(TasksDone / (parts * 2));
-                        Thread.Sleep(20);
+                        if (progressCallback == null)
+                        {
+                            progress.Report(TasksDone / (parts * 2));
+                            Thread.Sleep(20);
+                        }
+                        else
+                        {
+                            progressCallback?.Invoke(Convert.ToInt32(TasksDone / (parts * 2)));
+                        }
                     };
 
                     // GetResponseAsync deadlocks for some reason so switched to HttpClient instead
@@ -89,6 +103,7 @@ namespace OctaneDownloadEngine
                     //Variable to hold the old loop end
                     var previous = 0;
 
+                    var pieces = new List<FileChunk>();
                     //Loop to add all the events to the queue
                     for (var i = (int) partSize; i <= responseLength; i += (int) partSize)
                     {
@@ -96,9 +111,17 @@ namespace OctaneDownloadEngine
                         var start = previous;
                         var current_end = i;
 
+                        pieces.Add(new FileChunk(start, current_end));
+
+                        //Set the start of the next loop to be the current end
+                        previous = current_end;
+                    }
+
+                    Parallel.ForEach(pieces, piece =>
+                    {
                         //Open a http request with the range
-                        var request = new HttpRequestMessage {RequestUri = new Uri(url)};
-                        request.Headers.Range = new RangeHeaderValue(start, current_end);
+                        var request = new HttpRequestMessage { RequestUri = new Uri(url) };
+                        request.Headers.Range = new RangeHeaderValue(piece.start, piece.end);
 
                         //Send the request
                         var downloadTask = client.SendAsync(request);
@@ -106,15 +129,11 @@ namespace OctaneDownloadEngine
                         //Add the task to the queue along with the start and end value
                         asyncTasks.Enqueue(
                             new Tuple<Task<byte[]>, int, int>(downloadTask.Result.Content.ReadAsByteArrayAsync(),
-                                start, current_end));
+                                piece.start, piece.end));
 
                         //Use interlocked to increment Tasks done by one
                         Interlocked.Add(ref OctaneEngine.TasksDone, 1);
-
-                        //Set the start of the next loop to be the current end
-                        previous = current_end;
-                    }
-
+                    });
                     // now that all the downloads are started, we can await the results
                     // loop through looking for a completed task in case they complete out of order
                     while (asyncTasks.Count > 0)
