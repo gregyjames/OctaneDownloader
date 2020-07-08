@@ -7,7 +7,10 @@
 
 A high Performance C# file downloader that asyncrounously downloads files as pieces. Made as a faster, more efficent replacement to Microsoft's WebClient.Want to see the library in action? Check out [Octane YouTube Extractor](https://github.com/gregyjames/OCTANE-YoutubeExtractor)
 
-The progress bar was implemented using my csharp-wrapper for [cpptqdm](https://github.com/aminnj/cpptqdm). It can be found [here](https://github.com/gregyjames/csharp-tqdm)
+# Features
+* Multipart Downloading
+* Download Retry
+* Progress
 
 # License
 The MIT License (MIT)
