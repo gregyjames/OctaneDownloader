@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -46,10 +48,35 @@ namespace OctaneDownloadEngine
 
         static int TasksDone = 0;
 
+        private static void CombineMultipleFilesIntoSingleFile(string inputDirectoryPath, IEnumerable<FileChunk> files, string outputFilePath)
+        {
+            var _files = files.Select(chunk => chunk._tempfilename).ToArray();
+            
+            Console.WriteLine("Number of files: {0}.", _files.Length);
+            using (var outputStream = File.Create(outputFilePath))
+            {
+                foreach (var inputFilePath in _files)
+                {
+                    using (var inputStream = new BinaryWriter(File.OpenWrite(inputFilePath)))
+                    {
+                        // Buffer size can be passed as the second argument.
+                        //inputStream.CopyTo(outputStream, files.First().end - files.First().start);
+                        var s = File.Open(inputFilePath, FileMode.Open);
+                        var bytes = new byte[s.Length];
+                        var buffer = s.Read(bytes , 0, files.First().end-files.First().start);
+                        inputStream.Write(buffer);
+                    }
+                    Console.WriteLine("The file {0} has been processed.", inputFilePath);
+                    //File.Delete(inputFilePath);
+                }
+            }
+        }
+
         private async static Task DownloadByteArray(string url, double parts, Action<byte[]> callback, Action<int> progressCallback = null)
         {
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
             var partSize = (long)Math.Floor(responseLength / parts);
+            var pieces = new List<FileChunk>();
 
             Console.WriteLine(responseLength.ToString(CultureInfo.InvariantCulture) + " TOTAL SIZE");
             Console.WriteLine(partSize.ToString(CultureInfo.InvariantCulture) + " PART SIZE" + "\n");
@@ -63,7 +90,7 @@ namespace OctaneDownloadEngine
                     ms.SetLength(responseLength);
 
                     //Using custom concurrent queue to implement Enqueue and Dequeue Events
-                    var asyncTasks = new EventfulConcurrentQueue<Tuple<Task<byte[]>, int, int>>();
+                    var asyncTasks = new EventfulConcurrentQueue<Tuple<Task<Stream>, FileChunk>>();
 
                     //Delegate for Dequeue
                     asyncTasks.ItemDequeued += delegate
@@ -103,9 +130,8 @@ namespace OctaneDownloadEngine
                     //Variable to hold the old loop end
                     var previous = 0;
 
-                    var pieces = new List<FileChunk>();
                     //Loop to add all the events to the queue
-                    for (var i = (int) partSize; i <= responseLength; i += (int) partSize)
+                    for (var i = (int) partSize; i < responseLength; i += (int) partSize)
                     {
                         //Start and end values for the chunk
                         var start = previous;
@@ -124,15 +150,15 @@ namespace OctaneDownloadEngine
                         request.Headers.Range = new RangeHeaderValue(piece.start, piece.end);
 
                         //Send the request
-                        var downloadTask = client.SendAsync(request);
-
-                        //Add the task to the queue along with the start and end value
-                        asyncTasks.Enqueue(
-                            new Tuple<Task<byte[]>, int, int>(downloadTask.Result.Content.ReadAsByteArrayAsync(),
-                                piece.start, piece.end));
+                        var downloadTask = client.SendAsync(request).Result;
 
                         //Use interlocked to increment Tasks done by one
                         Interlocked.Add(ref OctaneEngine.TasksDone, 1);
+
+                        //Add the task to the queue along with the start and end value
+                        asyncTasks.Enqueue(
+                            new Tuple<Task<Stream>, FileChunk>(downloadTask.Content.ReadAsStreamAsync(),
+                                piece));
                     });
                     // now that all the downloads are started, we can await the results
                     // loop through looking for a completed task in case they complete out of order
@@ -141,19 +167,25 @@ namespace OctaneDownloadEngine
                         Parallel.ForEach(asyncTasks.Queue, async (task, state) =>
                         {
                             // as each task completes write the data to the file
-                            if (task.Item1.IsCompleted)
-                            {
-                                var array = await task.Item1.ConfigureAwait(false);
+                            //if (task.Item1.IsCompleted)
+                            //{
+                                //var array = await task.Item1.ConfigureAwait(false);
+                                //lock (ms)
+                                //{
 
-                                lock (ms)
+                                using (FileStream fs = new FileStream(task.Item2._tempfilename, FileMode.OpenOrCreate, FileAccess.Write))
                                 {
-                                    ms.Position = task.Item2;
-                                    ms.Write(array, 0, array.Length);
-                                    asyncTasks.TryDequeue(out task);
-                                    Interlocked.Add(ref TasksDone, 1);
+                                    //lock (fs) 
+                                    //{ 
+                                        task.Item1.Result.CopyToAsync(fs).Wait();
+                                    //}
                                 }
 
-                            }
+                                asyncTasks.TryDequeue(out task);
+                                Interlocked.Add(ref TasksDone, 1);
+                                //}
+
+                            //}
                         });
                     }
                 }
@@ -164,9 +196,10 @@ namespace OctaneDownloadEngine
             }
             finally
             {
-                ms.Flush();
-                ms.Close();
-                callback?.Invoke(ms.ToArray());
+                CombineMultipleFilesIntoSingleFile(Directory.GetCurrentDirectory(), pieces, "image2.jpg");
+                //ms.Flush();
+                //ms.Close();
+                //callback?.Invoke(ms.ToArray());
             }
         }
     }
