@@ -1,9 +1,13 @@
-﻿namespace OctaneDownloadEngine
+﻿using System;
+
+namespace OctaneDownloadEngine
 {
     class FileChunk
     {
         public int start { get; set; }
         public int end { get; set; }
+
+        public string _tempfilename;
 
         public FileChunk(){}
 
@@ -11,6 +15,7 @@
         {
             start = startByte;
             end = endByte;
+            _tempfilename = Guid.NewGuid().ToString();
         }
     }
 }
