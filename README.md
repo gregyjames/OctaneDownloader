@@ -5,7 +5,7 @@
 ![alt tag](https://image.ibb.co/h2tK8v/Untitled_1.png)
 
 
-A high Performance C# file downloader that asyncrounously downloads files as pieces. Made as a faster, more efficent replacement to Microsoft's WebClient.Want to see the library in action? Check out [Octane YouTube Extractor](https://github.com/gregyjames/OCTANE-YoutubeExtractor)
+A high Performance C# file downloading library that asynchronously downloads files as pieces. Made as a faster, more efficient replacement to Microsoft's WebClient. Want to see the library in action? Check out [Octane YouTube Extractor](https://github.com/gregyjames/OCTANE-YoutubeExtractor)
 
 # Features
 * Multipart Downloading
