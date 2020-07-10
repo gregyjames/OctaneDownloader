@@ -74,7 +74,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <PostBuildEvent>ren $(TargetDir)OctaneEngine.dll Octane.dll
-$(ILMergeConsolePath) /out:$(TargetFileName) /target:library Octane.dll System.Threading.Tasks.Dataflow.dll
+$(ILMergeConsolePath) /out:$(TargetFileName) /target:library /wildcards *.dll
 del $(TargetDir)Octane.dll
 del $(TargetDir)System.Threading.Tasks.Dataflow.dll
 del *.pdb

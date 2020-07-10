@@ -81,6 +81,9 @@ namespace OctaneDownloadEngine
                             //Use our custom Retry handler, with a max retry value of 10
                             new RetryHandler(new HttpClientHandler(), 10)) {MaxResponseContentBufferSize = 1000000000};
 
+                        client.DefaultRequestHeaders.ConnectionClose = false;
+                        client.Timeout = Timeout.InfiniteTimeSpan;
+
                         //Variable to hold the old loop end
                         var previous = 0;
 
@@ -285,6 +288,10 @@ namespace OctaneDownloadEngine
                             new RetryHandler(new HttpClientHandler(), 10))
                         {MaxResponseContentBufferSize = 1000000000};
 
+                    //client.MaxResponseContentBufferSize = partSize;
+                    client.DefaultRequestHeaders.ConnectionClose = false;
+                    client.Timeout = Timeout.InfiniteTimeSpan;
+
                     //Variable to hold the old loop end
                     var previous = 0;
 
@@ -323,10 +330,11 @@ namespace OctaneDownloadEngine
                             Console.Title = "STREAMING....";
                             //Open a http request with the range
                             var request = new HttpRequestMessage {RequestUri = new Uri(url)};
+                            request.Headers.ConnectionClose = false;
                             request.Headers.Range = new RangeHeaderValue(piece.start, piece.end);
 
                             //Send the request
-                            var downloadTask = client.SendAsync(request, HttpCompletionOption.ResponseContentRead);
+                            var downloadTask = client.SendAsync(request, HttpCompletionOption.ResponseContentRead, CancellationToken.None);
 
                             //Use interlocked to increment Tasks done by one
                             Interlocked.Add(ref TasksDone, 1);
@@ -335,7 +343,7 @@ namespace OctaneDownloadEngine
                             return new Tuple<Task<HttpResponseMessage>, FileChunk>(downloadTask, piece);
                         }, new ExecutionDataflowBlockOptions
                         {
-                            BoundedCapacity = (int) parts, // Cap the item count
+                            BoundedCapacity = Environment.ProcessorCount, // Cap the item count
                             MaxDegreeOfParallelism = Environment.ProcessorCount, // Parallelize on all cores
                         }
                     );
@@ -347,16 +355,18 @@ namespace OctaneDownloadEngine
                             using (var fileToWriteTo = File.Open(task.Item2._tempfilename, FileMode.OpenOrCreate,
                                 FileAccess.ReadWrite, FileShare.ReadWrite))
                             {
-                                await streamToRead.CopyToAsync(fileToWriteTo);
-                                var s = new FileChunk();
-                                asyncTasks.TryDequeue(out s);
-                                Interlocked.Add(ref TasksDone, 1);
+                                await streamToRead.CopyToAsync(fileToWriteTo).ContinueWith(task1 =>
+                                {
+                                    var s = new FileChunk();
+                                    Interlocked.Add(ref TasksDone, 1);
+                                    asyncTasks.TryDequeue(out s);
+                                }, CancellationToken.None,TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Current);
                             }
                         }
                     }, new ExecutionDataflowBlockOptions
                     {
-                        BoundedCapacity = (int) parts, // Cap the item count
-                        MaxDegreeOfParallelism = DataflowBlockOptions.Unbounded, // Parallelize on all cores
+                        BoundedCapacity = Environment.ProcessorCount, // Cap the item count
+                        MaxDegreeOfParallelism = Environment.ProcessorCount, // Parallelize on all cores
                     });
 
                     //Propage errors and completion
@@ -365,23 +375,27 @@ namespace OctaneDownloadEngine
                     getStream.LinkTo(writeStream, linkOptions);
 
                     //Start every piece in pieces in parallel fashion
-                    Parallel.ForEach(pieces, async (chunk) => { await getStream.SendAsync(chunk); });
-
-                    //Wait for all the streams to be recieved
-                    getStream.Complete();
-                    //Write all the streams
-                    await writeStream.Completion;
-
-                    //If all the tasks are done, Join the temp files
-                    if (asyncTasks.Count == 0)
+                    Parallel.ForEach(pieces, async (chunk) =>
                     {
-                        CombineMultipleFilesIntoSingleFile(pieces, filename);
-                    }
+                        await getStream.SendAsync(chunk);
+                        //Wait for all the streams to be recieved
+                        getStream.Complete();
+                    });
+
+                    //Write all the streams
+                    await writeStream.Completion.ContinueWith(task =>
+                    {
+                        //If all the tasks are done, Join the temp files
+                        if (asyncTasks.Count == 0)
+                        {
+                            CombineMultipleFilesIntoSingleFile(pieces, filename);
+                        }
+                    }, CancellationToken.None,TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Current);
                 }
 
                 //Restore the original title
                 Console.Title = defaultTitle;
-            }
+        }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
@@ -393,9 +407,7 @@ namespace OctaneDownloadEngine
                     {
                         File.Delete(piece._tempfilename);
                     }
-                    catch (FileNotFoundException)
-                    {
-                    }
+                    catch (FileNotFoundException) { }
                 }
             }
         }
