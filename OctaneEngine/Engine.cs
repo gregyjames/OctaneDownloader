@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -7,8 +6,9 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Threading.Tasks;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 
 // ReSharper disable All
 
@@ -21,172 +21,157 @@ namespace OctaneDownloadEngine
             ServicePointManager.DefaultConnectionLimit = 10000;
         }
 
-        public static async void SplitDownloadArray(string url, double parts, Action<byte[]> callback)
-        {
-            try
-            {
-                await DownloadByteArray(url, parts, callback).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine(ex);
-                throw;
-            }
-        }
-
-        public static void SplitDownloadArray(string[] urls, double parts, Action<byte[]> callback)
-        {
-            var tasks = new List<Task>();
-
-            Parallel.ForEach(urls, url =>
-            {
-                tasks.Add(DownloadByteArray(url, parts, callback));
-            });
-
-            Task.WaitAll(tasks.ToArray());
-        }
-
         static int TasksDone = 0;
 
-        private static void CombineMultipleFilesIntoSingleFile(string inputDirectoryPath, IEnumerable<FileChunk> files, string outputFilePath)
-        {
-            var _files = files.Select(chunk => chunk._tempfilename).ToArray();
-            
-            Console.WriteLine("Number of files: {0}.", _files.Length);
-            using (var outputStream = File.Create(outputFilePath))
-            {
-                foreach (var inputFilePath in _files)
-                {
-                    using (var inputStream = new BinaryWriter(File.OpenWrite(inputFilePath)))
-                    {
-                        // Buffer size can be passed as the second argument.
-                        //inputStream.CopyTo(outputStream, files.First().end - files.First().start);
-                        var s = File.Open(inputFilePath, FileMode.Open);
-                        var bytes = new byte[s.Length];
-                        var buffer = s.Read(bytes , 0, files.First().end-files.First().start);
-                        inputStream.Write(buffer);
-                    }
-                    Console.WriteLine("The file {0} has been processed.", inputFilePath);
-                    //File.Delete(inputFilePath);
-                }
-            }
-        }
-
-        private async static Task DownloadByteArray(string url, double parts, Action<byte[]> callback, Action<int> progressCallback = null)
+        public async static void DownloadByteArray(string url, double parts, Action<byte[]> callback,
+            Action<int> progressCallback = null)
         {
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
-            var partSize = (long)Math.Floor(responseLength / parts);
+            var partSize = (long) Math.Floor(responseLength / parts);
             var pieces = new List<FileChunk>();
 
             Console.WriteLine(responseLength.ToString(CultureInfo.InvariantCulture) + " TOTAL SIZE");
             Console.WriteLine(partSize.ToString(CultureInfo.InvariantCulture) + " PART SIZE" + "\n");
 
-            var ms = new MemoryStream();
+
             try
             {
                 //Using our custom progressbar
                 using (var progress = new ProgressBar())
                 {
-                    ms.SetLength(responseLength);
-
-                    //Using custom concurrent queue to implement Enqueue and Dequeue Events
-                    var asyncTasks = new EventfulConcurrentQueue<Tuple<Task<Stream>, FileChunk>>();
-
-                    //Delegate for Dequeue
-                    asyncTasks.ItemDequeued += delegate
+                    using (var ms = new MemoryStream())
                     {
-                        //Tasks done holds the count of the tasks done
-                        //Parts *2 because there are parts number of Enqueue AND Dequeue operations
-                        if (progressCallback == null)
+                        ms.SetLength(responseLength);
+
+                        //Using custom concurrent queue to implement Enqueue and Dequeue Events
+                        var asyncTasks = new EventfulConcurrentQueue<FileChunk>();
+
+                        //Delegate for Dequeue
+                        asyncTasks.ItemDequeued += delegate
                         {
-                            progress.Report(TasksDone / (parts * 2));
-                            Thread.Sleep(20);
+                            //Tasks done holds the count of the tasks done
+                            //Parts *2 because there are parts number of Enqueue AND Dequeue operations
+                            if (progressCallback == null)
+                            {
+                                progress.Report(TasksDone / (parts * 2));
+                                Thread.Sleep(20);
+                            }
+                            else
+                            {
+                                progressCallback?.Invoke(Convert.ToInt32(TasksDone / (parts * 2)));
+                            }
+                        };
+
+                        //Delagate for Enqueue
+                        asyncTasks.ItemEnqueued += delegate
+                        {
+                            if (progressCallback == null)
+                            {
+                                progress.Report(TasksDone / (parts * 2));
+                                Thread.Sleep(20);
+                            }
+                            else
+                            {
+                                progressCallback?.Invoke(Convert.ToInt32(TasksDone / (parts * 2)));
+                            }
+                        };
+
+                        // GetResponseAsync deadlocks for some reason so switched to HttpClient instead
+                        var client = new HttpClient(
+                            //Use our custom Retry handler, with a max retry value of 10
+                            new RetryHandler(new HttpClientHandler(), 10)) {MaxResponseContentBufferSize = 1000000000};
+
+                        //Variable to hold the old loop end
+                        var previous = 0;
+
+                        //Loop to add all the events to the queue
+                        for (var i = (int) partSize; i <= responseLength; i += (int) partSize)
+                        {
+                            Console.Title = "WRITING CHUNKS...";
+                            if (i + partSize < responseLength)
+                            {
+                                //Start and end values for the chunk
+                                var start = previous;
+                                var current_end = i;
+
+                                pieces.Add(new FileChunk(start, current_end));
+
+                                //Set the start of the next loop to be the current end
+                                previous = current_end;
+                            }
+                            else
+                            {
+                                //Start and end values for the chunk
+                                var start = previous;
+                                var current_end = i;
+
+                                pieces.Add(new FileChunk(start, (int) responseLength));
+
+                                //Set the start of the next loop to be the current end
+                                previous = current_end;
+                            }
                         }
-                        else
-                        {
-                            progressCallback?.Invoke(Convert.ToInt32(TasksDone / (parts * 2)));
-                        }
-                    };
 
-                    //Delagate for Enqueue
-                    asyncTasks.ItemEnqueued += delegate
-                    {
-                        if (progressCallback == null)
-                        {
-                            progress.Report(TasksDone / (parts * 2));
-                            Thread.Sleep(20);
-                        }
-                        else
-                        {
-                            progressCallback?.Invoke(Convert.ToInt32(TasksDone / (parts * 2)));
-                        }
-                    };
+                        var getStream = new TransformBlock<FileChunk, Tuple<Task<HttpResponseMessage>, FileChunk>>(
+                            piece =>
+                            {
+                                Console.Title = "STREAMING....";
+                                //Open a http request with the range
+                                var request = new HttpRequestMessage {RequestUri = new Uri(url)};
+                                request.Headers.Range = new RangeHeaderValue(piece.start, piece.end);
 
-                    // GetResponseAsync deadlocks for some reason so switched to HttpClient instead
-                    var client = new HttpClient(
-                        //Use our custom Retry handler, with a max retry value of 10
-                        new RetryHandler(new HttpClientHandler(), 10)) {MaxResponseContentBufferSize = 1000000000};
+                                //Send the request
+                                var downloadTask = client.SendAsync(request, HttpCompletionOption.ResponseContentRead);
 
-                    //Variable to hold the old loop end
-                    var previous = 0;
-
-                    //Loop to add all the events to the queue
-                    for (var i = (int) partSize; i < responseLength; i += (int) partSize)
-                    {
-                        //Start and end values for the chunk
-                        var start = previous;
-                        var current_end = i;
-
-                        pieces.Add(new FileChunk(start, current_end));
-
-                        //Set the start of the next loop to be the current end
-                        previous = current_end;
-                    }
-
-                    Parallel.ForEach(pieces, piece =>
-                    {
-                        //Open a http request with the range
-                        var request = new HttpRequestMessage { RequestUri = new Uri(url) };
-                        request.Headers.Range = new RangeHeaderValue(piece.start, piece.end);
-
-                        //Send the request
-                        var downloadTask = client.SendAsync(request).Result;
-
-                        //Use interlocked to increment Tasks done by one
-                        Interlocked.Add(ref OctaneEngine.TasksDone, 1);
-
-                        //Add the task to the queue along with the start and end value
-                        asyncTasks.Enqueue(
-                            new Tuple<Task<Stream>, FileChunk>(downloadTask.Content.ReadAsStreamAsync(),
-                                piece));
-                    });
-                    // now that all the downloads are started, we can await the results
-                    // loop through looking for a completed task in case they complete out of order
-                    while (asyncTasks.Count > 0)
-                    {
-                        Parallel.ForEach(asyncTasks.Queue, async (task, state) =>
-                        {
-                            // as each task completes write the data to the file
-                            //if (task.Item1.IsCompleted)
-                            //{
-                                //var array = await task.Item1.ConfigureAwait(false);
-                                //lock (ms)
-                                //{
-
-                                using (FileStream fs = new FileStream(task.Item2._tempfilename, FileMode.OpenOrCreate, FileAccess.Write))
-                                {
-                                    //lock (fs) 
-                                    //{ 
-                                        task.Item1.Result.CopyToAsync(fs).Wait();
-                                    //}
-                                }
-
-                                asyncTasks.TryDequeue(out task);
+                                //Use interlocked to increment Tasks done by one
                                 Interlocked.Add(ref TasksDone, 1);
-                                //}
+                                asyncTasks.Enqueue(piece);
 
-                            //}
+                                return new Tuple<Task<HttpResponseMessage>, FileChunk>(downloadTask, piece);
+                            }, new ExecutionDataflowBlockOptions
+                            {
+                                BoundedCapacity = (int) parts, // Cap the item count
+                                MaxDegreeOfParallelism = Environment.ProcessorCount, // Parallelize on all cores
+                            }
+                        );
+
+                        var writeStream = new ActionBlock<Tuple<Task<HttpResponseMessage>, FileChunk>>(async tuple =>
+                        {
+                            var buffer = new byte[tuple.Item2.end - tuple.Item2.start];
+                            using (var stream = await tuple.Item1.Result.Content.ReadAsStreamAsync())
+                            {
+                                await stream.ReadAsync(buffer, 0, buffer.Length);
+                            }
+
+                            lock (ms)
+                            {
+                                ms.Position = tuple.Item2.start;
+                                ms.Write(buffer, 0, buffer.Length);
+                            }
+
+                            var s = new FileChunk();
+                            asyncTasks.TryDequeue(out s);
+                            Interlocked.Add(ref TasksDone, 1);
+                        }, new ExecutionDataflowBlockOptions
+                        {
+                            BoundedCapacity = (int) parts, // Cap the item count
+                            MaxDegreeOfParallelism = Environment.ProcessorCount, // Parallelize on all cores
                         });
+
+                        var linkOptions = new DataflowLinkOptions {PropagateCompletion = true};
+                        getStream.LinkTo(writeStream, linkOptions);
+
+                        Parallel.ForEach(pieces, async (chunk) => { await getStream.SendAsync(chunk); });
+
+                        getStream.Complete();
+                        await writeStream.Completion;
+
+                        if (asyncTasks.Count == 0)
+                        {
+                            ms.Flush();
+                            ms.Close();
+                            callback?.Invoke(ms.ToArray());
+                        }
                     }
                 }
             }
@@ -194,18 +179,11 @@ namespace OctaneDownloadEngine
             {
                 Console.WriteLine(ex.Message);
             }
-            finally
-            {
-                CombineMultipleFilesIntoSingleFile(Directory.GetCurrentDirectory(), pieces, "image2.jpg");
-                //ms.Flush();
-                //ms.Close();
-                //callback?.Invoke(ms.ToArray());
-            }
         }
 
-        private static void CombineMultipleFilesIntoSingleFile(string inputDirectoryPath, List<FileChunk> files, string outputFilePath)
+        private static void CombineMultipleFilesIntoSingleFile(List<FileChunk> files, string outputFilePath)
         {
-            Console.WriteLine("Number of files: {0}.", files.Count);
+            Console.Title = string.Format("Number of files: {0}.", files.Count);
             using (var outputStream = File.Create(outputFilePath))
             {
                 foreach (var inputFilePath in files)
@@ -216,20 +194,52 @@ namespace OctaneDownloadEngine
                         outputStream.Position = inputFilePath.start;
                         inputStream.CopyTo(outputStream);
                     }
-                    Console.WriteLine("The file has been processed from {0} to {1}.", inputFilePath.start, inputFilePath.end);
+
+                    Console.Title = string.Format("The file has been processed from {0} to {1}.", inputFilePath.start,
+                        inputFilePath.end);
                     File.Delete(inputFilePath._tempfilename);
                 }
             }
         }
 
-        public async static Task DownloadFile(string url, double parts, string outFile, Action<int> progressCallback = null)
+        public static bool IsFileReady(string filename)
+        {
+            // If the file can be opened for exclusive access it means that the file
+            // is no longer locked by another process.
+            try
+            {
+                using (FileStream inputStream = File.Open(filename, FileMode.Open, FileAccess.Read, FileShare.None))
+                    return inputStream.Length > 0;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        public async static Task DownloadFile(string url, double parts, string outFile = null,
+            Action<int> progressCallback = null)
         {
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
-            var partSize = (long)Math.Round(responseLength / parts);
+            var partSize = (long) Math.Round(responseLength / parts);
             var pieces = new List<FileChunk>();
 
             Console.WriteLine(responseLength.ToString(CultureInfo.InvariantCulture) + " TOTAL SIZE");
             Console.WriteLine(partSize.ToString(CultureInfo.InvariantCulture) + " PART SIZE" + "\n");
+
+            var filename = outFile;
+
+            var defaultTitle = Console.Title;
+            var uri = new Uri(url);
+
+            if (outFile == null)
+            {
+                filename = Path.GetFileName(uri.LocalPath);
+            }
+            else
+            {
+                filename = outFile;
+            }
 
             try
             {
@@ -237,7 +247,7 @@ namespace OctaneDownloadEngine
                 using (var progress = new ProgressBar())
                 {
                     //Using custom concurrent queue to implement Enqueue and Dequeue Events
-                    var asyncTasks = new EventfulConcurrentQueue<Tuple<Task, FileChunk>>();
+                    var asyncTasks = new EventfulConcurrentQueue<FileChunk>();
 
                     //Delegate for Dequeue
                     asyncTasks.ItemDequeued += delegate
@@ -271,16 +281,17 @@ namespace OctaneDownloadEngine
 
                     // GetResponseAsync deadlocks for some reason so switched to HttpClient instead
                     var client = new HttpClient(
-                        //Use our custom Retry handler, with a max retry value of 10
-                        new RetryHandler(new HttpClientHandler(), 10))
-                    { MaxResponseContentBufferSize = 1000000000 };
+                            //Use our custom Retry handler, with a max retry value of 10
+                            new RetryHandler(new HttpClientHandler(), 10))
+                        {MaxResponseContentBufferSize = 1000000000};
 
                     //Variable to hold the old loop end
                     var previous = 0;
 
                     //Loop to add all the events to the queue
-                    for (var i = (int)partSize; i < responseLength; i += (int)partSize)
+                    for (var i = (int) partSize; i <= responseLength; i += (int) partSize)
                     {
+                        Console.Title = "WRITING CHUNKS...";
                         if (i + partSize < responseLength)
                         {
                             //Start and end values for the chunk
@@ -298,56 +309,104 @@ namespace OctaneDownloadEngine
                             var start = previous;
                             var current_end = i;
 
-                            pieces.Add(new FileChunk(start, (int)responseLength));
+                            pieces.Add(new FileChunk(start, (int) responseLength));
 
                             //Set the start of the next loop to be the current end
                             previous = current_end;
                         }
                     }
 
-                    Parallel.ForEach(pieces, piece =>
+                    Console.Title = "CHUNKS DONE";
+
+                    var getStream = new TransformBlock<FileChunk, Tuple<Task<HttpResponseMessage>, FileChunk>>(piece =>
+                        {
+                            Console.Title = "STREAMING....";
+                            //Open a http request with the range
+                            var request = new HttpRequestMessage {RequestUri = new Uri(url)};
+                            request.Headers.Range = new RangeHeaderValue(piece.start, piece.end);
+
+                            //Send the request
+                            var downloadTask = client.SendAsync(request, HttpCompletionOption.ResponseContentRead);
+
+                            //Use interlocked to increment Tasks done by one
+                            Interlocked.Add(ref TasksDone, 1);
+                            asyncTasks.Enqueue(piece);
+
+                            return new Tuple<Task<HttpResponseMessage>, FileChunk>(downloadTask, piece);
+                        }, new ExecutionDataflowBlockOptions
+                        {
+                            BoundedCapacity = (int) parts, // Cap the item count
+                            MaxDegreeOfParallelism = Environment.ProcessorCount, // Parallelize on all cores
+                        }
+                    );
+
+                    var writeStream = new ActionBlock<Tuple<Task<HttpResponseMessage>, FileChunk>>(async task =>
                     {
-                        //Open a http request with the range
-                        var request = new HttpRequestMessage { RequestUri = new Uri(url) };
-                        request.Headers.Range = new RangeHeaderValue(piece.start, piece.end);
-
-                        //Send the request
-                        var downloadTask = client.SendAsync(request).Result;
-
-                        //Use interlocked to increment Tasks done by one
-                        Interlocked.Add(ref OctaneEngine.TasksDone, 1);
-
-                        //Add the task to the queue along with the start and end value
-                        asyncTasks.Enqueue(new Tuple<Task, FileChunk>(downloadTask.Content.ReadAsStreamAsync().ContinueWith(
-                            task =>
+                        using (var streamToRead = await task.Item1.Result.Content.ReadAsStreamAsync())
+                        {
+                            using (var fileToWriteTo = File.Open(task.Item2._tempfilename, FileMode.OpenOrCreate,
+                                FileAccess.ReadWrite, FileShare.ReadWrite))
                             {
-                                using (var fs = new FileStream(piece._tempfilename, FileMode.OpenOrCreate,
-                                    FileAccess.Write))
-                                {
-                                    task.Result.CopyTo(fs);
-                                }
-                            }), piece));
+                                await streamToRead.CopyToAsync(fileToWriteTo);
+                                var s = new FileChunk();
+                                asyncTasks.TryDequeue(out s);
+                                Interlocked.Add(ref TasksDone, 1);
+                            }
+                        }
+                    }, new ExecutionDataflowBlockOptions
+                    {
+                        BoundedCapacity = (int) parts, // Cap the item count
+                        MaxDegreeOfParallelism = DataflowBlockOptions.Unbounded, // Parallelize on all cores
                     });
 
-                    while (asyncTasks.Count > 0)
+                    //Propage errors and completion
+                    var linkOptions = new DataflowLinkOptions {PropagateCompletion = true};
+                    //Write the block ass soon as the stream is recieved
+                    getStream.LinkTo(writeStream, linkOptions);
+
+                    //Start every piece in pieces in parallel fashion
+                    Parallel.ForEach(pieces, async (chunk) => { await getStream.SendAsync(chunk); });
+
+                    //Wait for all the streams to be recieved
+                    getStream.Complete();
+                    //Write all the streams
+                    await writeStream.Completion;
+
+                    //If all the tasks are done, Join the temp files
+                    if (asyncTasks.Count == 0)
                     {
-                        Parallel.ForEach(asyncTasks.Queue, async (task, state) =>
-                        {
-                            task.Item1.Wait();
-                            asyncTasks.TryDequeue(out task);
-                            Interlocked.Add(ref TasksDone, 1);
-                        });
+                        CombineMultipleFilesIntoSingleFile(pieces, filename);
                     }
                 }
+
+                //Restore the original title
+                Console.Title = defaultTitle;
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
+
+                //Delete the tempfiles if there's an error
+                foreach (var piece in pieces)
+                {
+                    try
+                    {
+                        File.Delete(piece._tempfilename);
+                    }
+                    catch (FileNotFoundException)
+                    {
+                    }
+                }
             }
-            finally
+        }
+
+        public async static Task DownloadFiles(List<string> urls, List<string> outfiles, double parts,
+            Action<int> progressCallback = null)
+        {
+            Parallel.For(0, urls.Count(), async i =>
             {
-                CombineMultipleFilesIntoSingleFile(Directory.GetCurrentDirectory(), pieces, outFile);
-            }
+                await DownloadFile(urls[i], parts, outfiles[i], progressCallback);
+            });
         }
     }
 }

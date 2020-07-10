@@ -1,5 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\packages\ILMerge.3.0.41\build\ILMerge.props" Condition="Exists('..\packages\ILMerge.3.0.41\build\ILMerge.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -27,6 +28,8 @@
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -36,10 +39,11 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
+    <WarningLevel>0</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <UseVSHostingProcess>false</UseVSHostingProcess>
+    <LangVersion>7.1</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -49,15 +53,20 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <LangVersion>7.1</LangVersion>
   </PropertyGroup>
-  <PropertyGroup>
-    <NoWin32Manifest>true</NoWin32Manifest>
-  </PropertyGroup>
+  <PropertyGroup />
   <PropertyGroup>
     <ApplicationIcon>Itzikgur-My-Seven-Downloads-1 %281%29.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup>
     <SignManifests>false</SignManifests>
+  </PropertyGroup>
+  <PropertyGroup>
+    <NoWin32Manifest>true</NoWin32Manifest>
+  </PropertyGroup>
+  <PropertyGroup>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="OctaneEngine">
@@ -75,6 +84,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Itzikgur-My-Seven-Downloads-1 %281%29.ico" />
@@ -100,6 +110,23 @@
     <WCFMetadata Include="Service References\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>$(ILMergeConsolePath) /out:$(TargetDir)OctaneDownloadEngine_X.exe $(TargetPath) $(TargetDir)OctaneEngine.dll
+del $(TargetPath)
+del $(TargetDir)OctaneEngine.dll
+del $(TargetDir)System.Threading.Tasks.Dataflow.dll
+del *.pdb
+del *.xml
+del *.config
+del *.dll
+ren OctaneDownloadEngine_X.exe $(TargetFileName)</PostBuildEvent>
+  </PropertyGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\ILMerge.3.0.41\build\ILMerge.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\ILMerge.3.0.41\build\ILMerge.props'))" />
+  </Target>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
