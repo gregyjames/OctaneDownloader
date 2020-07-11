@@ -16,6 +16,7 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Pp]ackages/
+*.exe
 
 # Visual Studio 2015 cache/options directory
 .vs/

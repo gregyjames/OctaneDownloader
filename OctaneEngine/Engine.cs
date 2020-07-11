@@ -29,7 +29,14 @@ namespace OctaneDownloadEngine
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
             var partSize = (long) Math.Floor(responseLength / parts);
             var pieces = new List<FileChunk>();
+            int maxworkerThreads;
+            int maxconcurrentActiveRequests;
 
+            ThreadPool.GetMaxThreads(out maxworkerThreads,
+                out maxconcurrentActiveRequests);
+
+            bool changeSucceeded = ThreadPool.SetMaxThreads(
+                maxworkerThreads, maxconcurrentActiveRequests);
             Console.WriteLine(responseLength.ToString(CultureInfo.InvariantCulture) + " TOTAL SIZE");
             Console.WriteLine(partSize.ToString(CultureInfo.InvariantCulture) + " PART SIZE" + "\n");
 
@@ -226,6 +233,14 @@ namespace OctaneDownloadEngine
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
             var partSize = (long) Math.Round(responseLength / parts);
             var pieces = new List<FileChunk>();
+            int maxworkerThreads;
+            int maxconcurrentActiveRequests;
+
+            ThreadPool.GetMaxThreads(out maxworkerThreads,
+                out maxconcurrentActiveRequests);
+
+            bool changeSucceeded = ThreadPool.SetMaxThreads(
+                maxworkerThreads, maxconcurrentActiveRequests);
 
             Console.WriteLine(responseLength.ToString(CultureInfo.InvariantCulture) + " TOTAL SIZE");
             Console.WriteLine(partSize.ToString(CultureInfo.InvariantCulture) + " PART SIZE" + "\n");
