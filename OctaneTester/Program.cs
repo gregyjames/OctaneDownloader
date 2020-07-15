@@ -1,4 +1,10 @@
-﻿using OctaneDownloadEngine;
+using System;
+using System.IO;
+using System.Threading;
+using OctaneDownloadEngine;
+using System.Xml;
+using System.Xml.Linq;
+using System.Xml.Serialization;
 
 namespace OctaneDownloadEngine
 {
@@ -6,9 +12,26 @@ namespace OctaneDownloadEngine
     {
         private static void Main()
         {
-            const string url = "https://az764295.vo.msecnd.net/stable/d5e9aa0227e057a60c82568bf31c04730dc15dcd/VSCodeUserSetup-x64-1.47.0.exe";
+            var xmlDoc = new XmlDocument();
+            xmlDoc.Load("files.xml");
+            var files = xmlDoc.SelectNodes("//files/file");
 
-            OctaneEngine.DownloadFile(url, 4).GetAwaiter().GetResult();
+            foreach (XmlNode fileNode in files)
+            {
+                var url = fileNode.Attributes["input"].Value;
+                try
+                {
+                    var ODE = new OctaneEngine();
+                    Console.Clear();
+                    ODE.DownloadFile(url, 4).GetAwaiter().GetResult();
+                    Thread.Sleep(1000);
+                }
+                catch
+                {
+                    var filename = Path.GetFileName(new Uri(url).LocalPath);
+                    Console.WriteLine("Download error on " + filename);
+                }
+            }
         }
     }
 }
