@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -16,9 +15,10 @@ namespace OctaneDownloadEngine
 {
     public class OctaneEngine
     {
-        protected OctaneEngine()
+        public OctaneEngine()
         {
             ServicePointManager.DefaultConnectionLimit = 10000;
+            TasksDone = 0;
         }
 
         static int TasksDone = 0;
@@ -30,10 +30,9 @@ namespace OctaneDownloadEngine
             var partSize = (long) Math.Floor(responseLength / parts);
             var pieces = new List<FileChunk>();
             int maxworkerThreads;
-            int maxconcurrentActiveRequests;
 
             ThreadPool.GetMaxThreads(out maxworkerThreads,
-                out maxconcurrentActiveRequests);
+                out int maxconcurrentActiveRequests);
 
             bool changeSucceeded = ThreadPool.SetMaxThreads(
                 maxworkerThreads, maxconcurrentActiveRequests);
@@ -122,6 +121,12 @@ namespace OctaneDownloadEngine
                             }
                         }
 
+                        var getFileChunk = new TransformManyBlock<IEnumerable<FileChunk>, FileChunk>(chunk => chunk, new ExecutionDataflowBlockOptions()
+                        {
+                            BoundedCapacity = Int32.MaxValue, // Cap the item count
+                            MaxDegreeOfParallelism = Environment.ProcessorCount, // Parallelize on all cores
+                        });
+
                         var getStream = new TransformBlock<FileChunk, Tuple<Task<HttpResponseMessage>, FileChunk>>(
                             piece =>
                             {
@@ -169,19 +174,22 @@ namespace OctaneDownloadEngine
                         });
 
                         var linkOptions = new DataflowLinkOptions {PropagateCompletion = true};
+
+                        getFileChunk.LinkTo(getStream, linkOptions);
                         getStream.LinkTo(writeStream, linkOptions);
 
-                        Parallel.ForEach(pieces, async (chunk) => { await getStream.SendAsync(chunk); });
+                        getFileChunk.Post(pieces);
+                        getFileChunk.Complete();
 
-                        getStream.Complete();
-                        await writeStream.Completion;
-
-                        if (asyncTasks.Count == 0)
+                        await writeStream.Completion.ContinueWith(task =>
                         {
-                            ms.Flush();
-                            ms.Close();
-                            callback?.Invoke(ms.ToArray());
-                        }
+                            if (asyncTasks.Count == 0)
+                            {
+                                ms.Flush();
+                                ms.Close();
+                                callback?.Invoke(ms.ToArray());
+                            }
+                        });
                     }
                 }
             }
@@ -227,7 +235,7 @@ namespace OctaneDownloadEngine
             }
         }
 
-        public async static Task DownloadFile(string url, double parts, string outFile = null,
+        public async Task DownloadFile(string url, double parts, string outFile = null,
             Action<int> progressCallback = null)
         {
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
@@ -297,16 +305,6 @@ namespace OctaneDownloadEngine
                         }
                     };
 
-                    // GetResponseAsync deadlocks for some reason so switched to HttpClient instead
-                    var client = new HttpClient(
-                            //Use our custom Retry handler, with a max retry value of 10
-                            new RetryHandler(new HttpClientHandler(), 10))
-                        {MaxResponseContentBufferSize = 1000000000};
-
-                    //client.MaxResponseContentBufferSize = partSize;
-                    client.DefaultRequestHeaders.ConnectionClose = false;
-                    client.Timeout = Timeout.InfiniteTimeSpan;
-
                     //Variable to hold the old loop end
                     var previous = 0;
 
@@ -340,8 +338,24 @@ namespace OctaneDownloadEngine
 
                     Console.Title = "CHUNKS DONE";
 
+                    var getFileChunk = new TransformManyBlock<IEnumerable<FileChunk>, FileChunk>(chunk => chunk, new ExecutionDataflowBlockOptions()
+                    {
+                        BoundedCapacity = Int32.MaxValue, // Cap the item count
+                        MaxDegreeOfParallelism = Environment.ProcessorCount, // Parallelize on all cores
+                    });
+
                     var getStream = new TransformBlock<FileChunk, Tuple<Task<HttpResponseMessage>, FileChunk>>(piece =>
                         {
+                            // GetResponseAsync deadlocks for some reason so switched to HttpClient instead
+                            var client = new HttpClient(
+                                    //Use our custom Retry handler, with a max retry value of 10
+                                    new RetryHandler(new HttpClientHandler(), 10))
+                                { MaxResponseContentBufferSize = 1000000000 };
+
+                            //client.MaxResponseContentBufferSize = partSize;
+                            client.DefaultRequestHeaders.ConnectionClose = false;
+                            client.Timeout = Timeout.InfiniteTimeSpan;
+
                             Console.Title = "STREAMING....";
                             //Open a http request with the range
                             var request = new HttpRequestMessage {RequestUri = new Uri(url)};
@@ -358,7 +372,7 @@ namespace OctaneDownloadEngine
                             return new Tuple<Task<HttpResponseMessage>, FileChunk>(downloadTask, piece);
                         }, new ExecutionDataflowBlockOptions
                         {
-                            BoundedCapacity = Environment.ProcessorCount, // Cap the item count
+                            BoundedCapacity = Int32.MaxValue, // Cap the item count
                             MaxDegreeOfParallelism = Environment.ProcessorCount, // Parallelize on all cores
                         }
                     );
@@ -380,22 +394,15 @@ namespace OctaneDownloadEngine
                         }
                     }, new ExecutionDataflowBlockOptions
                     {
-                        BoundedCapacity = Environment.ProcessorCount, // Cap the item count
+                        BoundedCapacity = Int32.MaxValue, // Cap the item count
                         MaxDegreeOfParallelism = Environment.ProcessorCount, // Parallelize on all cores
                     });
 
                     //Propage errors and completion
                     var linkOptions = new DataflowLinkOptions {PropagateCompletion = true};
-                    //Write the block ass soon as the stream is recieved
-                    getStream.LinkTo(writeStream, linkOptions);
 
-                    //Start every piece in pieces in parallel fashion
-                    Parallel.ForEach(pieces, async (chunk) =>
-                    {
-                        await getStream.SendAsync(chunk);
-                        //Wait for all the streams to be recieved
-                        getStream.Complete();
-                    });
+                    getFileChunk.LinkTo(getStream, linkOptions);
+                    getStream.LinkTo(writeStream, linkOptions);
 
                     //Write all the streams
                     await writeStream.Completion.ContinueWith(task =>
@@ -405,7 +412,12 @@ namespace OctaneDownloadEngine
                         {
                             CombineMultipleFilesIntoSingleFile(pieces, filename);
                         }
-                    }, CancellationToken.None,TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Current);
+                    }, CancellationToken.None, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Current);
+
+
+                    getFileChunk.Post(pieces);
+                    getFileChunk.Complete();
+
                 }
 
                 //Restore the original title
@@ -425,15 +437,6 @@ namespace OctaneDownloadEngine
                     catch (FileNotFoundException) { }
                 }
             }
-        }
-
-        public async static Task DownloadFiles(List<string> urls, List<string> outfiles, double parts,
-            Action<int> progressCallback = null)
-        {
-            Parallel.For(0, urls.Count(), async i =>
-            {
-                await DownloadFile(urls[i], parts, outfiles[i], progressCallback);
-            });
         }
     }
 }
