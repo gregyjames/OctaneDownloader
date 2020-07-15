@@ -28,7 +28,7 @@ namespace OctaneDownloadEngine
         {
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
             var partSize = (long) Math.Floor(responseLength / parts);
-            var pieces = new List<FileChunk>();
+            var pieces = getFileChunks(partSize, responseLength);
             int maxworkerThreads;
 
             ThreadPool.GetMaxThreads(out maxworkerThreads,
@@ -48,9 +48,6 @@ namespace OctaneDownloadEngine
                     using (var ms = new MemoryStream())
                     {
                         ms.SetLength(responseLength);
-
-                        //Using custom concurrent queue to implement Enqueue and Dequeue Events
-                        var asyncTasks = new EventfulConcurrentQueue<FileChunk>();
 
                         //Delegate for Dequeue
                         asyncTasks.ItemDequeued += delegate
@@ -240,7 +237,7 @@ namespace OctaneDownloadEngine
         {
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
             var partSize = (long) Math.Round(responseLength / parts);
-            var pieces = new List<FileChunk>();
+            var pieces = getFileChunks(partSize, responseLength);
             int maxworkerThreads;
             int maxconcurrentActiveRequests;
 
@@ -384,13 +381,15 @@ namespace OctaneDownloadEngine
                             using (var fileToWriteTo = File.Open(task.Item2._tempfilename, FileMode.OpenOrCreate,
                                 FileAccess.ReadWrite, FileShare.ReadWrite))
                             {
-                                await streamToRead.CopyToAsync(fileToWriteTo).ContinueWith(task1 =>
-                                {
-                                    var s = new FileChunk();
-                                    Interlocked.Add(ref TasksDone, 1);
-                                    asyncTasks.TryDequeue(out s);
-                                }, CancellationToken.None,TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Current);
+                                await task.Item1.Result.Content.CopyToAsync(fileToWriteTo);
                             }
+                        }
+
+                        if (task.Item1.IsCompleted)
+                        {
+                            var s = new FileChunk();
+                            Interlocked.Add(ref TasksDone, 1);
+                            asyncTasks.TryDequeue(out s);
                         }
                     }, new ExecutionDataflowBlockOptions
                     {
