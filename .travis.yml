@@ -4,7 +4,6 @@ mono: none
 dotnet: 3.0.100
 install:
  - sudo apt-get install nunit-console
- - nuget restore ./OctaneDownloadEngine.sln
 script:
  - dotnet restore
  - xbuild ./OctaneDownloadEngine.sln
