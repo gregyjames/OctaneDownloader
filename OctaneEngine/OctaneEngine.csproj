@@ -97,6 +97,8 @@
   <PropertyGroup>
     <PostBuildEvent>
     </PostBuildEvent>
+    <PostBuildEvent>
+</PostBuildEvent>
   </PropertyGroup>
   <Target Name="BeforeBuild">
   </Target>
