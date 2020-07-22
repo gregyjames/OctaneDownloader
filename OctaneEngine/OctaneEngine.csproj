@@ -84,7 +84,7 @@
     </PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <PostBuildEvent>mv $(TargetDir)OctaneEngine.dll Octane.dll
+    <PostBuildEvent>ren $(TargetDir)OctaneEngine.dll Octane.dll
 $(ILMergeConsolePath) /out:$(TargetFileName) /target:library /wildcards *.dll
 del $(TargetDir)Octane.dll
 del $(TargetDir)System.Threading.Tasks.Dataflow.dll
@@ -92,7 +92,8 @@ del $(TargetDir)nunit.framework.dll
 del $(TargetDir)SafeObjectPool.dll
 del *.pdb
 del *.xml
-del *.config</PostBuildEvent>
+del *.config
+SET ERRORLEVEL = 0</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
