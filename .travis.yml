@@ -1,10 +1,11 @@
 language: csharp
 solution: OctaneDownloadEngine.sln
-mono: none
+mono: 5.2.0
 dotnet: 3.0.100
 install:
+ - export FrameworkPathOverride=$(dirname $(which mono))/../lib/mono/4.5/
  - sudo apt-get install nunit-console
 script:
  - dotnet restore
- - msbuild ./OctaneDownloadEngine.sln
+ - dotnet build ./OctaneDownloadEngine.sln
  - nunit-console ./OctaneEngine/bin/Debug/OctaneEngine.dll
