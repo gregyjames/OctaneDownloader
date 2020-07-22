@@ -6,5 +6,5 @@ install:
  - sudo apt-get install nunit-console
 script:
  - dotnet restore
- - xbuild ./OctaneDownloadEngine.sln
+ - msbuild ./OctaneDownloadEngine.sln
  - nunit-console ./OctaneEngine/bin/Debug/OctaneEngine.dll
