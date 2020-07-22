@@ -84,7 +84,7 @@
     </PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <PostBuildEvent>ren $(TargetDir)OctaneEngine.dll Octane.dll
+    <PostBuildEvent>mv $(TargetDir)OctaneEngine.dll Octane.dll
 $(ILMergeConsolePath) /out:$(TargetFileName) /target:library /wildcards *.dll
 del $(TargetDir)Octane.dll
 del $(TargetDir)System.Threading.Tasks.Dataflow.dll
