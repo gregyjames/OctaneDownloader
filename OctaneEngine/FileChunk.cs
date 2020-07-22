@@ -3,21 +3,28 @@ using System.IO;
 
 namespace OctaneDownloadEngine
 {
-    class FileChunk
+    public class FileChunk
     {
-        public int start { get; set; }
-        public int end { get; set; }
-        public string _tempfilename = "";
+        public int Start { get; set; }
+        public int End { get; set; }
+        public string TempFileName  {get;}
 
         public FileChunk(){}
-        public int id { get; set; }
+        public int Id { get; set; }
 
         public FileChunk(int startByte, int endByte)
         {
-            _tempfilename = Guid.NewGuid().ToString();
-            File.Create(_tempfilename);
-            start = startByte;
-            end = endByte;
+            TempFileName = Guid.NewGuid().ToString();
+            Start = startByte;
+            End = endByte;
+        }
+
+        public FileChunk(int startByte, int endByte, bool createFile)
+        {
+            TempFileName = Guid.NewGuid().ToString();
+            File.Create(TempFileName);
+            Start = startByte;
+            End = endByte;
         }
     }
 }

@@ -2,5 +2,10 @@ language: csharp
 solution: OctaneDownloadEngine.sln
 mono: none
 dotnet: 3.0.100
+install:
+ - sudo apt-get install nunit-console
+ - nuget restore ./OctaneDownloadEngine.sln
 script:
  - dotnet restore
+ - xbuild ./OctaneDownloadEngine.sln
+ - nunit-console ./OctaneEngine/bin/Debug/OctaneEngine.dll

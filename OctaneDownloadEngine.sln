@@ -1,14 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.30128.74
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.1169
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OctaneEngine", "OctaneEngine\OctaneEngine.csproj", "{8058F2AA-7DB9-4FDF-9548-003BB35BABD7}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OctaneTester", "OctaneTester\OctaneTester.csproj", "{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}"
-	ProjectSection(ProjectDependencies) = postProject
-		{8058F2AA-7DB9-4FDF-9548-003BB35BABD7} = {8058F2AA-7DB9-4FDF-9548-003BB35BABD7}
-	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -36,20 +31,6 @@ Global
 		{8058F2AA-7DB9-4FDF-9548-003BB35BABD7}.Release|Win32.ActiveCfg = Release|Any CPU
 		{8058F2AA-7DB9-4FDF-9548-003BB35BABD7}.Release|x64.ActiveCfg = Release|Any CPU
 		{8058F2AA-7DB9-4FDF-9548-003BB35BABD7}.Release|x64.Build.0 = Release|Any CPU
-		{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
-		{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
-		{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}.Debug|Win32.ActiveCfg = Debug|Any CPU
-		{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}.Debug|x64.Build.0 = Debug|Any CPU
-		{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
-		{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}.Release|Mixed Platforms.Build.0 = Release|Any CPU
-		{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}.Release|Win32.ActiveCfg = Release|Any CPU
-		{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}.Release|x64.ActiveCfg = Release|Any CPU
-		{2A12EE1E-CA94-44C9-9B38-2144CBEAFCA7}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
