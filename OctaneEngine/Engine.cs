@@ -75,7 +75,7 @@ namespace OctaneDownloadEngine
                 }
             };
 
-            //Delagate for Enqueue
+            //Delegate for Enqueue
             asyncTasks.ItemEnqueued += delegate
             {
                 if (progressCallback == null)
@@ -152,23 +152,23 @@ namespace OctaneDownloadEngine
                 {
                     //Start and end values for the chunk
                     var start = previous;
-                    var current_end = i;
+                    var currentEnd = i;
 
-                    pieces.Add(new FileChunk(start, current_end, true));
+                    pieces.Add(new FileChunk(start, currentEnd, true));
 
                     //Set the start of the next loop to be the current end
-                    previous = current_end;
+                    previous = currentEnd;
                 }
                 else
                 {
                     //Start and end values for the chunk
                     var start = previous;
-                    var current_end = i;
+                    var currentEnd = i;
 
                     pieces.Add(new FileChunk(start, (int)responseLength, true));
 
                     //Set the start of the next loop to be the current end
-                    previous = current_end;
+                    previous = currentEnd;
                 }
             }
 
@@ -230,7 +230,7 @@ namespace OctaneDownloadEngine
                             }
                         };
 
-                        //Delagate for Enqueue
+                        //Delegate for Enqueue
                         asyncTasks.ItemEnqueued += delegate
                         {
                             if (OnUpdate == null)
@@ -264,23 +264,23 @@ namespace OctaneDownloadEngine
                             {
                                 //Start and end values for the chunk
                                 var start = previous;
-                                var current_end = i;
+                                var currentEnd = i;
 
-                                pieces.Add(new FileChunk(start, current_end));
+                                pieces.Add(new FileChunk(start, currentEnd));
 
                                 //Set the start of the next loop to be the current end
-                                previous = current_end;
+                                previous = currentEnd;
                             }
                             else
                             {
                                 //Start and end values for the chunk
                                 var start = previous;
-                                var current_end = i;
+                                var currentEnd = i;
 
                                 pieces.Add(new FileChunk(start, (int)responseLength));
 
                                 //Set the start of the next loop to be the current end
-                                previous = current_end;
+                                previous = currentEnd;
                             }
                         }
 
@@ -378,7 +378,7 @@ namespace OctaneDownloadEngine
             TransformManyBlock<IEnumerable<FileChunk>, FileChunk> getFileChunk;
             TransformBlock<FileChunk, Tuple<Task<HttpResponseMessage>, FileChunk>> getStream;
             ActionBlock<Tuple<Task<HttpResponseMessage>, FileChunk>> writeStream;
-            //Get responce length 
+            //Get response length 
             responseLength = (await WebRequest.Create(URL).GetResponseAsync()).ContentLength;
             //Calculate Part size
             var partSize = (long)Math.Round(responseLength / Parts);
@@ -415,7 +415,7 @@ namespace OctaneDownloadEngine
 
                     Console.Title = "CHUNKS DONE";
 
-                    //Transfrom many to get from List<Filechunk> => Filechunk essentially iterating
+                    //Transform many to get from List<Filechunk> => Filechunk essentially iterating
                     getFileChunk = new TransformManyBlock<IEnumerable<FileChunk>, FileChunk>(chunk => chunk, new ExecutionDataflowBlockOptions());
 
                     //Gets the request stream from the filechunk 
