@@ -15,8 +15,6 @@ bld/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
-[Pp]ackages/
-*.exe
 
 # Visual Studio 2015 cache/options directory
 .vs/
@@ -25,12 +23,3 @@ bld/
 _ReSharper*/
 *.[Rr]e[Ss]harper
 *.DotSettings.user
-
-*.htm
-
-OctaneEngine/Properties/Settings.settings
-
-<<<<<<< HEAD
-=======
-OctaneEngine/Properties/
->>>>>>> master
