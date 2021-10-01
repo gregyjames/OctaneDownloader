@@ -3,7 +3,6 @@
 *.user
 *.userosscache
 *.sln.docstates
-
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
@@ -15,11 +14,11 @@ bld/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
-
+[Pp]ackages/
 # Visual Studio 2015 cache/options directory
 .vs/
-
 # ReSharper is a .NET coding add-in
 _ReSharper*/
 *.[Rr]e[Ss]harper
 *.DotSettings.user
+ILMerge.3.0.29.deleteme

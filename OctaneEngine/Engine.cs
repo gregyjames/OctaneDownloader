@@ -15,12 +15,12 @@ namespace OctaneDownloadEngine
 {
     public class OctaneEngine
     {
-        protected OctaneEngine()
+        public OctaneEngine()
         {
             ServicePointManager.DefaultConnectionLimit = 10000;
         }
 
-        static int TasksDone = 0;
+        private static int TasksDone = 0;
 
         #region Helper methods
         private static void CombineMultipleFilesIntoSingleFile(List<FileChunk> files, string outputFilePath)
@@ -138,6 +138,11 @@ namespace OctaneDownloadEngine
                         }
                     }
 
+                    Parallel.For(0, pieces.Count, i =>
+                    {
+                        pieces[i].CreateTempFile();
+                    });
+
                     Console.Title = "CHUNKS DONE";
 
                     var bufferBlock = new BufferBlock<FileChunk>();
@@ -151,7 +156,7 @@ namespace OctaneDownloadEngine
                             request.Headers.Range = new RangeHeaderValue(piece.Start, piece.End);
 
                             //Send the request
-                            var downloadTask = new Task<HttpResponseMessage>(() => client.SendAsync(request, HttpCompletionOption.ResponseContentRead).Result);
+                            var downloadTask = new Task<HttpResponseMessage>(() => client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead).Result);
 
                             //Use interlocked to increment Tasks done by one
                             Interlocked.Add(ref TasksDone, 1);
@@ -165,7 +170,7 @@ namespace OctaneDownloadEngine
                             return new Tuple<Task<HttpResponseMessage>, FileChunk>(downloadTask, piece);
                         }, new ExecutionDataflowBlockOptions
                         {
-                            BoundedCapacity = 2, // Cap the item count
+                            BoundedCapacity = -1, // Cap the item count
                             MaxDegreeOfParallelism = Environment.ProcessorCount, // Parallelize on all cores
                         }
                     );
@@ -190,11 +195,13 @@ namespace OctaneDownloadEngine
                                     asyncTasks.TryDequeue(out s);
                                     Interlocked.Add(ref TasksDone, 1);
                                 }
+                                task.Item1.Result.Dispose();
+                                task.Item1.Dispose();
                             }
                         }
                     }, new ExecutionDataflowBlockOptions
                     {
-                        BoundedCapacity = 2, // Cap the item count
+                        BoundedCapacity = -1, // Cap the item count
                         MaxDegreeOfParallelism = DataflowBlockOptions.Unbounded, // Parallelize on all cores
                     });
 
@@ -225,10 +232,17 @@ namespace OctaneDownloadEngine
                         getStream.Complete();
                         writeStream.Complete();
                     }
+
+                    
                 }
 
                 //Restore the original title
                 Console.Title = defaultTitle;
+
+                //Force garbage collection
+                GC.Collect(3);
+                GC.WaitForPendingFinalizers();
+                GC.Collect(3);
             }
             catch (Exception ex)
             {

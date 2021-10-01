@@ -12,7 +12,7 @@ namespace OctaneDownloadEngine
                 Console.Write("Enter file URL: ");
                 s = Console.ReadLine();
 
-                OctaneEngine.DownloadFile(s, 10).ContinueWith(x =>
+                OctaneEngine.DownloadFile(s, 4).ContinueWith(x =>
                 {
                     Console.WriteLine("DONE!");
                 }).Wait();

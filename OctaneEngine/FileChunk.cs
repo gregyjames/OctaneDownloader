@@ -15,9 +15,13 @@ namespace OctaneDownloadEngine
         public FileChunk(int startByte, int endByte)
         {
             TempFileName = Guid.NewGuid().ToString();
-            File.Create(TempFileName);
             Start = startByte;
             End = endByte;
+        }
+
+        public void CreateTempFile()
+        {
+            File.Create(TempFileName);
         }
     }
 }
