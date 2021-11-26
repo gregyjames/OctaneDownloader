@@ -7,7 +7,7 @@ namespace OctaneTester
         private static void Main()
         {
             var s = Engine.DownloadFile(
-                    "https://release.axocdn.com/win64/GitKrakenSetup.exe", 128, "out.exe");
+                    "https://bitport.io/my-files/download/zq2lly7320nqzwfa2dzbq2okek7yxr44/jxpdd1dcpu", 8);
 
             s.Wait();
 
