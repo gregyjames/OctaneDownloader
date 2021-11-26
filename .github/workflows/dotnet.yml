@@ -18,6 +18,7 @@ jobs:
       with:
         dotnet-version: 6.0.x
     - uses: actions/cache@v2
+      id: cacheStep
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
@@ -28,6 +29,7 @@ jobs:
     - name: Setup NuGet.exe for use with actions
       uses: NuGet/setup-nuget@v1.0.5
     - name: Restore NuGet
+      if: steps.cacheStep.outputs.cache-hit != 'true'
       run: nuget restore Octane.sln
     - name: Build
       run: dotnet build --no-restore
