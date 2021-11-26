@@ -25,4 +25,8 @@ jobs:
       run: nuget restore Octane.sln
     - name: Build
       run: dotnet build --no-restore
+    - name: Install NUnit
+      run: nuget install NUnit.Console -Version 3.9.0 -OutputDirectory testrunner
+    - name: Run Tests
+      run: ./testrunner/NUnit.ConsoleRunner.3.9.0/tools/nunit3-console.exe ./OctaneEngine/bin/Debug/net6.0/OctaneEngine.dll
     
