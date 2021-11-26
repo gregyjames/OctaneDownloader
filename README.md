@@ -1,5 +1,5 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/140a182997cf46ba9f84060f4a7ae17e)](https://app.codacy.com/manual/madra.uc/OctaneDownloader?utm_source=github.com&utm_medium=referral&utm_content=gregyjames/OctaneDownloader&utm_campaign=Badge_Grade_Dashboard)
-[![Build Status](https://travis-ci.com/gregyjames/OctaneDownloader.svg?branch=master)](https://travis-ci.com/gregyjames/OctaneDownloader)
+![example workflow](https://github.com/gregyjames/OctaneDownloader/actions/workflows/dotnet.yml/badge.svg)
 [![CodeFactor](https://www.codefactor.io/repository/github/gregyjames/octanedownloader/badge)](https://www.codefactor.io/repository/github/gregyjames/octanedownloader)
 
 ![alt tag](https://image.ibb.co/h2tK8v/Untitled_1.png)
