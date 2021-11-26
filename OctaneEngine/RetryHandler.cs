@@ -1,4 +1,5 @@
-﻿using System.Net.Http;
+﻿using System.Diagnostics;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,7 +10,7 @@ namespace OctaneEngine
         // Strongly consider limiting the number of retries - "retry forever" is
         // probably not the most user friendly way you could respond to "the
         // network cable got pulled out."
-        private int _maxRetries = 3;
+        private readonly int _maxRetries = 3;
 
         public RetryHandler(HttpMessageHandler innerHandler) : base(innerHandler) { }
 
@@ -22,7 +23,7 @@ namespace OctaneEngine
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
-            HttpResponseMessage response = null;
+            HttpResponseMessage? response = null;
             for (int i = 0; i < _maxRetries; i++)
             {
                 response = await base.SendAsync(request, cancellationToken);
@@ -32,6 +33,7 @@ namespace OctaneEngine
                 }
             }
 
+            Debug.Assert(response != null, nameof(response) + " != null");
             return response;
         }
     }

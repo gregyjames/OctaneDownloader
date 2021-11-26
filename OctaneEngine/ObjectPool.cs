@@ -14,7 +14,7 @@ namespace OctaneEngine
             _objects = new ConcurrentBag<T>();
         }
 
-        public T Get() => _objects != null && _objects.TryTake(out T item) ? item : _objectGenerator();
+        public T Get() => _objects != null && _objects.TryTake(out T? item) ? item : _objectGenerator();
 
         public void Return(T item) => _objects!.Add(item);
 
