@@ -1,7 +1,7 @@
 language: csharp
 solution: Octane.sln
-mono: 5.2.0
-dotnet: 3.0.100
+mono: none
+dotnet: 6.0.0
 install:
  - export FrameworkPathOverride=$(dirname $(which mono))/../lib/mono/4.5/
  - nuget restore Octane.sln
