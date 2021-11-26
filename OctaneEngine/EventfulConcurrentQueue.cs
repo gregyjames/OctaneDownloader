@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 
-namespace OctaneDownloadEngine
+namespace OctaneEngine
 {
 
         public sealed class EventfulConcurrentQueue<T>: ConcurrentQueue<T>

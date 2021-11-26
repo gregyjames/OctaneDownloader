@@ -1,4 +1,4 @@
-﻿using OctaneDownloadEngine;
+﻿using OctaneEngine;
 
 namespace OctaneTester
 {
@@ -6,8 +6,8 @@ namespace OctaneTester
     {
         private static void Main()
         {
-            var s = OctaneEngine.DownloadFile(
-                    "https://release.axocdn.com/win64/GitKrakenSetup.exe", 128, "out.exe");
+            var s = Engine.DownloadFile(
+                    "https://www.wonderland.money/static/media/Chershire_Cat.24ee16b9.jpeg", 4);
 
             s.Wait();
 

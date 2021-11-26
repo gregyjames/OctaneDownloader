@@ -7,21 +7,20 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
+using OctaneEngine;
 using ShellProgressBar;
 
 // ReSharper disable All
 
-namespace OctaneDownloadEngine
+namespace OctaneEngine
 {
-    public class OctaneEngine
+    public static class Engine
     {
-        public OctaneEngine()
+        public async static Task DownloadFile(string url, int parts, string outFile = null!, Action<int> progressCallback = null!)
         {
             ServicePointManager.Expect100Continue = false;
             ServicePointManager.DefaultConnectionLimit = 10000;
-        }
-        public async static Task DownloadFile(string url, int parts, string outFile = null!, Action<int> progressCallback = null!)
-        {
+            
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
             var partSize = (long)Math.Floor(responseLength / (parts + 0.0));
             var pieces = new List<FileChunk>();
@@ -58,6 +57,7 @@ namespace OctaneDownloadEngine
                     var message = client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
                         .Result;
 
+                    
                     if (message.IsSuccessStatusCode)
                     {
                         await using var streamToRead = await message.Content.ReadAsStreamAsync(cancellationToken);
