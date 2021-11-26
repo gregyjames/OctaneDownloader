@@ -7,7 +7,7 @@ namespace OctaneTester
         private static void Main()
         {
             var s = Engine.DownloadFile(
-                    "https://www.wonderland.money/static/media/Chershire_Cat.24ee16b9.jpeg", 4);
+                    "https://release.axocdn.com/win64/GitKrakenSetup.exe", 128, "out.exe");
 
             s.Wait();
 
