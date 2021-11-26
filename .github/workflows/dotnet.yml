@@ -17,6 +17,12 @@ jobs:
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: 6.0.x
+    - uses: actions/cache@v2
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
     - name: Restore dependencies
       run: dotnet restore
     - name: Setup NuGet.exe for use with actions
@@ -27,12 +33,6 @@ jobs:
       run: dotnet build --no-restore
     - name: Install NUnit
       run: nuget install NUnit.Console -Version 3.9.0 -OutputDirectory testrunner
-    - uses: actions/cache@v2
-      with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
     - name: Run Tests
       run: dotnet test
     
