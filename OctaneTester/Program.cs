@@ -1,23 +1,15 @@
-﻿using System;
-using OctaneDownloadEngine;
-namespace OctaneDownloadEngine
+﻿using OctaneDownloadEngine;
+
+namespace OctaneTester
 {
     internal static class Program
     {
         private static void Main()
         {
-            var s = "";
-            while (s != "EXIT")
-            {
-                Console.Write("Enter file URL: ");
-                s = Console.ReadLine();
+            var s = OctaneEngine.DownloadFile(
+                    "https://release.axocdn.com/win64/GitKrakenSetup.exe", 128, "out.exe");
 
-                OctaneEngine.DownloadFile(s, 4).ContinueWith(x =>
-                {
-                    Console.WriteLine("DONE!");
-                }).Wait();
-            }
-            Console.ReadLine();
+            s.Wait();
 
         }
     }

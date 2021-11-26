@@ -5,23 +5,15 @@ namespace OctaneDownloadEngine
 {
     internal class FileChunk
     {
-        public int Start { get; set; }
-        public int End { get; set; }
-        public string TempFileName = "";
-
+        public long Start { get; set; }
+        public long End { get; set; }
         public FileChunk(){}
         public int Id { get; set; }
 
-        public FileChunk(int startByte, int endByte)
+        public FileChunk(long startByte, long endByte)
         {
-            TempFileName = Guid.NewGuid().ToString();
             Start = startByte;
             End = endByte;
-        }
-
-        public void CreateTempFile()
-        {
-            File.Create(TempFileName);
         }
     }
 }
