@@ -33,6 +33,8 @@ jobs:
       run: nuget restore Octane.sln
     - name: Build
       run: dotnet build --no-restore
+    - name: Install MSTEST
+      run: nuget install Microsoft.NET.Test.Sdk -Version 17.0.0
     - name: Run Tests
       run: dotnet test
     
