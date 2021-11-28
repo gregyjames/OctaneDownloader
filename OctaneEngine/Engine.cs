@@ -15,6 +15,18 @@ namespace OctaneEngine
 {
     public static class Engine
     {
+        private static string prettySize(long len)
+        {
+            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+            int order = 0;
+            while (len >= 1024 && order < sizes.Length - 1) {
+                order++;
+                len = len/1024;
+            }
+            string result = String.Format("{0:0.##} {1}", len, sizes[order]);
+
+            return result;
+        }
         /// <summary>
         /// The core octane download function.
         /// </summary>
@@ -38,8 +50,8 @@ namespace OctaneEngine
             var pieces = new List<FileChunk>();
             var uri = new Uri(url);
 
-            Console.WriteLine(responseLength.ToString(CultureInfo.InvariantCulture) + " TOTAL SIZE");
-            Console.WriteLine(partSize.ToString(CultureInfo.InvariantCulture) + " PART SIZE" + "\n");
+            Console.WriteLine("TOTAL SIZE: " + prettySize(responseLength));
+            Console.WriteLine("PART SIZE: " + prettySize(partSize) + "\n");
 
             //Get outfile name from argument or URL
             string filename = outFile ?? Path.GetFileName(uri.LocalPath);
@@ -59,14 +71,25 @@ namespace OctaneEngine
             //Options for progress base
             var options = new ProgressBarOptions
             {
-                ProgressCharacter = '─',
-                ProgressBarOnBottom = true
+                ProgressBarOnBottom = false,
+                BackgroundCharacter = '\u2593',
+                DenseProgressBar = false
             };
+            var childOptions = new ProgressBarOptions
+            {
+                ForegroundColor = ConsoleColor.Cyan,
+                BackgroundColor = ConsoleColor.Black,
+                CollapseWhenFinished = true,
+                DenseProgressBar = false,
+                //ProgressCharacter = null,
+                BackgroundCharacter = '\u2591'
+            };
+            
             try
             {
                 using (var pbar = new ProgressBar(parts, "Downloading File...", options))
                 {
-                    await Parallel.ForEachAsync(pieces, new ParallelOptions(), async (piece, cancellationToken) =>
+                    await Parallel.ForEachAsync(pieces, new ParallelOptions(){MaxDegreeOfParallelism = Environment.ProcessorCount}, async (piece, cancellationToken) =>
                     {
                         //Get a http client from the pool and request for the content range
                         var client = httpPool.Get();
@@ -81,27 +104,52 @@ namespace OctaneEngine
                             if (message.IsSuccessStatusCode)
                             {
                                 //Get the content stream from the message request
-                                using (var streamToRead = new StreamContent(await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), bufferSize))
+                                using (var streamToRead = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
                                 {
                                     //Create a memory mapped stream to the mmf with the piece offset and size equal to the response size
                                     using (var streams = mmf.CreateViewStream(piece.Start, message.Content.Headers.ContentLength!.Value, MemoryMappedFileAccess.ReadWrite))
                                     {
-                                        //Copy from the content stream to the mmf stream
-                                        var T = streamToRead.CopyToAsync(streams, cancellationToken);
-                                        await T.WaitAsync(cancellationToken).ConfigureAwait(false);
-                                        //If done, update progress, return http client to pool, and flush/close mmf stream
-                                        if (T.IsCompletedSuccessfully)
+                                        using (var chil = pbar.Spawn((int)Math.Round((decimal)(message.Content.Headers.ContentLength / bufferSize)), null, childOptions))
                                         {
-                                            pbar.Tick();
-                                            httpPool.Return(client);
-                                            streams.Flush();
-                                            streams.Close();
+                                            //Copy from the content stream to the mmf stream
+                                            var buffer = new byte[bufferSize];
+                                            int offset, bytesRead;
+                                            // Until we've read everything
+                                            do
+                                            {
+                                                offset = 0;
+                                                // Until the buffer is very nearly full or there's nothing left to read
+                                                do
+                                                {
+                                                    bytesRead = await streamToRead.ReadAsync(
+                                                        buffer.AsMemory(offset, bufferSize - offset),
+                                                        cancellationToken);
+                                                    offset += bytesRead;
+                                                } while (bytesRead != 0 && offset < bufferSize);
+
+                                                // Empty the buffer
+                                                if (offset != 0)
+                                                {
+                                                    //fileStrm.Write(buffer, 0, offset);
+                                                    await streams.WriteAsync(buffer.AsMemory(0, offset),
+                                                        cancellationToken);
+                                                    chil.Tick();
+                                                }
+                                            } while (bytesRead != 0);
                                         }
+                                        streams.Flush();
+                                        streams.Close();
                                     }
+                                    streamToRead.Close();
                                 }
                             }
+                            pbar.Tick();
+                            message.Dispose();
                         }
+                        request.Dispose();
                     });
+                    mmf.Dispose();
+                    httpPool.Empty();
                 }
             }
             catch(Exception ex)

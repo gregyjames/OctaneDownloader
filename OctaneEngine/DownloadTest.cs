@@ -4,7 +4,7 @@ using NUnit.Framework;
 namespace OctaneEngine
 {
     [TestFixture]
-    public class Tests
+    public class DownloadTest
     {
         [SetUp]
         public void Init()

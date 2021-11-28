@@ -7,7 +7,7 @@ namespace OctaneTester
     {
         private static void Main()
         {
-            var s = Engine.DownloadFile("https://speed.hetzner.de/1GB.bin", 2048, 4096);
+            var s = Engine.DownloadFile("https://speed.hetzner.de/1GB.bin", Environment.ProcessorCount * 4, 8192);
             s.Wait();
 
 

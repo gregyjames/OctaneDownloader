@@ -11,9 +11,4 @@
       <ProjectReference Include="..\OctaneEngine\OctaneEngine.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-      <PackageReference Include="NUnit" Version="3.13.2" />
-      <PackageReference Include="ShellProgressBar" Version="5.1.0" />
-    </ItemGroup>
-
 </Project>
