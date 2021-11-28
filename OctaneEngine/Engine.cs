@@ -15,8 +15,14 @@ namespace OctaneEngine
 {
     public static class Engine
     {
-        public async static Task DownloadFile(string url, int parts, string outFile = null!,
-            Action<int> progressCallback = null!)
+        /// <summary>
+        /// The core octane download function.
+        /// </summary>
+        /// <param name="url">The string url of the file to be downloaded.</param>
+        /// <param name="parts">The number of parts (processes) needed to download the file.</param>
+        /// <param name="bufferSize">The buffer size to use to download the file</param>
+        /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
+        public async static Task DownloadFile(string url, int parts, int bufferSize=8096,string outFile = null!)
         {
             //HTTP Client pool so we don't have to keep making them
             var httpPool = new ObjectPool<HttpClient?>(() =>
@@ -70,27 +76,28 @@ namespace OctaneEngine
                         //Request headers so we dont cache the file into memory
                         if (client != null)
                         {
-                            var message = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
-                                cancellationToken);
+                            var message = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
 
                             if (message.IsSuccessStatusCode)
                             {
                                 //Get the content stream from the message request
-                                await using var streamToRead = await message.Content.ReadAsStreamAsync(cancellationToken);
-                                //Create a memory mapped stream to the mmf with the piece offset and size equal to the response size
-                                var streams = mmf.CreateViewStream(piece.Start,
-                                    message.Content.Headers.ContentLength!.Value,
-                                    MemoryMappedFileAccess.ReadWrite);
-                                //Copy from the content stream to the mmf stream
-                                var T = streamToRead.CopyToAsync(streams, cancellationToken);
-                                await T.WaitAsync(cancellationToken);
-                                //If done, update progress, return http client to pool, and flush/close mmf stream
-                                if (T.IsCompletedSuccessfully)
+                                using (var streamToRead = new StreamContent(await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), bufferSize))
                                 {
-                                    pbar.Tick();
-                                    httpPool.Return(client);
-                                    streams.Flush();
-                                    streams.Close();
+                                    //Create a memory mapped stream to the mmf with the piece offset and size equal to the response size
+                                    using (var streams = mmf.CreateViewStream(piece.Start, message.Content.Headers.ContentLength!.Value, MemoryMappedFileAccess.ReadWrite))
+                                    {
+                                        //Copy from the content stream to the mmf stream
+                                        var T = streamToRead.CopyToAsync(streams, cancellationToken);
+                                        await T.WaitAsync(cancellationToken).ConfigureAwait(false);
+                                        //If done, update progress, return http client to pool, and flush/close mmf stream
+                                        if (T.IsCompletedSuccessfully)
+                                        {
+                                            pbar.Tick();
+                                            httpPool.Return(client);
+                                            streams.Flush();
+                                            streams.Close();
+                                        }
+                                    }
                                 }
                             }
                         }

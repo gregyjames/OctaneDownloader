@@ -1,4 +1,5 @@
-﻿using OctaneEngine;
+﻿using System;
+using OctaneEngine;
 
 namespace OctaneTester
 {
@@ -6,10 +7,9 @@ namespace OctaneTester
     {
         private static void Main()
         {
-            var s = Engine.DownloadFile(
-                    "https://bitport.io/my-files/download/zq2lly7320nqzwfa2dzbq2okek7yxr44/jxpdd1dcpu", 8);
-
+            var s = Engine.DownloadFile("https://speed.hetzner.de/1GB.bin", 2048, 4096);
             s.Wait();
+
 
         }
     }
