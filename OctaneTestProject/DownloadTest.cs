@@ -1,6 +1,6 @@
 ﻿using System.IO;
 using NUnit.Framework;
-using OctaneEngine;
+
 namespace OctaneEngine
 {
     [TestFixture]

@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace OctaneEngine
+﻿namespace OctaneEngine
 {
     internal class FileChunk
     {
