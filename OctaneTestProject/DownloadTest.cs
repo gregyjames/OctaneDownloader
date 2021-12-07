@@ -1,7 +1,8 @@
 ﻿using System.IO;
 using NUnit.Framework;
+using OctaneEngine;
 
-namespace OctaneEngine
+namespace OctaneTestProject
 {
     [TestFixture]
     public class DownloadTest
@@ -21,13 +22,10 @@ namespace OctaneEngine
         [Test]
         public void DownloadFile()
         {
-            var t = Engine.DownloadFile("https://www.wonderland.money/static/media/Chershire_Cat.24ee16b9.jpeg", 4, 256,"Chershire_Cat.24ee16b9.jpeg");
+            var t = Engine.DownloadFile("https://www.wonderland.money/static/media/Chershire_Cat.24ee16b9.jpeg", 4, 256,
+                false,"Chershire_Cat.24ee16b9.jpeg");
             t.Wait();
-            if (t.IsCompletedSuccessfully)
-            {
-                Assert.IsTrue(File.Exists("Chershire_Cat.24ee16b9.jpeg"));
-            }
+            if (t.IsCompletedSuccessfully) Assert.IsTrue(File.Exists("Chershire_Cat.24ee16b9.jpeg"));
         }
     }
-
 }

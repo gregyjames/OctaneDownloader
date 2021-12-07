@@ -1,7 +1,8 @@
 namespace OctaneEngine.ShellProgressBar
 {
-	public enum ProgressBarHeight
-	{
-		Increment, Decrement
-	}
+    public enum ProgressBarHeight
+    {
+        Increment,
+        Decrement
+    }
 }

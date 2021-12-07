@@ -5,20 +5,29 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <NeutralLanguage>en-US</NeutralLanguage>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageId>OctaneEngineCore</PackageId>
+        <PackageVersion>2.0.0</PackageVersion>
+        <Authors>Greg James</Authors>
+        <Description>A high Performance C# file downloader that asyncrounously downloads files as pieces. Made as a faster, more efficent replacement to Microsoft's WebClient.</Description>
+        <Copyright>2015, Greg James</Copyright>
+        <PackageProjectUrl>https://github.com/gregyjames/OctaneDownloader</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/gregyjames/OctaneDownloader</RepositoryUrl>
+        <PackageTags>c-sharp download parallel downloader multithreading threading networking</PackageTags>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
-      <Optimize>true</Optimize>
-      <DebugSymbols>false</DebugSymbols>
-      <PlatformTarget>x64</PlatformTarget>
+        <Optimize>true</Optimize>
+        <DebugSymbols>false</DebugSymbols>
+        <PlatformTarget>x64</PlatformTarget>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
-      <PlatformTarget>x64</PlatformTarget>
+        <PlatformTarget>x64</PlatformTarget>
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="ShellProgressBar" />
+        <Folder Include="ShellProgressBar" />
     </ItemGroup>
 
 </Project>

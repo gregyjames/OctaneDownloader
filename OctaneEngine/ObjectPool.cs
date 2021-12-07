@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 
 namespace OctaneEngine
 {
-    public class ObjectPool<T>
+    public class ObjectPool<T>: IDisposable
     {
         private ConcurrentBag<T>? _objects;
         private readonly Func<T> _objectGenerator;
@@ -14,13 +14,24 @@ namespace OctaneEngine
             _objects = new ConcurrentBag<T>();
         }
 
-        public T Get() => _objects != null && _objects.TryTake(out T? item) ? item : _objectGenerator();
+        public T Get()
+        {
+            return _objects != null && _objects.TryTake(out var item) ? item : _objectGenerator();
+        }
 
-        public void Return(T item) => _objects!.Add(item);
+        public void Return(T item)
+        {
+            _objects!.Add(item);
+        }
 
         public void Empty()
         {
             _objects = null;
+        }
+
+        public void Dispose()
+        {
+            Empty();
         }
     }
 }

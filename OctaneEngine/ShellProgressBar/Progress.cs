@@ -2,37 +2,34 @@ using System;
 
 namespace OctaneEngine.ShellProgressBar
 {
-	internal class Progress<T> : IProgress<T>, IDisposable
-	{
-		private readonly WeakReference<OctaneEngine.ShellProgressBar.IProgressBar> _progressBar;
-		private readonly Func<T, string> _message;
-		private readonly Func<T, double?> _percentage;
+    internal class Progress<T> : IProgress<T>, IDisposable
+    {
+        private readonly WeakReference<IProgressBar> _progressBar;
+        private readonly Func<T, string> _message;
+        private readonly Func<T, double?> _percentage;
 
-		public Progress(OctaneEngine.ShellProgressBar.IProgressBar progressBar, Func<T, string> message, Func<T, double?> percentage)
-		{
-			_progressBar = new WeakReference<OctaneEngine.ShellProgressBar.IProgressBar>(progressBar);
-			_message = message;
-			_percentage = percentage ?? (value => value as double? ?? value as float?);
-		}
+        public Progress(IProgressBar progressBar, Func<T, string> message, Func<T, double?> percentage)
+        {
+            _progressBar = new WeakReference<IProgressBar>(progressBar);
+            _message = message;
+            _percentage = percentage ?? (value => value as double? ?? value as float?);
+        }
 
-		public void Report(T value)
-		{
-			if (!_progressBar.TryGetTarget(out var progressBar)) return;
+        public void Report(T value)
+        {
+            if (!_progressBar.TryGetTarget(out var progressBar)) return;
 
-			var message = _message?.Invoke(value);
-			var percentage = _percentage(value);
-			if (percentage.HasValue)
-				progressBar.Tick((int)(percentage * progressBar.MaxTicks), message);
-			else
-				progressBar.Tick(message);
-		}
+            var message = _message?.Invoke(value);
+            var percentage = _percentage(value);
+            if (percentage.HasValue)
+                progressBar.Tick((int)(percentage * progressBar.MaxTicks), message);
+            else
+                progressBar.Tick(message);
+        }
 
-		public void Dispose()
-		{
-			if (_progressBar.TryGetTarget(out var progressBar))
-			{
-				progressBar.Dispose();
-			}
-		}
-	}
+        public void Dispose()
+        {
+            if (_progressBar.TryGetTarget(out var progressBar)) progressBar.Dispose();
+        }
+    }
 }
