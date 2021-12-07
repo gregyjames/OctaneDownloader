@@ -33,8 +33,6 @@ jobs:
     - name: Publish NuGet
       uses: brandedoutcast/publish-nuget@v2.5.5
       with:
-        # NuGet package id, used for version detection & defaults to project name
-        PACKAGE_NAME: OctaneEngineCore
         # Filepath of the project to be packaged, relative to root of repository
         PROJECT_FILE_PATH: D:\a\OctaneDownloader\OctaneDownloader\OctaneEngine\OctaneEngine.csproj
         # API key to authenticate with NuGet server
