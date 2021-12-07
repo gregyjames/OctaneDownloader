@@ -39,6 +39,8 @@ jobs:
         NUGET_KEY: ${{secrets.NUGET_AUTH_TOKEN}}
         # Flag to toggle pushing symbols along with nuget package to the server, disabled by default
         INCLUDE_SYMBOLS: false
+        # Useful with external providers like Nerdbank.GitVersioning, ignores VERSION_FILE_PATH & VERSION_REGEX
+        VERSION_STATIC: 2.0.0
         
  
     
