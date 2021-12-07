@@ -1,11 +1,17 @@
 ![C#](https://github.com/gregyjames/OctaneDownloader/actions/workflows/dotnet.yml/badge.svg)
 [![CodeQL](https://github.com/gregyjames/OctaneDownloader/actions/workflows/codeql-analysis.yml/badge.svg?branch=master)](https://github.com/gregyjames/OctaneDownloader/actions/workflows/codeql-analysis.yml)
 [![CodeFactor](https://www.codefactor.io/repository/github/gregyjames/octanedownloader/badge)](https://www.codefactor.io/repository/github/gregyjames/octanedownloader)
+[![NuGet latest version](https://badgen.net/nuget/v/OctaneEngine)](https://www.nuget.org/packages/OctaneEngine)
 
 ![alt tag](https://image.ibb.co/h2tK8v/Untitled_1.png)
 
 
 A high Performance C# file downloader that asyncrounously downloads files as pieces. Made as a faster, more efficent replacement to Microsoft's WebClient.Want to see the library in action? Check out [Octane YouTube Extractor](https://github.com/gregyjames/OCTANE-YoutubeExtractor)
+
+# Usage
+```sh
+dotnet add package OctaneEngine
+```
 
 # Features
 * Multipart Downloading
