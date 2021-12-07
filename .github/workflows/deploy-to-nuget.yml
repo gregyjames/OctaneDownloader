@@ -1,0 +1,38 @@
+name: Deploy to NuGet
+on: [workflow_dispatch]
+env:
+  PACKAGE_OUT_DIR: ${{ github.workspace }}\output
+  NUGET_SOURCE_URL: "https://api.nuget.org/v3/index.json"
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 6.0.x
+    - uses: actions/cache@v2
+      id: cacheStep
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Setup NuGet.exe for use with actions
+      uses: NuGet/setup-nuget@v1.0.5
+    - name: Restore NuGet
+      if: steps.cacheStep.outputs.cache-hit != 'true'
+      run: nuget restore Octane.sln
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+    - name: Pack project
+      run: dotnet pack --no-restore --no-build --configuration Release --include-symbols --output ${{ env.PACKAGE_OUT_DIR }}
+    - name: Push Package
+      run: dotnet nuget push ${{ env.PACKAGE_OUT_DIR }}\*.nupkg -k {{ secrets.NUGET_AUTH_TOKEN }} -s ${{ env.NUGET_SOURCE_URL }}
+    
+    
