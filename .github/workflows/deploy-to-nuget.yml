@@ -30,9 +30,16 @@ jobs:
       run: nuget restore Octane.sln
     - name: Build
       run: dotnet build --no-restore --configuration Release
-    - name: Pack project
-      run: dotnet pack --no-restore --no-build --configuration Release --include-symbols --output ${{ env.PACKAGE_OUT_DIR }}
-    - name: Push Package
-      run: dotnet nuget push ${{ env.PACKAGE_OUT_DIR }}\*.nupkg -k {{ secrets.NUGET_AUTH_TOKEN }} -s ${{ env.NUGET_SOURCE_URL }}
+    - name: Publish NuGet
+      uses: brandedoutcast/publish-nuget@v2.5.5
+      with:
+        # Filepath of the project to be packaged, relative to root of repository
+        PROJECT_FILE_PATH: /OctaneEngine/OctaneEngine.csproj
+        # API key to authenticate with NuGet server
+        NUGET_KEY: ${{secrets.NUGET_AUTH_TOKEN}}
+        # Flag to toggle pushing symbols along with nuget package to the server, disabled by default
+        INCLUDE_SYMBOLS: false
+        
+ 
     
     
