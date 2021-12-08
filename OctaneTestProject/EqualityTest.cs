@@ -17,8 +17,8 @@ namespace OctaneTestProject
         [TearDown]
         public void CleanUp()
         {
-            File.Delete("1.jpeg");
-            File.Delete("2.jpeg");
+            //File.Delete("1.jpeg");
+            //File.Delete("2.jpeg");
         }
 
         [Test]
@@ -31,9 +31,9 @@ namespace OctaneTestProject
                 {
                     client.DownloadFile(url, "2.jpeg");
                 }
-
-                Assert.IsTrue(File.ReadAllBytes("1.jpeg").SequenceEqual(File.ReadAllBytes("2.jpeg")));
             }).Wait();
+            
+            Assert.IsTrue(File.ReadAllBytes("1.jpeg").SequenceEqual(File.ReadAllBytes("2.jpeg")));
         }
     }
 }
