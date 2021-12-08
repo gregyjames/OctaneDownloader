@@ -147,6 +147,7 @@ namespace OctaneEngine.ShellProgressBar
         {
             var depth = indentation.Length;
             var messageWidth = 30;
+            var maxCharacterWidth = Console.WindowWidth - depth * 2 + 2;
             var truncatedMessage = StringExtensions.Excerpt(message, messageWidth - 2) + " ";
             var width = Console.WindowWidth - depth * 2 + 2 - truncatedMessage.Length;
 
