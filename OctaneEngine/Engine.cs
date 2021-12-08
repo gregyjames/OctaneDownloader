@@ -38,8 +38,9 @@ namespace OctaneEngine
         /// <param name="bufferSize">The buffer size to use to download the file</param>
         /// <param name="showProgress">Show the progressbars?</param>
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
+        /// <param name="doneCallback">Callback to handle download completion</param>
         public async static Task DownloadFile(string url, int parts, int bufferSize = 8096, bool showProgress = false,
-            string outFile = null!)
+            string outFile = null!, Action<Boolean> doneCallback = null!)
         {
             //HTTP Client pool so we don't have to keep making them
             var httpPool = new ObjectPool<HttpClient?>(() =>
@@ -171,8 +172,6 @@ namespace OctaneEngine
 
                                 request.Dispose();
                             });
-                        mmf.Dispose();
-                        httpPool.Empty();
                     }
                 }
 
@@ -230,7 +229,7 @@ namespace OctaneEngine
                                                         cancellationToken);
                                                 }
                                             } while (bytesRead != 0);
-                                            
+
                                             streams.Flush();
                                             streams.Close();
                                         }
@@ -245,13 +244,18 @@ namespace OctaneEngine
                             request.Dispose();
                             httpPool.Return(client);
                         });
-                    mmf.Dispose();
-                    httpPool.Dispose();
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
+                doneCallback(false);
+            }
+            finally
+            {
+                mmf.Dispose();
+                httpPool.Empty();
+                doneCallback(true);
             }
         }
     }
