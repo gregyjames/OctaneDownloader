@@ -7,7 +7,7 @@ namespace OctaneTester
     {
         private static void Main()
         {
-            Engine.DownloadFile("https://speed.hetzner.de/1GB.bin", Environment.ProcessorCount, 8192, false, null!, x =>
+            Engine.DownloadFile("https://speed.hetzner.de/100MB.bin", Environment.ProcessorCount, 8192, true, null!, x =>
                 {
                     //Task completion action example
                     Console.WriteLine(x ? "Done!" : "Download failed!");
