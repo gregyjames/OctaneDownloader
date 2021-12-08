@@ -12,7 +12,9 @@ namespace OctaneEngine
         // network cable got pulled out."
         private readonly int _maxRetries = 3;
 
-        public RetryHandler(HttpMessageHandler innerHandler) : base(innerHandler) { }
+        public RetryHandler(HttpMessageHandler innerHandler) : base(innerHandler)
+        {
+        }
 
         public RetryHandler(HttpMessageHandler innerHandler, int maxRetries) : base(innerHandler)
         {
@@ -24,13 +26,10 @@ namespace OctaneEngine
             CancellationToken cancellationToken)
         {
             HttpResponseMessage? response = null;
-            for (int i = 0; i < _maxRetries; i++)
+            for (var i = 0; i < _maxRetries; i++)
             {
                 response = await base.SendAsync(request, cancellationToken);
-                if (response.IsSuccessStatusCode)
-                {
-                    return response;
-                }
+                if (response.IsSuccessStatusCode) return response;
             }
 
             Debug.Assert(response != null, nameof(response) + " != null");

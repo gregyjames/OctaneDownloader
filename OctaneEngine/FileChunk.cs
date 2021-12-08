@@ -4,7 +4,11 @@
     {
         public long Start { get; set; }
         public long End { get; set; }
-        public FileChunk(){}
+
+        public FileChunk()
+        {
+        }
+
         public int Id { get; set; }
 
         public FileChunk(long startByte, long endByte)
