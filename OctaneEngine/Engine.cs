@@ -39,12 +39,13 @@ namespace OctaneEngine
         /// <param name="showProgress">Show the progressbars?</param>
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
         /// <param name="doneCallback">Callback to handle download completion</param>
+        /// <param name="numRetries">Number of times to retry a failed download</param>
         public async static Task DownloadFile(string url, int parts, int bufferSize = 8096, bool showProgress = false,
-            string outFile = null!, Action<Boolean> doneCallback = null!)
+            string outFile = null!, Action<Boolean> doneCallback = null!, int numRetries = 10)
         {
             //HTTP Client pool so we don't have to keep making them
             var httpPool = new ObjectPool<HttpClient?>(() =>
-                new HttpClient(new RetryHandler(new HttpClientHandler(), 10))
+                new HttpClient(new RetryHandler(new HttpClientHandler(), numRetries))
                     { MaxResponseContentBufferSize = 1000000000 });
 
             ServicePointManager.Expect100Continue = false;
