@@ -8,7 +8,7 @@ namespace OctaneTestProject
 {
     public class EqualityTest
     {
-        [SetUp]
+        /*[SetUp]
         public void Init()
         {
             //_exists = false;
@@ -34,6 +34,6 @@ namespace OctaneTestProject
             }).Wait();
             
             Assert.IsTrue(File.ReadAllBytes("1.jpeg").SequenceEqual(File.ReadAllBytes("2.jpeg")));
-        }
+        }*/
     }
 }
