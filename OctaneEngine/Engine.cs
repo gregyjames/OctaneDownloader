@@ -5,6 +5,7 @@ using System.IO.MemoryMappedFiles;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Threading;
 using System.Threading.Tasks;
 using ProgressBar = OctaneEngine.ShellProgressBar.ProgressBar;
 using ProgressBarOptions = OctaneEngine.ShellProgressBar.ProgressBarOptions;
@@ -39,9 +40,10 @@ namespace OctaneEngine
         /// <param name="showProgress">Show the progressbars?</param>
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
         /// <param name="doneCallback">Callback to handle download completion</param>
+        /// <param name="progressCallback">The callback for progress if not wanting to use the built in progress</param>
         /// <param name="numRetries">Number of times to retry a failed download</param>
         public async static Task DownloadFile(string url, int parts, int bufferSize = 8096, bool showProgress = false,
-            string outFile = null!, Action<Boolean> doneCallback = null!, int numRetries = 10)
+            string outFile = null!, Action<Boolean> doneCallback = null!, Action<Double> progressCallback = null!, int numRetries = 10)
         {
             //HTTP Client pool so we don't have to keep making them
             var httpPool = new ObjectPool<HttpClient?>(() =>
@@ -92,6 +94,8 @@ namespace OctaneEngine
                 BackgroundCharacter = '\u2591'
             };
 
+            int tasksDone = 0;
+            
             try
             {
                 if (showProgress)
@@ -244,6 +248,9 @@ namespace OctaneEngine
 
                             request.Dispose();
                             httpPool.Return(client);
+                            //Interlocked.Add(ref tasksDone, 1);
+                            tasksDone += 1;
+                            progressCallback((double)((tasksDone + 0.0)/(parts + 0.0)));
                         });
                 }
             }
