@@ -26,6 +26,7 @@ namespace OctaneEngine
 
         public void Empty()
         {
+            _objects.Clear();
             _objects = null;
         }
 

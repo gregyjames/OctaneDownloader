@@ -1,20 +1,14 @@
 ﻿namespace OctaneEngine
 {
-    internal class FileChunk
+    internal readonly struct FileChunk
     {
-        public long Start { get; set; }
-        public long End { get; set; }
-
-        public FileChunk()
-        {
-        }
-
-        public int Id { get; set; }
+        public long Start { get; }
+        public long End { get; }
 
         public FileChunk(long startByte, long endByte)
         {
-            Start = startByte;
-            End = endByte;
+            this.Start = startByte;
+            this.End = endByte;
         }
     }
 }

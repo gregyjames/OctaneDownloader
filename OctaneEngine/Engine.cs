@@ -16,9 +16,9 @@ namespace OctaneEngine
 {
     public static class Engine
     {
+        static string[] sizes = { "B", "KB", "MB", "GB", "TB" };
         private static string prettySize(long len)
         {
-            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
             int order = 0;
             while (len >= 1024 && order < sizes.Length - 1)
             {
@@ -45,10 +45,12 @@ namespace OctaneEngine
         public async static Task DownloadFile(string url, int parts, int bufferSize = 8096, bool showProgress = false,
             string outFile = null!, Action<Boolean> doneCallback = null!, Action<Double> progressCallback = null!, int numRetries = 10)
         {
+            if (url == null) throw new ArgumentNullException(nameof(url));
+            
             //HTTP Client pool so we don't have to keep making them
             var httpPool = new ObjectPool<HttpClient?>(() =>
                 new HttpClient(new RetryHandler(new HttpClientHandler(), numRetries))
-                    { MaxResponseContentBufferSize = 1000000000 });
+                    { MaxResponseContentBufferSize = bufferSize });
 
             ServicePointManager.Expect100Continue = false;
             ServicePointManager.DefaultConnectionLimit = 10000;
@@ -82,7 +84,8 @@ namespace OctaneEngine
             {
                 ProgressBarOnBottom = false,
                 BackgroundCharacter = '\u2593',
-                DenseProgressBar = false
+                DenseProgressBar = false,
+                DisplayTimeInRealTime = false
             };
             var childOptions = new ProgressBarOptions
             {
@@ -91,7 +94,8 @@ namespace OctaneEngine
                 CollapseWhenFinished = true,
                 DenseProgressBar = false,
                 //ProgressCharacter = null,
-                BackgroundCharacter = '\u2591'
+                BackgroundCharacter = '\u2591',
+                DisplayTimeInRealTime = false
             };
 
             int tasksDone = 0;
@@ -106,9 +110,12 @@ namespace OctaneEngine
                             new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount },
                             async (piece, cancellationToken) =>
                             {
+                                System.Diagnostics.Trace.Listeners.Clear();
                                 //Get a http client from the pool and request for the content range
+                                
                                 var client = httpPool.Get();
                                 var request = new HttpRequestMessage { RequestUri = new Uri(url) };
+                                
                                 request.Headers.Range = new RangeHeaderValue(piece.Start, piece.End);
 
                                 //Request headers so we dont cache the file into memory
@@ -161,6 +168,8 @@ namespace OctaneEngine
                                                             chil.Tick();
                                                         }
                                                     } while (bytesRead != 0);
+                                                    
+                                                    Array.Clear(buffer);
                                                 }
 
                                                 streams.Flush();
@@ -175,7 +184,9 @@ namespace OctaneEngine
                                     message.Dispose();
                                 }
 
+                                Interlocked.Increment(ref tasksDone);
                                 request.Dispose();
+                                httpPool.Return(client);
                             });
                     }
                 }
@@ -190,7 +201,7 @@ namespace OctaneEngine
                             var client = httpPool.Get();
                             var request = new HttpRequestMessage { RequestUri = new Uri(url) };
                             request.Headers.Range = new RangeHeaderValue(piece.Start, piece.End);
-
+                            
                             //Request headers so we dont cache the file into memory
                             if (client != null)
                             {
@@ -243,13 +254,13 @@ namespace OctaneEngine
                                     }
                                 }
 
+                                message.Content.Dispose();
                                 message.Dispose();
                             }
 
                             request.Dispose();
+                            Interlocked.Increment(ref tasksDone);
                             httpPool.Return(client);
-                            //Interlocked.Add(ref tasksDone, 1);
-                            tasksDone += 1;
                             progressCallback((double)((tasksDone + 0.0)/(parts + 0.0)));
                         });
                 }
