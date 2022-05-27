@@ -22,7 +22,7 @@ namespace OctaneTestProject
         [Test]
         public void DownloadFile()
         {
-            var url = "https://www.wonderland.money/static/media/Chershire_Cat.24ee16b9.jpeg";
+            var url = "https://file-examples.com/storage/fe2a923118628f9c0986d27/2017/10/file_example_JPG_2500kB.jpg";
             var outFile = "Chershire_Cat.24ee16b9.jpeg";
             
             Engine.DownloadFile(url, 4, 256,
