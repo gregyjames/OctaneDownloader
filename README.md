@@ -21,6 +21,11 @@ dotnet add package OctaneEngineCore
 * Progress
 
 # Usage
+### Simple usage
+```csharp
+Engine.DownloadFile("https://speed.hetzner.de/100MB.bin", 4);
+```
+### Advanced usage
 ```csharp
 Engine.DownloadFile("https://speed.hetzner.de/100MB.bin", 4, 8192, true, null!, x =>
 {
