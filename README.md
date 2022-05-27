@@ -20,6 +20,15 @@ dotnet add package OctaneEngineCore
 * Download Retry
 * Progress
 
+# Usage
+```csharp
+Engine.DownloadFile("https://speed.hetzner.de/100MB.bin", 4, 8192, true, null!, x =>
+{
+  //Task completion action example
+  Console.WriteLine(x ? "Done!" : "Download failed!");
+},Console.WriteLine).Wait();
+```
+
 # License
 The MIT License (MIT)
 
