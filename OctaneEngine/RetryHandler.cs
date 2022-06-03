@@ -14,6 +14,7 @@ namespace OctaneEngine
 
         public RetryHandler(HttpMessageHandler innerHandler) : base(innerHandler)
         {
+            
         }
 
         public RetryHandler(HttpMessageHandler innerHandler, int maxRetries) : base(innerHandler)
@@ -28,6 +29,7 @@ namespace OctaneEngine
             HttpResponseMessage? response = null;
             for (var i = 0; i < _maxRetries; i++)
             {
+                
                 response = await base.SendAsync(request, cancellationToken);
                 if (response.IsSuccessStatusCode) return response;
             }
