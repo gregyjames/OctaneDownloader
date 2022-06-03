@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.MemoryMappedFiles;
@@ -49,16 +50,26 @@ namespace OctaneEngine
             
             //HTTP Client pool so we don't have to keep making them
             var httpPool = new ObjectPool<HttpClient?>(() =>
-                new HttpClient(new RetryHandler(new HttpClientHandler(), numRetries))
-                    { MaxResponseContentBufferSize = bufferSize });
+                new HttpClient(new RetryHandler(new HttpClientHandler
+                    {
+                        Proxy = null,
+                        UseProxy = false,
+                        MaxConnectionsPerServer = 256,
+                        UseCookies = false
+                    }, numRetries))
+                    { MaxResponseContentBufferSize = bufferSize});
 
+            var memPool = ArrayPool<byte>.Shared;
+            
             ServicePointManager.Expect100Continue = false;
             ServicePointManager.DefaultConnectionLimit = 10000;
 
             //Get response length and calculate part sizes
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
             var partSize = (long)Math.Floor(responseLength / (parts + 0.0));
-            var pieces = new List<FileChunk>();
+            //var pieces = new List<FileChunk>();
+
+            var pieces = new List<ValueTuple<long, long>>();
             var uri = new Uri(url);
 
             Console.WriteLine("TOTAL SIZE: " + prettySize(responseLength));
@@ -67,16 +78,10 @@ namespace OctaneEngine
             //Get outfile name from argument or URL
             string filename = outFile ?? Path.GetFileName(uri.LocalPath);
 
-            //Create memory mapped file to hold the file
-            var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, responseLength,
-                MemoryMappedFileAccess.ReadWrite);
-
             //Loop to add all the events to the queue
             for (long i = 0; i < responseLength; i += partSize)
             {
-                pieces.Add(i + partSize < responseLength
-                    ? new FileChunk(i, i + partSize)
-                    : new FileChunk(i, responseLength));
+                pieces.Insert(0,(i + partSize < responseLength ? new ValueTuple<long, long>(i, i + partSize) : new ValueTuple<long, long>(i, responseLength)));
             }
 
             //Options for progress base
@@ -92,189 +97,216 @@ namespace OctaneEngine
                 ForegroundColor = ConsoleColor.Cyan,
                 BackgroundColor = ConsoleColor.Black,
                 CollapseWhenFinished = true,
-                DenseProgressBar = false,
-                //ProgressCharacter = null,
+                DenseProgressBar = true,
                 BackgroundCharacter = '\u2591',
                 DisplayTimeInRealTime = false
             };
 
-            int tasksDone = 0;
-            
-            try
+            //Create memory mapped file to hold the file
+            using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, responseLength,
+                MemoryMappedFileAccess.ReadWrite))
             {
-                if (showProgress)
+                int tasksDone = 0;
+                //var pieceCounts = Enumerable.Range(0, parts);
+                try
                 {
-                    using (var pbar = new ProgressBar(parts, "Downloading File...", options))
+                    if (showProgress)
+                    {
+                        using (var pbar = new ProgressBar(parts, "Downloading File...", options))
+                        {
+                            await Parallel.ForEachAsync(pieces,
+                                new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                                async (piece, cancellationToken) =>
+                                {
+                                    System.Diagnostics.Trace.Listeners.Clear();
+                                    //Get a http client from the pool and request for the content range
+
+                                    var client = httpPool.Get();
+                                    try
+                                    {
+                                        using (var request = new HttpRequestMessage { RequestUri = new Uri(url) })
+                                        {
+
+                                            request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
+
+                                            //Request headers so we dont cache the file into memory
+                                            if (client != null)
+                                            {
+                                                using (var message = await client.SendAsync(request,
+                                                    HttpCompletionOption.ResponseHeadersRead,
+                                                    cancellationToken).ConfigureAwait(false))
+                                                {
+
+                                                    if (message.IsSuccessStatusCode)
+                                                    {
+                                                        //Get the content stream from the message request
+                                                        using (var streamToRead = await message.Content
+                                                            .ReadAsStreamAsync(cancellationToken)
+                                                            .ConfigureAwait(false))
+                                                        {
+                                                            //Create a memory mapped stream to the mmf with the piece offset and size equal to the response size
+                                                            using (var streams = mmf.CreateViewStream(piece.Item1,
+                                                                message.Content.Headers.ContentLength!.Value,
+                                                                MemoryMappedFileAccess.Write))
+                                                            {
+                                                                using (var chil =
+                                                                    pbar.Spawn(
+                                                                        (int)Math.Round(
+                                                                            (double)(message.Content.Headers
+                                                                                    .ContentLength /
+                                                                                bufferSize)), "", childOptions))
+                                                                {
+                                                                    //Copy from the content stream to the mmf stream
+                                                                    //var buffer = new byte[bufferSize];
+                                                                    var buffer = memPool.Rent(bufferSize);
+
+                                                                    int offset, bytesRead;
+                                                                    // Until we've read everything
+                                                                    do
+                                                                    {
+                                                                        offset = 0;
+                                                                        // Until the buffer is very nearly full or there's nothing left to read
+                                                                        do
+                                                                        {
+                                                                            bytesRead = await streamToRead.ReadAsync(
+                                                                                    buffer.AsMemory(offset,
+                                                                                        bufferSize - offset),
+                                                                                    cancellationToken)
+                                                                                .ConfigureAwait(false);
+                                                                            offset += bytesRead;
+                                                                        } while (bytesRead != 0 && offset < bufferSize);
+
+                                                                        // Empty the buffer
+                                                                        if (offset != 0)
+                                                                        {
+                                                                            //fileStrm.Write(buffer, 0, offset);
+                                                                            await streams.WriteAsync(
+                                                                                    buffer.AsMemory(0, offset),
+                                                                                    cancellationToken)
+                                                                                .ConfigureAwait(false);
+                                                                            chil.Tick();
+                                                                        }
+                                                                    } while (bytesRead != 0);
+
+                                                                    //Array.Clear(buffer);
+                                                                    memPool.Return(buffer, false);
+                                                                }
+
+                                                                streams.Flush();
+                                                                //streams.Close();
+                                                            }
+
+                                                            //streamToRead.Close();
+                                                        }
+                                                    }
+
+                                                    pbar.Tick();
+                                                }
+                                            }
+
+                                            Interlocked.Increment(ref tasksDone);
+                                        }
+                                    }
+                                    finally
+                                    {
+                                        httpPool.Return(client);
+                                    }
+                                });
+                        }
+                    }
+
+                    else
                     {
                         await Parallel.ForEachAsync(pieces,
                             new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount },
                             async (piece, cancellationToken) =>
                             {
-                                System.Diagnostics.Trace.Listeners.Clear();
                                 //Get a http client from the pool and request for the content range
-                                
                                 var client = httpPool.Get();
-                                var request = new HttpRequestMessage { RequestUri = new Uri(url) };
-                                
-                                request.Headers.Range = new RangeHeaderValue(piece.Start, piece.End);
-
-                                //Request headers so we dont cache the file into memory
-                                if (client != null)
+                                try
                                 {
-                                    var message = await client.SendAsync(request,
-                                        HttpCompletionOption.ResponseHeadersRead,
-                                        cancellationToken).ConfigureAwait(false);
-
-                                    if (message.IsSuccessStatusCode)
+                                    using (var request = new HttpRequestMessage { RequestUri = new Uri(url) })
                                     {
-                                        //Get the content stream from the message request
-                                        using (var streamToRead = await message.Content
-                                            .ReadAsStreamAsync(cancellationToken)
-                                            .ConfigureAwait(false))
+                                        request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
+
+                                        //Request headers so we dont cache the file into memory
+                                        if (client != null)
                                         {
-                                            //Create a memory mapped stream to the mmf with the piece offset and size equal to the response size
-                                            using (var streams = mmf.CreateViewStream(piece.Start,
-                                                message.Content.Headers.ContentLength!.Value,
-                                                MemoryMappedFileAccess.ReadWrite))
+                                            using (var message = await client.SendAsync(request,
+                                                HttpCompletionOption.ResponseHeadersRead,
+                                                cancellationToken).ConfigureAwait(false))
                                             {
-                                                using (var chil =
-                                                    pbar.Spawn(
-                                                        (int)Math.Round(
-                                                            (decimal)(message.Content.Headers.ContentLength /
-                                                                      bufferSize)), "", childOptions))
+
+                                                if (message.IsSuccessStatusCode)
                                                 {
-                                                    //Copy from the content stream to the mmf stream
-                                                    var buffer = new byte[bufferSize];
-                                                    int offset, bytesRead;
-                                                    // Until we've read everything
-                                                    do
+                                                    //Get the content stream from the message request
+                                                    using (var streamToRead = await message.Content
+                                                        .ReadAsStreamAsync(cancellationToken)
+                                                        .ConfigureAwait(false))
                                                     {
-                                                        offset = 0;
-                                                        // Until the buffer is very nearly full or there's nothing left to read
-                                                        do
+                                                        //Create a memory mapped stream to the mmf with the piece offset and size equal to the response size
+                                                        using (var streams = mmf.CreateViewStream(piece.Item1,
+                                                            message.Content.Headers.ContentLength!.Value,
+                                                            MemoryMappedFileAccess.Write))
                                                         {
-                                                            bytesRead = await streamToRead.ReadAsync(
-                                                                buffer.AsMemory(offset, bufferSize - offset),
-                                                                cancellationToken).ConfigureAwait(false);
-                                                            offset += bytesRead;
-                                                        } while (bytesRead != 0 && offset < bufferSize);
+                                                            //Copy from the content stream to the mmf stream
+                                                            //var buffer = new byte[bufferSize];
+                                                            var buffer = memPool.Rent(bufferSize);
+                                                            int offset, bytesRead;
+                                                            // Until we've read everything
+                                                            do
+                                                            {
+                                                                offset = 0;
+                                                                // Until the buffer is very nearly full or there's nothing left to read
+                                                                do
+                                                                {
+                                                                    bytesRead = await streamToRead.ReadAsync(
+                                                                        buffer.AsMemory(offset, bufferSize - offset),
+                                                                        cancellationToken);
+                                                                    offset += bytesRead;
+                                                                } while (bytesRead != 0 && offset < bufferSize);
 
-                                                        // Empty the buffer
-                                                        if (offset != 0)
-                                                        {
-                                                            //fileStrm.Write(buffer, 0, offset);
-                                                            await streams.WriteAsync(buffer.AsMemory(0, offset),
-                                                                cancellationToken).ConfigureAwait(false);
-                                                            chil.Tick();
+                                                                // Empty the buffer
+                                                                if (offset != 0)
+                                                                {
+                                                                    //fileStrm.Write(buffer, 0, offset);
+                                                                    await streams.WriteAsync(buffer.AsMemory(0, offset),
+                                                                        cancellationToken);
+                                                                }
+                                                            } while (bytesRead != 0);
+
+                                                            streams.Flush();
+                                                            //streams.Close();
+                                                            memPool.Return(buffer);
                                                         }
-                                                    } while (bytesRead != 0);
-                                                    
-                                                    Array.Clear(buffer);
+
+                                                        //streamToRead.Close();
+                                                    }
                                                 }
-
-                                                streams.Flush();
-                                                streams.Close();
                                             }
-
-                                            streamToRead.Close();
                                         }
+
                                     }
-
-                                    pbar.Tick();
-                                    message.Dispose();
                                 }
-
-                                Interlocked.Increment(ref tasksDone);
-                                request.Dispose();
-                                httpPool.Return(client);
+                                finally
+                                {
+                                    Interlocked.Increment(ref tasksDone);
+                                    httpPool.Return(client);
+                                    progressCallback((double)((tasksDone + 0.0) / (parts + 0.0)));
+                                }
                             });
                     }
                 }
-
-                else
+                catch (Exception ex)
                 {
-                    await Parallel.ForEachAsync(pieces,
-                        new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount },
-                        async (piece, cancellationToken) =>
-                        {
-                            //Get a http client from the pool and request for the content range
-                            var client = httpPool.Get();
-                            var request = new HttpRequestMessage { RequestUri = new Uri(url) };
-                            request.Headers.Range = new RangeHeaderValue(piece.Start, piece.End);
-                            
-                            //Request headers so we dont cache the file into memory
-                            if (client != null)
-                            {
-                                var message = await client.SendAsync(request,
-                                    HttpCompletionOption.ResponseHeadersRead,
-                                    cancellationToken).ConfigureAwait(false);
-
-                                if (message.IsSuccessStatusCode)
-                                {
-                                    //Get the content stream from the message request
-                                    using (var streamToRead = await message.Content
-                                        .ReadAsStreamAsync(cancellationToken)
-                                        .ConfigureAwait(false))
-                                    {
-                                        //Create a memory mapped stream to the mmf with the piece offset and size equal to the response size
-                                        using (var streams = mmf.CreateViewStream(piece.Start,
-                                            message.Content.Headers.ContentLength!.Value,
-                                            MemoryMappedFileAccess.ReadWrite))
-                                        {
-                                            //Copy from the content stream to the mmf stream
-                                            var buffer = new byte[bufferSize];
-                                            int offset, bytesRead;
-                                            // Until we've read everything
-                                            do
-                                            {
-                                                offset = 0;
-                                                // Until the buffer is very nearly full or there's nothing left to read
-                                                do
-                                                {
-                                                    bytesRead = await streamToRead.ReadAsync(
-                                                        buffer.AsMemory(offset, bufferSize - offset),
-                                                        cancellationToken);
-                                                    offset += bytesRead;
-                                                } while (bytesRead != 0 && offset < bufferSize);
-
-                                                // Empty the buffer
-                                                if (offset != 0)
-                                                {
-                                                    //fileStrm.Write(buffer, 0, offset);
-                                                    await streams.WriteAsync(buffer.AsMemory(0, offset),
-                                                        cancellationToken);
-                                                }
-                                            } while (bytesRead != 0);
-
-                                            streams.Flush();
-                                            streams.Close();
-                                        }
-
-                                        streamToRead.Close();
-                                    }
-                                }
-
-                                message.Content.Dispose();
-                                message.Dispose();
-                            }
-
-                            request.Dispose();
-                            Interlocked.Increment(ref tasksDone);
-                            httpPool.Return(client);
-                            progressCallback((double)((tasksDone + 0.0)/(parts + 0.0)));
-                        });
+                    Console.WriteLine(ex.Message);
+                    doneCallback(false);
                 }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-                doneCallback(false);
-            }
-            finally
-            {
-                mmf.Dispose();
-                httpPool.Empty();
-                doneCallback(true);
+                finally
+                {
+                    httpPool.Empty();
+                    doneCallback(true);
+                }
             }
         }
     }
