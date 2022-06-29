@@ -17,7 +17,7 @@ namespace OctaneEngine
 {
     public static class Engine
     {
-        static string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        static readonly string[] sizes = { "B", "KB", "MB", "GB", "TB" };
         private static string prettySize(long len)
         {
             int order = 0;
