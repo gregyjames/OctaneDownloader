@@ -22,7 +22,7 @@ namespace OctaneTestProject
         [Test]
         public void DownloadFile()
         {
-            var url = "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Nintendo-Famicom-Disk-System.png/1024px-Nintendo-Famicom-Disk-System.png";
+            var url = "http://ipv4.download.thinkbroadband.com/5MB.zip";
             var outFile = "Chershire_Cat.24ee16b9.jpeg";
             
             Engine.DownloadFile(url, 4, 256,
