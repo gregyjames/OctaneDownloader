@@ -9,13 +9,13 @@ using System.Threading.Tasks;
 
 namespace OctaneEngine
 {
-    public static class Extensions
+public static class Extensions
+{
+public static Task<Stream> ReadAsStreamAsync(this HttpContent httpContent, CancellationToken cancellationToken)
     {
-        public static Task<Stream> ReadAsStreamAsync(this HttpContent httpContent, CancellationToken cancellationToken)
-        {
-            return httpContent.ReadAsStreamAsync();
-        }
-
+        return httpContent.ReadAsStreamAsync();
     }
+
+}
 }
 #endif
