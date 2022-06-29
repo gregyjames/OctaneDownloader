@@ -169,8 +169,8 @@ namespace OctaneEngine
                                                                         do
                                                                         {
                                                                             bytesRead = await streamToRead.ReadAsync(
-                                                                                    buffer.AsMemory(offset,
-                                                                                        bufferSize - offset),
+                                                                                    buffer, offset,
+                                                                                    bufferSize - offset,
                                                                                     cancellationToken)
                                                                                 .ConfigureAwait(false);
                                                                             offset += bytesRead;
@@ -181,7 +181,7 @@ namespace OctaneEngine
                                                                         {
                                                                             //fileStrm.Write(buffer, 0, offset);
                                                                             await streams.WriteAsync(
-                                                                                    buffer.AsMemory(0, offset),
+                                                                                    buffer, 0, offset,
                                                                                     cancellationToken)
                                                                                 .ConfigureAwait(false);
                                                                             chil.Tick();
@@ -261,7 +261,7 @@ namespace OctaneEngine
                                                                 do
                                                                 {
                                                                     bytesRead = await streamToRead.ReadAsync(
-                                                                        buffer.AsMemory(offset, bufferSize - offset),
+                                                                        buffer, offset, bufferSize - offset,
                                                                         cancellationToken);
                                                                     offset += bytesRead;
                                                                 } while (bytesRead != 0 && offset < bufferSize);
@@ -270,7 +270,7 @@ namespace OctaneEngine
                                                                 if (offset != 0)
                                                                 {
                                                                     //fileStrm.Write(buffer, 0, offset);
-                                                                    await streams.WriteAsync(buffer.AsMemory(0, offset),
+                                                                    await streams.WriteAsync(buffer, 0, offset,
                                                                         cancellationToken);
                                                                 }
                                                             } while (bytesRead != 0);
