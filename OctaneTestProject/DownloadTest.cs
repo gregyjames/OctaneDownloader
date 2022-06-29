@@ -16,14 +16,14 @@ namespace OctaneTestProject
         [TearDown]
         public void CleanUp()
         {
-            File.Delete("Chershire_Cat.24ee16b9.jpeg");
+            File.Delete("Chershire_Cat.24ee16b9.png");
         }
 
         [Test]
         public void DownloadFile()
         {
-            var url = "http://ipv4.download.thinkbroadband.com/5MB.zip";
-            var outFile = "Chershire_Cat.24ee16b9.jpeg";
+            var url = "https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
+            var outFile = "Chershire_Cat.24ee16b9.png";
             
             Engine.DownloadFile(url, 4, 256,
                 false,outFile, b =>
