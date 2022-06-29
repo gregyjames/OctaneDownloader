@@ -26,7 +26,13 @@ namespace OctaneEngine
 
         public void Empty()
         {
+#if NET461 || NET472
+            T? ignored;
+            while (_objects.TryTake(out ignored));
+#else
             _objects.Clear();
+#endif
+
             _objects = null;
         }
 
