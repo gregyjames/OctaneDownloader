@@ -67,8 +67,6 @@ namespace OctaneEngine
             //Get response length and calculate part sizes
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
             var partSize = (long)Math.Floor(responseLength / (parts + 0.0));
-            //var pieces = new List<FileChunk>();
-
             var pieces = new List<ValueTuple<long, long>>();
             var uri = new Uri(url);
 
@@ -292,7 +290,7 @@ namespace OctaneEngine
                                 {
                                     Interlocked.Increment(ref tasksDone);
                                     httpPool.Return(client);
-                                    progressCallback((double)((tasksDone + 0.0) / (parts + 0.0)));
+                                    progressCallback((double)((tasksDone + 0.0) / (pieces.Count + 0.0)));
                                 }
                             });
                     }
