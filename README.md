@@ -44,6 +44,8 @@ var config = new OctaneConfiguration
   UseProxy = false,
   Proxy = null
 };
+
+Engine.DownloadFile("https://speed.hetzner.de/100MB.bin", "outfile.bin", config);
 ```
 
 # License
