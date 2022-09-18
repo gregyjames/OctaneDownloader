@@ -19,6 +19,7 @@ dotnet add package OctaneEngineCore
 * Multipart Downloading
 * Download Retry
 * Progress
+* Throttling
 
 # Usage
 ### Simple usage
