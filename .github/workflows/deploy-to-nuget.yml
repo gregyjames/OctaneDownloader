@@ -39,5 +39,5 @@ jobs:
         NUGET_KEY: ${{secrets.NUGET_AUTH_TOKEN}}
         # Flag to toggle pushing symbols along with nuget package to the server, disabled by default
         INCLUDE_SYMBOLS: false
-        VERSION_REGEX: ‘^\s*<Version>(.*)<\/Version>\s*$’
+        VERSION_REGEX: " (. *) <\ / Version>"
         TAG_FORMAT: ‘*’
