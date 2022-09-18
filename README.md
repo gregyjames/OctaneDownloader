@@ -20,6 +20,7 @@ dotnet add package OctaneEngineCore
 * Download Retry
 * Progress
 * Throttling
+* Proxy Support
 
 # Usage
 ### Simple usage
