@@ -20,6 +20,7 @@ dotnet add package OctaneEngineCore
 * Download Retry
 * Progress
 * Throttling
+* Proxy Support
 
 # Usage
 ### Simple usage
@@ -39,10 +40,12 @@ var config = new OctaneConfiguration
   DoneCallback = x => Assert.IsTrue(File.Exists(outFile)),
   ProgressCallback = Console.WriteLine,
   NumRetries = 20,
-  BytesPerSecond = 0
+  BytesPerSecond = 0,
+  UseProxy = false,
+  Proxy = null
 };
-            
-Engine.DownloadFile(url, outFile, config).Wait();
+
+Engine.DownloadFile("https://speed.hetzner.de/100MB.bin", "outfile.bin", config);
 ```
 
 # License
