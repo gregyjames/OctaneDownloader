@@ -36,14 +36,7 @@ namespace OctaneEngine
         /// The core octane download function.
         /// </summary>
         /// <param name="url">The string url of the file to be downloaded.</param>
-        /// <param name="parts">The number of parts (processes) needed to download the file.</param>
-        /// <param name="bufferSize">The buffer size to use to download the file</param>
-        /// <param name="showProgress">Show the progressbars?</param>
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
-        /// <param name="doneCallback">Callback to handle download completion</param>
-        /// <param name="progressCallback">The callback for progress if not wanting to use the built in progress</param>
-        /// <param name="numRetries">Number of times to retry a failed download</param>
-        /// <param name="bytesPerSecond">Throttle the file download speed if specified. 1 means unlimited.</param>
         public async static Task DownloadFile(string url, string outFile = null , OctaneConfiguration config = null)
         {
             if (config == null)

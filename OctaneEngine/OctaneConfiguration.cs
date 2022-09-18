@@ -1,67 +1,52 @@
 using System;
-using System.Collections;
 
 namespace OctaneEngine;
 
 public class OctaneConfiguration
 {
-    private int _parts;
-    private int _bufferSize;
-    private bool _showProgress;
-    private Action<Boolean> _doneCallback;
-    private Action<Double> _progressCallback;
-    private int _numRetries;
-    private int _bytesPerSecond;
-    
-    public int Parts
-    {
-        get => _parts;
-        set => _parts = value;
-    }
+    /// <summary>
+    /// The number of parts to download in parallel.
+    /// </summary>
+    public int Parts { get; set; }
 
-    public int BufferSize
-    {
-        get => _bufferSize;
-        set => _bufferSize = value;
-    }
+    /// <summary>
+    /// The memory buffersize to use, default 8192.
+    /// </summary>
+    public int BufferSize { get; set; }
 
-    public bool ShowProgress
-    {
-        get => _showProgress;
-        set => _showProgress = value;
-    }
-    public Action<bool> DoneCallback
-    {
-        get => _doneCallback;
-        set => _doneCallback = value;
-    }
+    /// <summary>
+    /// Show a progress bar
+    /// </summary>
+    public bool ShowProgress { get; set; }
 
-    public Action<double> ProgressCallback
-    {
-        get => _progressCallback;
-        set => _progressCallback = value;
-    }
+    /// <summary>
+    /// The Action<bool> function to call when the download is finished. 
+    /// </summary>
+    public Action<bool> DoneCallback { get; set; }
 
-    public int NumRetries
-    {
-        get => _numRetries;
-        set => _numRetries = value;
-    }
+    /// <summary>
+    /// The Action<double> function to call to report download progress.
+    /// </summary>
+    public Action<double> ProgressCallback { get; set; }
 
-    public int BytesPerSecond
-    {
-        get => _bytesPerSecond;
-        set => _bytesPerSecond = value;
-    }
+    /// <summary>
+    /// Number of times to retry if the connection fails.
+    /// </summary>
+    public int NumRetries { get; set; }
+
+    /// <summary>
+    /// Use this option to throttle the download of the file. Use 1 to disable throttling.
+    /// </summary>
+    public int BytesPerSecond { get; set; }
 
     public OctaneConfiguration()
     {
-        _parts = 1;
-        _bufferSize = 8096;
-        _showProgress = false;
-        _doneCallback = null!;
-        _progressCallback = null!;
-        _numRetries = 10;
-        _bytesPerSecond = 1;
+        Parts = 4;
+        BufferSize = 8096;
+        ShowProgress = false;
+        DoneCallback = null!;
+        ProgressCallback = null!;
+        NumRetries = 10;
+        BytesPerSecond = 1;
     }
 }
