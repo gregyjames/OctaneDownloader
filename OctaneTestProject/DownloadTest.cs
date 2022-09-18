@@ -34,7 +34,9 @@ namespace OctaneTestProject
                 DoneCallback = x => Assert.IsTrue(File.Exists(outFile)),
                 ProgressCallback = Console.WriteLine,
                 NumRetries = 20,
-                BytesPerSecond = 0
+                BytesPerSecond = 1,
+                UseProxy = false,
+                Proxy = null
             };
             
             Engine.DownloadFile(url, outFile, config).Wait();

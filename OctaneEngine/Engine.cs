@@ -51,8 +51,8 @@ namespace OctaneEngine
             var httpPool = new ObjectPool<HttpClient?>(() =>
                 new HttpClient(new RetryHandler(new HttpClientHandler
                     {
-                        Proxy = null,
-                        UseProxy = false,
+                        Proxy = config.Proxy,
+                        UseProxy = config.UseProxy,
                         MaxConnectionsPerServer = 256,
                         UseCookies = false
                     }, config.NumRetries))
@@ -125,7 +125,7 @@ namespace OctaneEngine
                                         {
 
                                             request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
-
+                                            
                                             //Request headers so we dont cache the file into memory
                                             if (client != null)
                                             {
@@ -142,7 +142,7 @@ namespace OctaneEngine
                                                             .ConfigureAwait(false))
                                                         {
                                                             //Throttle stream to over BPS divided among the parts
-                                                            var source = new ThrottleStream(streamToRead, programbps);
+                                                            var source = config.BytesPerSecond != 1 ? new ThrottleStream(streamToRead, programbps) : null;
                                                             //Create a memory mapped stream to the mmf with the piece offset and size equal to the response size
                                                             using (var streams = mmf.CreateViewStream(piece.Item1,
                                                                 message.Content.Headers.ContentLength!.Value,
@@ -262,7 +262,7 @@ namespace OctaneEngine
                                                             message.Content.Headers.ContentLength!.Value,
                                                             MemoryMappedFileAccess.Write))
                                                         {
-                                                            var source = new ThrottleStream(streamToRead, programbps);
+                                                            var source = config.BytesPerSecond != 1 ? new ThrottleStream(streamToRead, programbps) : null;
                                                             //Copy from the content stream to the mmf stream
                                                             //var buffer = new byte[bufferSize];
                                                             var buffer = memPool.Rent(config.BufferSize);
