@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using NUnit.Framework;
 using OctaneEngine;
 
@@ -28,9 +29,12 @@ namespace OctaneTestProject
             var config = new OctaneConfiguration
             {
                 Parts = 4,
+                BufferSize = 8192,
                 ShowProgress = false,
                 DoneCallback = x => Assert.IsTrue(File.Exists(outFile)),
-                NumRetries = 20
+                ProgressCallback = Console.WriteLine,
+                NumRetries = 20,
+                BytesPerSecond = 0
             };
             
             Engine.DownloadFile(url, outFile, config).Wait();

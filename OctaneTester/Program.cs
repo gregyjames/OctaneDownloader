@@ -20,7 +20,7 @@ namespace OctaneTester
                 },
                 ProgressCallback = x =>
                 {
-                    //Console.WriteLine(x.ToString(CultureInfo.InvariantCulture));
+                    Console.WriteLine(x.ToString(CultureInfo.InvariantCulture));
                 },
                 NumRetries = 10
             };
