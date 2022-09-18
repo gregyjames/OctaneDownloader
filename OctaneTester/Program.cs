@@ -14,14 +14,10 @@ namespace OctaneTester
                 BufferSize = 8192,
                 ShowProgress = true,
                 BytesPerSecond = 1,
-                DoneCallback = x =>
-                {
-                    Console.WriteLine("Done!");
-                },
-                ProgressCallback = x =>
-                {
-                    Console.WriteLine(x.ToString(CultureInfo.InvariantCulture));
-                },
+                UseProxy = false,
+                Proxy = null,
+                DoneCallback = x => { Console.WriteLine("Done!"); },
+                ProgressCallback = x => { Console.WriteLine(x.ToString(CultureInfo.InvariantCulture)); },
                 NumRetries = 10
             };
 
