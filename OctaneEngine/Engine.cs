@@ -43,10 +43,16 @@ namespace OctaneEngine
         /// <param name="doneCallback">Callback to handle download completion</param>
         /// <param name="progressCallback">The callback for progress if not wanting to use the built in progress</param>
         /// <param name="numRetries">Number of times to retry a failed download</param>
+        /// <param name="bytesPerSecond">Throttle the file download speed if specified. 1 means unlimited.</param>
         public async static Task DownloadFile(string url, int parts, int bufferSize = 8096, bool showProgress = false,
-            string outFile = null!, Action<Boolean> doneCallback = null!, Action<Double> progressCallback = null!, int numRetries = 10)
+            string outFile = null!,
+            Action<Boolean> doneCallback = null!,
+            Action<Double> progressCallback = null!,
+            int numRetries = 10,
+            int bytesPerSecond = 1)
         {
             if (url == null) throw new ArgumentNullException(nameof(url));
+            var programbps = bytesPerSecond / parts;
             
             //HTTP Client pool so we don't have to keep making them
             var httpPool = new ObjectPool<HttpClient?>(() =>
@@ -142,6 +148,8 @@ namespace OctaneEngine
                                                             .ReadAsStreamAsync(cancellationToken)
                                                             .ConfigureAwait(false))
                                                         {
+                                                            //Throttle stream to over BPS divided among the parts
+                                                            var source = new ThrottleStream(streamToRead, programbps);
                                                             //Create a memory mapped stream to the mmf with the piece offset and size equal to the response size
                                                             using (var streams = mmf.CreateViewStream(piece.Item1,
                                                                 message.Content.Headers.ContentLength!.Value,
@@ -166,12 +174,26 @@ namespace OctaneEngine
                                                                         // Until the buffer is very nearly full or there's nothing left to read
                                                                         do
                                                                         {
-                                                                            bytesRead = await streamToRead.ReadAsync(
-                                                                                    buffer, offset,
-                                                                                    bufferSize - offset,
-                                                                                    cancellationToken)
-                                                                                .ConfigureAwait(false);
-                                                                            offset += bytesRead;
+                                                                            if (bytesPerSecond == 1)
+                                                                            {
+                                                                                bytesRead = await streamToRead
+                                                                                    .ReadAsync(
+                                                                                        buffer, 
+                                                                                        offset,
+                                                                                        bufferSize - offset,
+                                                                                        cancellationToken)
+                                                                                    .ConfigureAwait(false);
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                bytesRead = await source.ReadAsync(
+                                                                                        buffer,
+                                                                                        offset,
+                                                                                        bufferSize - offset,
+                                                                                        cancellationToken)
+                                                                                    .ConfigureAwait(false);
+                                                                                offset += bytesRead;
+                                                                            }
                                                                         } while (bytesRead != 0 && offset < bufferSize);
 
                                                                         // Empty the buffer
@@ -247,6 +269,7 @@ namespace OctaneEngine
                                                             message.Content.Headers.ContentLength!.Value,
                                                             MemoryMappedFileAccess.Write))
                                                         {
+                                                            var source = new ThrottleStream(streamToRead, programbps);
                                                             //Copy from the content stream to the mmf stream
                                                             //var buffer = new byte[bufferSize];
                                                             var buffer = memPool.Rent(bufferSize);
@@ -258,10 +281,26 @@ namespace OctaneEngine
                                                                 // Until the buffer is very nearly full or there's nothing left to read
                                                                 do
                                                                 {
-                                                                    bytesRead = await streamToRead.ReadAsync(
-                                                                        buffer, offset, bufferSize - offset,
-                                                                        cancellationToken);
-                                                                    offset += bytesRead;
+                                                                    if (bytesPerSecond == 1)
+                                                                    {
+                                                                        bytesRead = await streamToRead
+                                                                            .ReadAsync(
+                                                                                buffer, 
+                                                                                offset,
+                                                                                bufferSize - offset,
+                                                                                cancellationToken)
+                                                                            .ConfigureAwait(false);
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        bytesRead = await source.ReadAsync(
+                                                                                buffer,
+                                                                                offset,
+                                                                                bufferSize - offset,
+                                                                                cancellationToken)
+                                                                            .ConfigureAwait(false);
+                                                                        offset += bytesRead;
+                                                                    }
                                                                 } while (bytesRead != 0 && offset < bufferSize);
 
                                                                 // Empty the buffer
