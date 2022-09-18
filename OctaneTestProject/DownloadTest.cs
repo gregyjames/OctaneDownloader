@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using NUnit.Framework;
 using OctaneEngine;
 
@@ -22,17 +23,21 @@ namespace OctaneTestProject
         [Test]
         public void DownloadFile()
         {
-            var url = "https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
-            var outFile = "Chershire_Cat.24ee16b9.png";
+            const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
+            const string outFile = @"Chershire_Cat.24ee16b9.png";
+
+            var config = new OctaneConfiguration
+            {
+                Parts = 4,
+                BufferSize = 8192,
+                ShowProgress = false,
+                DoneCallback = x => Assert.IsTrue(File.Exists(outFile)),
+                ProgressCallback = Console.WriteLine,
+                NumRetries = 20,
+                BytesPerSecond = 0
+            };
             
-            Engine.DownloadFile(url, 4, 256,
-                false,outFile, b =>
-                {
-                    if (b)
-                    {
-                        Assert.IsTrue(File.Exists(outFile));
-                    }
-                }).Wait();
+            Engine.DownloadFile(url, outFile, config).Wait();
         }
     }
 }

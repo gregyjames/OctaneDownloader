@@ -24,15 +24,25 @@ dotnet add package OctaneEngineCore
 # Usage
 ### Simple usage
 ```csharp
-Engine.DownloadFile("https://speed.hetzner.de/100MB.bin", 4);
+Engine.DownloadFile("https://speed.hetzner.de/100MB.bin", "outfile.bin");
 ```
 ### Advanced usage
 ```csharp
-Engine.DownloadFile("https://speed.hetzner.de/100MB.bin", 4, 8192, true, null!, x =>
+const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
+const string outFile = @"Chershire_Cat.24ee16b9.png";
+
+var config = new OctaneConfiguration
 {
-  //Task completion action example
-  Console.WriteLine(x ? "Done!" : "Download failed!");
-},Console.WriteLine).Wait();
+  Parts = 4,
+  BufferSize = 8192,
+  ShowProgress = false,
+  DoneCallback = x => Assert.IsTrue(File.Exists(outFile)),
+  ProgressCallback = Console.WriteLine,
+  NumRetries = 20,
+  BytesPerSecond = 0
+};
+            
+Engine.DownloadFile(url, outFile, config).Wait();
 ```
 
 # License

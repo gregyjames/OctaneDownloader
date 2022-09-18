@@ -36,23 +36,16 @@ namespace OctaneEngine
         /// The core octane download function.
         /// </summary>
         /// <param name="url">The string url of the file to be downloaded.</param>
-        /// <param name="parts">The number of parts (processes) needed to download the file.</param>
-        /// <param name="bufferSize">The buffer size to use to download the file</param>
-        /// <param name="showProgress">Show the progressbars?</param>
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
-        /// <param name="doneCallback">Callback to handle download completion</param>
-        /// <param name="progressCallback">The callback for progress if not wanting to use the built in progress</param>
-        /// <param name="numRetries">Number of times to retry a failed download</param>
-        /// <param name="bytesPerSecond">Throttle the file download speed if specified. 1 means unlimited.</param>
-        public async static Task DownloadFile(string url, int parts, int bufferSize = 8096, bool showProgress = false,
-            string outFile = null!,
-            Action<Boolean> doneCallback = null!,
-            Action<Double> progressCallback = null!,
-            int numRetries = 10,
-            int bytesPerSecond = 1)
+        public async static Task DownloadFile(string url, string outFile = null , OctaneConfiguration config = null)
         {
+            if (config == null)
+            {
+                config = new OctaneConfiguration();
+            }
+            
             if (url == null) throw new ArgumentNullException(nameof(url));
-            var programbps = bytesPerSecond / parts;
+            var programbps = config.BytesPerSecond / config.Parts;
             
             //HTTP Client pool so we don't have to keep making them
             var httpPool = new ObjectPool<HttpClient?>(() =>
@@ -62,8 +55,8 @@ namespace OctaneEngine
                         UseProxy = false,
                         MaxConnectionsPerServer = 256,
                         UseCookies = false
-                    }, numRetries))
-                    { MaxResponseContentBufferSize = bufferSize});
+                    }, config.NumRetries))
+                    { MaxResponseContentBufferSize = config.BufferSize});
 
             var memPool = ArrayPool<byte>.Shared;
             
@@ -72,7 +65,7 @@ namespace OctaneEngine
 
             //Get response length and calculate part sizes
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
-            var partSize = (long)Math.Floor(responseLength / (parts + 0.0));
+            var partSize = (long)Math.Floor(responseLength / (config.Parts + 0.0));
             var pieces = new List<ValueTuple<long, long>>();
             var uri = new Uri(url);
 
@@ -114,9 +107,9 @@ namespace OctaneEngine
                 //var pieceCounts = Enumerable.Range(0, parts);
                 try
                 {
-                    if (showProgress)
+                    if (config.ShowProgress)
                     {
-                        using (var pbar = new ProgressBar(parts, "Downloading File...", options))
+                        using (var pbar = new ProgressBar(config.Parts, "Downloading File...", options))
                         {
                             await Parallel.ForEachAsync(pieces,
                                 new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount },
@@ -160,11 +153,11 @@ namespace OctaneEngine
                                                                         (int)Math.Round(
                                                                             (double)(message.Content.Headers
                                                                                     .ContentLength /
-                                                                                bufferSize)), "", childOptions))
+                                                                                config.BufferSize)), "", childOptions))
                                                                 {
                                                                     //Copy from the content stream to the mmf stream
                                                                     //var buffer = new byte[bufferSize];
-                                                                    var buffer = memPool.Rent(bufferSize);
+                                                                    var buffer = memPool.Rent(config.BufferSize);
 
                                                                     int offset, bytesRead;
                                                                     // Until we've read everything
@@ -174,13 +167,13 @@ namespace OctaneEngine
                                                                         // Until the buffer is very nearly full or there's nothing left to read
                                                                         do
                                                                         {
-                                                                            if (bytesPerSecond == 1)
+                                                                            if (config.BytesPerSecond == 1)
                                                                             {
                                                                                 bytesRead = await streamToRead
                                                                                     .ReadAsync(
                                                                                         buffer, 
                                                                                         offset,
-                                                                                        bufferSize - offset,
+                                                                                        config.BufferSize - offset,
                                                                                         cancellationToken)
                                                                                     .ConfigureAwait(false);
                                                                             }
@@ -189,12 +182,12 @@ namespace OctaneEngine
                                                                                 bytesRead = await source.ReadAsync(
                                                                                         buffer,
                                                                                         offset,
-                                                                                        bufferSize - offset,
+                                                                                        config.BufferSize - offset,
                                                                                         cancellationToken)
                                                                                     .ConfigureAwait(false);
                                                                                 offset += bytesRead;
                                                                             }
-                                                                        } while (bytesRead != 0 && offset < bufferSize);
+                                                                        } while (bytesRead != 0 && offset < config.BufferSize);
 
                                                                         // Empty the buffer
                                                                         if (offset != 0)
@@ -272,7 +265,7 @@ namespace OctaneEngine
                                                             var source = new ThrottleStream(streamToRead, programbps);
                                                             //Copy from the content stream to the mmf stream
                                                             //var buffer = new byte[bufferSize];
-                                                            var buffer = memPool.Rent(bufferSize);
+                                                            var buffer = memPool.Rent(config.BufferSize);
                                                             int offset, bytesRead;
                                                             // Until we've read everything
                                                             do
@@ -281,13 +274,13 @@ namespace OctaneEngine
                                                                 // Until the buffer is very nearly full or there's nothing left to read
                                                                 do
                                                                 {
-                                                                    if (bytesPerSecond == 1)
+                                                                    if (config.BufferSize == 1)
                                                                     {
                                                                         bytesRead = await streamToRead
                                                                             .ReadAsync(
                                                                                 buffer, 
                                                                                 offset,
-                                                                                bufferSize - offset,
+                                                                                config.BufferSize - offset,
                                                                                 cancellationToken)
                                                                             .ConfigureAwait(false);
                                                                     }
@@ -296,12 +289,12 @@ namespace OctaneEngine
                                                                         bytesRead = await source.ReadAsync(
                                                                                 buffer,
                                                                                 offset,
-                                                                                bufferSize - offset,
+                                                                                config.BufferSize - offset,
                                                                                 cancellationToken)
                                                                             .ConfigureAwait(false);
                                                                         offset += bytesRead;
                                                                     }
-                                                                } while (bytesRead != 0 && offset < bufferSize);
+                                                                } while (bytesRead != 0 && offset < config.BufferSize);
 
                                                                 // Empty the buffer
                                                                 if (offset != 0)
@@ -329,7 +322,7 @@ namespace OctaneEngine
                                 {
                                     Interlocked.Increment(ref tasksDone);
                                     httpPool.Return(client);
-                                    progressCallback((double)((tasksDone + 0.0) / (pieces.Count + 0.0)));
+                                    config.ProgressCallback((double)((tasksDone + 0.0) / (pieces.Count + 0.0)));
                                 }
                             });
                     }
@@ -337,12 +330,12 @@ namespace OctaneEngine
                 catch (Exception ex)
                 {
                     Console.WriteLine(ex.Message);
-                    doneCallback(false);
+                    config.DoneCallback(false);
                 }
                 finally
                 {
                     httpPool.Empty();
-                    doneCallback(true);
+                    config.DoneCallback(true);
                 }
             }
         }
