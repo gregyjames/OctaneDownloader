@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 
 namespace OctaneEngine;
 
@@ -38,7 +39,16 @@ public class OctaneConfiguration
     /// Use this option to throttle the download of the file. Use 1 to disable throttling.
     /// </summary>
     public int BytesPerSecond { get; set; }
-
+    
+    /// <summary>
+    /// Enable if you want to use a proxy
+    /// </summary>
+    public bool UseProxy { get; set; }
+    
+    /// <summary>
+    /// The Proxy settings to use.
+    /// </summary>
+    public IWebProxy Proxy { get; set; }
     public OctaneConfiguration()
     {
         Parts = 4;
@@ -48,5 +58,7 @@ public class OctaneConfiguration
         ProgressCallback = null!;
         NumRetries = 10;
         BytesPerSecond = 1;
+        UseProxy = false;
+        Proxy = null;
     }
 }
