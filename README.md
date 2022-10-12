@@ -23,29 +23,20 @@ dotnet add package OctaneEngineCore
 * Proxy Support
 
 # Usage
-### Simple usage
 ```csharp
-Engine.DownloadFile("https://speed.hetzner.de/100MB.bin", "outfile.bin");
-```
-### Advanced usage
-```csharp
-const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
-const string outFile = @"Chershire_Cat.24ee16b9.png";
-
-var config = new OctaneConfiguration
-{
-  Parts = 4,
-  BufferSize = 8192,
-  ShowProgress = false,
-  DoneCallback = x => Assert.IsTrue(File.Exists(outFile)),
-  ProgressCallback = Console.WriteLine,
-  NumRetries = 20,
-  BytesPerSecond = 0,
-  UseProxy = false,
-  Proxy = null
+var config = new OctaneConfiguration{
+     Parts = 2,
+     BufferSize = 8192,
+     ShowProgress = true,
+     BytesPerSecond = 1,
+     UseProxy = false,
+     Proxy = null,
+     DoneCallback = x => { Console.WriteLine("Done!"); },
+     ProgressCallback = x => { Console.WriteLine(x.ToString(CultureInfo.InvariantCulture)); },
+     NumRetries = 10
 };
 
-Engine.DownloadFile("https://speed.hetzner.de/100MB.bin", "outfile.bin", config);
+Engine.DownloadFile("https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png", "out.png", config).Wait();
 ```
 
 # License
