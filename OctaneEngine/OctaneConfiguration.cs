@@ -11,7 +11,7 @@ public class OctaneConfiguration
     public int Parts { get; set; }
 
     /// <summary>
-    /// The memory buffersize to use, default 8192.
+    /// The memory buffer size to use, default 8192.
     /// </summary>
     public int BufferSize { get; set; }
 
