@@ -28,7 +28,7 @@ namespace OctaneTestProject
 
             var config = new OctaneConfiguration
             {
-                Parts = 4,
+                Parts = 2,
                 BufferSize = 8192,
                 ShowProgress = false,
                 DoneCallback = x => Assert.IsTrue(File.Exists(outFile)),

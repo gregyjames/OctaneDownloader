@@ -6,6 +6,7 @@ using System.IO.MemoryMappedFiles;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
 using ProgressBar = OctaneEngine.ShellProgressBar.ProgressBar;
@@ -41,7 +42,8 @@ namespace OctaneEngine
             if (config == null) {
                 config = new OctaneConfiguration();
             }
-            
+
+            var old_mode = GCSettings.LatencyMode;
             if (url == null) throw new ArgumentNullException(nameof(url));
             
             var memPool = ArrayPool<byte>.Shared;
@@ -98,7 +100,9 @@ namespace OctaneEngine
             //Create memory mapped file to hold the file
             using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, responseLength, MemoryMappedFileAccess.ReadWrite)) {
                 int tasksDone = 0;
-                try {
+                try
+                {
+                    GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
                     var pbar = config.ShowProgress ? new ProgressBar(config.Parts, "Downloading File...", options) : null;
                     await Parallel.ForEachAsync(pieces, new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, async (piece, cancellationToken) => {
                         System.Diagnostics.Trace.Listeners.Clear();
@@ -123,7 +127,9 @@ namespace OctaneEngine
                     Console.WriteLine(ex.Message);
                     config.DoneCallback(false);
                 }
-                finally {
+                finally
+                {
+                    GCSettings.LatencyMode = old_mode;
                     _client.Dispose();
                     config.DoneCallback(true);
                 }
