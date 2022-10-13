@@ -2,6 +2,7 @@
 [![CodeQL](https://github.com/gregyjames/OctaneDownloader/actions/workflows/codeql-analysis.yml/badge.svg?branch=master)](https://github.com/gregyjames/OctaneDownloader/actions/workflows/codeql-analysis.yml)
 [![CodeFactor](https://www.codefactor.io/repository/github/gregyjames/octanedownloader/badge)](https://www.codefactor.io/repository/github/gregyjames/octanedownloader)
 [![codebeat badge](https://codebeat.co/badges/9154fd6f-ac4b-4f00-8910-66488582efcd)](https://codebeat.co/projects/github-com-gregyjames-octanedownloader-master)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/e0366fe0406741bcbdab62354124d877)](https://www.codacy.com/gh/gregyjames/OctaneDownloader/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=gregyjames/OctaneDownloader&amp;utm_campaign=Badge_Grade)
 [![NuGet latest version](https://badgen.net/nuget/v/OctaneEngineCore)](https://www.nuget.org/packages/OctaneEngineCore)
 ![Nuget](https://img.shields.io/nuget/dt/OctaneEngineCore)
 
