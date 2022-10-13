@@ -1,4 +1,5 @@
 ![C#](https://github.com/gregyjames/OctaneDownloader/actions/workflows/dotnet.yml/badge.svg)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/22b964dfb0724d63ac42fe86c06b2d3f)](https://app.codacy.com/gh/gregyjames/OctaneDownloader?utm_source=github.com&utm_medium=referral&utm_content=gregyjames/OctaneDownloader&utm_campaign=Badge_Grade_Settings)
 [![CodeQL](https://github.com/gregyjames/OctaneDownloader/actions/workflows/codeql-analysis.yml/badge.svg?branch=master)](https://github.com/gregyjames/OctaneDownloader/actions/workflows/codeql-analysis.yml)
 [![CodeFactor](https://www.codefactor.io/repository/github/gregyjames/octanedownloader/badge)](https://www.codefactor.io/repository/github/gregyjames/octanedownloader)
 [![codebeat badge](https://codebeat.co/badges/9154fd6f-ac4b-4f00-8910-66488582efcd)](https://codebeat.co/projects/github-com-gregyjames-octanedownloader-master)
