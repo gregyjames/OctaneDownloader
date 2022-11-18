@@ -1,6 +1,29 @@
-﻿using System;
+﻿/*
+ * The MIT License (MIT)
+ * Copyright (c) 2015 Greg James
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Linq;
@@ -11,8 +34,7 @@ using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using ProgressBar = OctaneEngine.ShellProgressBar.ProgressBar;
-using ProgressBarOptions = OctaneEngine.ShellProgressBar.ProgressBarOptions;
+using ShellProgressBar;
 
 // ReSharper disable All
 
@@ -21,6 +43,7 @@ namespace OctaneEngine
     public static class Engine
     {
         static readonly string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+
         private static string prettySize(long len)
         {
             int order = 0;
@@ -36,37 +59,37 @@ namespace OctaneEngine
         }
 
         /// <summary>
-        /// The core octane download function.
+        ///     The core octane download function.
         /// </summary>
         /// <param name="url">The string url of the file to be downloaded.</param>
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
-        public async static Task DownloadFile(string url, ILoggerFactory loggerFactory = null, string outFile = null , OctaneConfiguration config = null) {
-            var stopwatch = new System.Diagnostics.Stopwatch();
+        public async static Task DownloadFile(string url, ILoggerFactory loggerFactory = null, string outFile = null,
+            OctaneConfiguration config = null)
+        {
+            var stopwatch = new Stopwatch();
 
-            if (loggerFactory == null)
-            {
-                loggerFactory = new LoggerFactory();
-            }
+            loggerFactory ??= new LoggerFactory();
             
             var logger = loggerFactory.CreateLogger("OctaneEngine");
-            
+
             stopwatch.Start();
-            if (config == null) {
-                logger.LogInformation("Octane config not providing, using default configuration.");    
+            if (config == null)
+            {
+                logger.LogInformation("Octane config not providing, using default configuration.");
                 config = new OctaneConfiguration();
             }
-            
+
             logger.LogInformation($"CONFIGURATION: {config.ToString()}");
-            
+
             var old_mode = GCSettings.LatencyMode;
             if (url == null)
             {
                 logger.LogCritical("No URL provided (null value).");
                 throw new ArgumentNullException(nameof(url));
             }
-            
+
             var memPool = ArrayPool<byte>.Shared;
-            
+
             //Get response length and calculate part sizes
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
             var rangeSupported = (await WebRequest.Create(url).GetResponseAsync()).Headers["Accept-Ranges"] == "bytes";
@@ -75,19 +98,19 @@ namespace OctaneEngine
             var pieces = new List<ValueTuple<long, long>>();
             var uri = new Uri(url);
             var filename = outFile ?? Path.GetFileName(uri.LocalPath);
-            
+
             logger.LogInformation($"Server file name: {filename}.");
             ServicePointManager.Expect100Continue = false;
             ServicePointManager.DefaultConnectionLimit = 10000;
             ServicePointManager.FindServicePoint(new Uri(url)).ConnectionLimit = config.Parts;
-            
-            #if NET6_0_OR_GREATER
+
+#if NET6_0_OR_GREATER
                 ServicePointManager.ReusePort = true;
-            #endif
-            
+#endif
+
             logger.LogInformation($"TOTAL SIZE: {prettySize(responseLength)}");
             logger.LogInformation($"PART SIZE: {prettySize(partSize)}");
-            
+
             //Loop to add all the events to the queue
             if (rangeSupported)
             {
@@ -101,9 +124,10 @@ namespace OctaneEngine
                         $"Piece with range ({pieces.First().Item1},{pieces.First().Item2}) added to tasks queue.");
                 }
             }
-            
+
             //Options for progress base
-            var options = new ProgressBarOptions {
+            var options = new ProgressBarOptions
+            {
                 ProgressBarOnBottom = false,
                 BackgroundCharacter = '\u2593',
                 DenseProgressBar = false,
@@ -111,6 +135,7 @@ namespace OctaneEngine
             };
 
             #region HTTPClient Init
+
             var clientHandler = new HttpClientHandler()
             {
                 PreAuthenticate = true,
@@ -121,29 +146,35 @@ namespace OctaneEngine
                 UseCookies = false,
                 ServerCertificateCustomValidationCallback = (_, _, _, _) => true
             };
-            
+
             var retryHandler = new RetryHandler(clientHandler, config.NumRetries, loggerFactory);
-        
-            var _client = new HttpClient(retryHandler) {
+
+            var _client = new HttpClient(retryHandler)
+            {
                 MaxResponseContentBufferSize = config.BufferSize
             };
+
             #endregion
-            
+
             //Create memory mapped file to hold the file
-            using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, responseLength, MemoryMappedFileAccess.ReadWrite)) {
+            using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, responseLength,
+                       MemoryMappedFileAccess.ReadWrite))
+            {
                 int tasksDone = 0;
                 try
                 {
                     GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
                     logger.LogTrace("Setting GC to sustained low latency mode.");
-                    var pbar = config.ShowProgress ? new ProgressBar(config.Parts, "Downloading File...", options) : null;
+                    var pbar = config.ShowProgress
+                        ? new ProgressBar(config.Parts, "Downloading File...", options)
+                        : null;
                     if (pbar == null)
                     {
-                        logger.LogInformation("Progress bar disabled.");    
+                        logger.LogInformation("Progress bar disabled.");
                     }
 
                     IClient client = null;
-                    
+
                     if (rangeSupported)
                     {
                         logger.LogInformation("Using Octane Client to download file.");
@@ -151,7 +182,7 @@ namespace OctaneEngine
                             new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount },
                             async (piece, cancellationToken) =>
                             {
-                                System.Diagnostics.Trace.Listeners.Clear();
+                                Trace.Listeners.Clear();
 
                                 //Get a client from the pool and request for the content range
                                 client = new OctaneClient(config, _client, loggerFactory, mmf, pbar, memPool);
@@ -181,11 +212,12 @@ namespace OctaneEngine
                         logger.LogInformation("Using Default Client to download file.");
                         client = new DefaultClient(_client, mmf);
                         var cancellationToken = new CancellationToken();
-                        var message = client.SendMessage(url, (0,0), cancellationToken).Result;
-                        await client.ReadResponse(message, (0,0), cancellationToken);
+                        var message = client.SendMessage(url, (0, 0), cancellationToken).Result;
+                        await client.ReadResponse(message, (0, 0), cancellationToken);
                     }
                 }
-                catch (Exception ex) {
+                catch (Exception ex)
+                {
                     logger.LogError(ex.Message);
                     config.DoneCallback(false);
                 }
