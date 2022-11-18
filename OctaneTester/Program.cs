@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Globalization;
+using Microsoft.Extensions.Logging;
 using OctaneEngine;
+using Serilog;
+using Serilog.Sinks.SystemConsole.Themes;
 
 namespace OctaneTester
 {
@@ -12,7 +15,7 @@ namespace OctaneTester
             {
                 Parts = 2,
                 BufferSize = 8192,
-                ShowProgress = true,
+                ShowProgress = false,
                 BytesPerSecond = 1,
                 UseProxy = false,
                 Proxy = null,
@@ -21,7 +24,19 @@ namespace OctaneTester
                 NumRetries = 10
             };
 
-            Engine.DownloadFile("https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png", null, config).Wait();
+            var seriLog = new LoggerConfiguration()
+                .Enrich.FromLogContext()
+                .MinimumLevel.Verbose()
+                .WriteTo.File("./OctaneLog.txt")
+                .WriteTo.Console(theme: AnsiConsoleTheme.Sixteen)
+                .CreateLogger();
+
+            var factory = LoggerFactory.Create(logging =>
+            {
+                logging.AddSerilog(seriLog);
+            });
+            
+            Engine.DownloadFile("https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png", factory, null, config).Wait();
         }
     }
 }

@@ -2,6 +2,7 @@
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace OctaneEngine
 {
@@ -11,30 +12,43 @@ namespace OctaneEngine
         // probably not the most user friendly way you could respond to "the
         // network cable got pulled out."
         private readonly int _maxRetries = 3;
+        private readonly ILogger<RetryHandler> _log;
 
         public RetryHandler(HttpMessageHandler innerHandler) : base(innerHandler)
         {
             
         }
 
-        public RetryHandler(HttpMessageHandler innerHandler, int maxRetries) : base(innerHandler)
+        public RetryHandler(HttpMessageHandler innerHandler, int maxRetries, ILoggerFactory loggerFactory) : base(innerHandler)
         {
             _maxRetries = maxRetries;
+            _log = loggerFactory.CreateLogger<RetryHandler>();
+            _log.LogInformation($"Retry handler created with {_maxRetries} retries.");
         }
 
-        protected override async Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             HttpResponseMessage? response = null;
             for (var i = 0; i < _maxRetries; i++)
             {
-                
                 response = await base.SendAsync(request, cancellationToken);
-                if (response.IsSuccessStatusCode) return response;
+                if (response.IsSuccessStatusCode)
+                {
+                    return response;
+                }
+                else
+                {
+                    _log.LogWarning($"Client failed sending request. Retrying attempt: {i}/{_maxRetries}");
+                }
             }
 
             Debug.Assert(response != null, nameof(response) + " != null");
+
+            if (response.IsSuccessStatusCode == false)
+            {
+                _log.LogError("HTTP Response code unsuccessful.");    
+            }
+            
             return response;
         }
     }

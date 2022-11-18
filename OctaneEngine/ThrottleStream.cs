@@ -2,6 +2,7 @@
 using System.IO;
 using System.Reactive.Concurrency;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace OctaneEngine
 {
@@ -13,12 +14,14 @@ namespace OctaneEngine
         private readonly IStopwatch _stopwatch;
         
         private long _processed;
+        private readonly ILogger<ThrottleStream> _log;
 
-        public ThrottleStream(Stream parent, int maxBytesPerSecond)
+        public ThrottleStream(Stream parent, int maxBytesPerSecond, ILoggerFactory factory)
         {
             this._maxBps = maxBytesPerSecond;
             this._parentStream = parent;
             this._scheduler = Scheduler.Immediate;
+            this._log = factory.CreateLogger<ThrottleStream>(); 
             _stopwatch = _scheduler.StartStopwatch();
             _processed = 0;
         }
@@ -26,6 +29,7 @@ namespace OctaneEngine
         protected void Throttle(int bytes)
         {
             _processed += bytes;
+            _log.LogTrace($"Throttle stream processed {_processed} bytes.");
             var targetTime = TimeSpan.FromSeconds((double)_processed / _maxBps);
             var actualTime = _stopwatch.Elapsed;
             var sleep = targetTime - actualTime;
@@ -53,6 +57,7 @@ namespace OctaneEngine
 
         public override int Read(byte[] buffer, int offset, int count)
         {
+            _log.LogTrace("Throttle stream read.");
             var read = _parentStream.Read(buffer, offset, count);
             Throttle(read);
             return read;
@@ -60,6 +65,7 @@ namespace OctaneEngine
 
         public override void Write(byte[] buffer, int offset, int count)
         {
+            _log.LogTrace("Throttle stream write.");
             Throttle(count);
             _parentStream.Write(buffer, offset, count);
         }

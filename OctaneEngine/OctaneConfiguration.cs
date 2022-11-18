@@ -39,16 +39,17 @@ public class OctaneConfiguration
     /// Use this option to throttle the download of the file. Use 1 to disable throttling.
     /// </summary>
     public int BytesPerSecond { get; set; }
-    
+
     /// <summary>
     /// Enable if you want to use a proxy
     /// </summary>
     public bool UseProxy { get; set; }
-    
+
     /// <summary>
     /// The Proxy settings to use.
     /// </summary>
     public IWebProxy Proxy { get; set; }
+
     public OctaneConfiguration()
     {
         Parts = 4;
@@ -60,5 +61,12 @@ public class OctaneConfiguration
         BytesPerSecond = 1;
         UseProxy = false;
         Proxy = null;
+    }
+
+    public override string ToString()
+    {
+        string s =
+            $"Parts: {Parts}, BufferSize: {BufferSize}, ShowProgres: {ShowProgress}, ProgressCallback: {ProgressCallback != null}, NumRetries: {NumRetries}, BytesPerSecond: {BytesPerSecond}, DoneCallback: {DoneCallback != null}, Proxy: {Proxy?.ToString() ?? "NULL"}, UseProxy: {UseProxy}";
+        return "{" + s + "}";
     }
 }

@@ -1,17 +1,31 @@
 ﻿using System;
 using System.IO;
+using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngine;
+using Serilog;
 
 namespace OctaneTestProject
 {
     [TestFixture]
     public class DownloadTest
     {
+        private ILoggerFactory _factory = null;
+        
         [SetUp]
         public void Init()
         {
-            
+            var seriLog = new LoggerConfiguration()
+                .Enrich.FromLogContext()
+                .MinimumLevel.Verbose()
+                .WriteTo.File("./OctaneLog.txt")
+                .WriteTo.Console()
+                .CreateLogger();
+
+            _factory = LoggerFactory.Create(logging =>
+            {
+                logging.AddSerilog(seriLog);
+            });
         }
 
         [TearDown]
@@ -39,7 +53,7 @@ namespace OctaneTestProject
                 Proxy = null
             };
             
-            Engine.DownloadFile(url, outFile, config).Wait();
+            Engine.DownloadFile(url, _factory, outFile, config).Wait();
         }
     }
 }
