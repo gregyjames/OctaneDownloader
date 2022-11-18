@@ -21,23 +21,42 @@ dotnet add package OctaneEngineCore
 * Download Retry
 * Progress
 * Throttling
+* Logging
 * Proxy Support
 
 # Usage
 ```csharp
-var config = new OctaneConfiguration{
+var config = new OctaneConfiguration
+{
      Parts = 2,
      BufferSize = 8192,
-     ShowProgress = true,
+     ShowProgress = false,
      BytesPerSecond = 1,
      UseProxy = false,
      Proxy = null,
-     DoneCallback = x => { Console.WriteLine("Done!"); },
-     ProgressCallback = x => { Console.WriteLine(x.ToString(CultureInfo.InvariantCulture)); },
+     DoneCallback = x => {
+          Console.WriteLine("Done!"); 
+     },
+     ProgressCallback = x => { 
+          Console.WriteLine(x.ToString(CultureInfo.InvariantCulture)); 
+     },
      NumRetries = 10
 };
 
-Engine.DownloadFile("https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png", "out.png", config).Wait();
+//Pick any logging implementation you want, here we are using Serilog
+var seriLog = new LoggerConfiguration()
+     .Enrich.FromLogContext()
+     .MinimumLevel.Verbose()
+     .WriteTo.File("./OctaneLog.txt")
+     .WriteTo.Console(theme: AnsiConsoleTheme.Sixteen)
+     .CreateLogger();
+
+var factory = LoggerFactory.Create(logging => {
+     logging.AddSerilog(seriLog);
+});
+
+Engine.DownloadFile("https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png", factory, null, config).Wait();
+        
 ```
 
 # License
