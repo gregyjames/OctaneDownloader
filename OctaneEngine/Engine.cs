@@ -69,6 +69,8 @@ namespace OctaneEngine
             
             //Get response length and calculate part sizes
             var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
+            var rangeSupported = (await WebRequest.Create(url).GetResponseAsync()).Headers["Accept-Ranges"] == "bytes";
+            logger.LogInformation($"Range supported: {rangeSupported}");
             var partSize = (long)Math.Floor(responseLength / (config.Parts + 0.0));
             var pieces = new List<ValueTuple<long, long>>();
             var uri = new Uri(url);
@@ -87,11 +89,19 @@ namespace OctaneEngine
             logger.LogInformation($"PART SIZE: {prettySize(partSize)}");
             
             //Loop to add all the events to the queue
-            for (long i = 0; i < responseLength; i += partSize) {
-                pieces.Insert(0,(i + partSize < responseLength ? new ValueTuple<long, long>(i, i + partSize) : new ValueTuple<long, long>(i, responseLength)));
-                logger.LogTrace($"Piece with range ({pieces.First().Item1},{pieces.First().Item2}) added to tasks queue.");
+            if (rangeSupported)
+            {
+                for (long i = 0; i < responseLength; i += partSize)
+                {
+                    pieces.Insert(0,
+                        (i + partSize < responseLength
+                            ? new ValueTuple<long, long>(i, i + partSize)
+                            : new ValueTuple<long, long>(i, responseLength)));
+                    logger.LogTrace(
+                        $"Piece with range ({pieces.First().Item1},{pieces.First().Item2}) added to tasks queue.");
+                }
             }
-
+            
             //Options for progress base
             var options = new ProgressBarOptions {
                 ProgressBarOnBottom = false,
@@ -131,29 +141,49 @@ namespace OctaneEngine
                     {
                         logger.LogInformation("Progress bar disabled.");    
                     }
-                    await Parallel.ForEachAsync(pieces, new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, async (piece, cancellationToken) => {
-                        System.Diagnostics.Trace.Listeners.Clear();
-                        
-                        //Get a client from the pool and request for the content range
-                        var client = new OctaneClient(config, _client, loggerFactory);
-                        
-                        using (var request = new HttpRequestMessage { RequestUri = new Uri(url) }) {
-                            request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
-                                            
-                            //Request headers so we dont cache the file into memory
-                            if (client != null) {
-                                var message = client.SendMessage(url, piece, cancellationToken).Result;
-                                await client.ReadResponse(message, mmf, piece, memPool, cancellationToken, pbar, loggerFactory);
-                            }
-                            else
-                            {
-                                logger.LogCritical("Error creating client.");
-                            }
 
-                            Interlocked.Increment(ref tasksDone);
-                            logger.LogTrace($"Finished {tasksDone - 1}/{config.Parts} pieces!");
-                        }
-                    });
+                    IClient client = null;
+                    
+                    if (rangeSupported)
+                    {
+                        logger.LogInformation("Using Octane Client to download file.");
+                        await Parallel.ForEachAsync(pieces,
+                            new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                            async (piece, cancellationToken) =>
+                            {
+                                System.Diagnostics.Trace.Listeners.Clear();
+
+                                //Get a client from the pool and request for the content range
+                                client = new OctaneClient(config, _client, loggerFactory, mmf, pbar, memPool);
+
+                                using (var request = new HttpRequestMessage { RequestUri = new Uri(url) })
+                                {
+                                    request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
+
+                                    //Request headers so we dont cache the file into memory
+                                    if (client != null)
+                                    {
+                                        var message = client.SendMessage(url, piece, cancellationToken).Result;
+                                        await client.ReadResponse(message, piece, cancellationToken);
+                                    }
+                                    else
+                                    {
+                                        logger.LogCritical("Error creating client.");
+                                    }
+
+                                    Interlocked.Increment(ref tasksDone);
+                                    logger.LogTrace($"Finished {tasksDone - 1}/{config.Parts} pieces!");
+                                }
+                            });
+                    }
+                    else
+                    {
+                        logger.LogInformation("Using Default Client to download file.");
+                        client = new DefaultClient(_client, mmf);
+                        var cancellationToken = new CancellationToken();
+                        var message = client.SendMessage(url, (0,0), cancellationToken).Result;
+                        await client.ReadResponse(message, (0,0), cancellationToken);
+                    }
                 }
                 catch (Exception ex) {
                     logger.LogError(ex.Message);

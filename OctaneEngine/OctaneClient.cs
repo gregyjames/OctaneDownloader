@@ -10,11 +10,15 @@ using OctaneEngine.ShellProgressBar;
 
 namespace OctaneEngine;
 
-public class OctaneClient
+public class OctaneClient: IClient
 {
     private readonly HttpClient _client;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly MemoryMappedFile _mmf;
+    private readonly ProgressBar _progressBar;
+    private readonly ArrayPool<byte> _memPool;
     private readonly OctaneConfiguration _config;
-    private readonly ILogger<OctaneClient> _log;
+    private readonly ILogger<IClient> _log;
     
     private readonly ProgressBarOptions _childOptions = new ProgressBarOptions
     {
@@ -26,11 +30,15 @@ public class OctaneClient
         DisplayTimeInRealTime = false
     };
 
-    public OctaneClient(OctaneConfiguration config, HttpClient httpClient, ILoggerFactory loggerFactory)
+    public OctaneClient(OctaneConfiguration config, HttpClient httpClient, ILoggerFactory loggerFactory, MemoryMappedFile mmf, ProgressBar progressBar, ArrayPool<byte> memPool)
     {
         _config = config;
         _client = httpClient;
-        _log = loggerFactory.CreateLogger<OctaneClient>();
+        _loggerFactory = loggerFactory;
+        _mmf = mmf;
+        _progressBar = progressBar;
+        _memPool = memPool;
+        _log = loggerFactory.CreateLogger<IClient>();
     }
 
     public async Task<HttpResponseMessage> SendMessage(string url, (long, long) piece, CancellationToken cancellationToken)
@@ -41,9 +49,7 @@ public class OctaneClient
         return await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task ReadResponse(HttpResponseMessage message, MemoryMappedFile mmf, (long, long) piece,
-        ArrayPool<byte> memPool, CancellationToken cancellationToken, ProgressBar progressBar,
-        ILoggerFactory loggerFactory)
+    public async Task ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken)
     {
         var stopwatch = new System.Diagnostics.Stopwatch();
         stopwatch.Start();
@@ -55,18 +61,18 @@ public class OctaneClient
             //Get the content stream from the message request
             using var streamToRead = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             //Throttle stream to over BPS divided among the parts
-            var source = _config.BytesPerSecond != 1 ? new ThrottleStream(streamToRead, programBps, loggerFactory) : null;
+            var source = _config.BytesPerSecond != 1 ? new ThrottleStream(streamToRead, programBps, _loggerFactory) : null;
             if (source != null)
             {
                 _log.LogTrace($"Throttling stream for piece ({piece.Item1},{piece.Item2}) to {programBps} bytes per second.");
             }
             
             //Create a memory mapped stream to the mmf with the piece offset and size equal to the response size
-            using var streams = mmf.CreateViewStream(piece.Item1, message.Content.Headers.ContentLength!.Value, MemoryMappedFileAccess.Write);
-            var child = progressBar?.Spawn((int)Math.Round((double)(message.Content.Headers.ContentLength / _config.BufferSize)), "", _childOptions);
+            using var streams = _mmf.CreateViewStream(piece.Item1, message.Content.Headers.ContentLength!.Value, MemoryMappedFileAccess.Write);
+            var child = _progressBar?.Spawn((int)Math.Round((double)(message.Content.Headers.ContentLength / _config.BufferSize)), "", _childOptions);
             
             //Copy from the content stream to the mmf stream
-            var buffer = memPool.Rent(_config.BufferSize);
+            var buffer = _memPool.Rent(_config.BufferSize);
             _log.LogInformation($"Buffer rented of size {_config.BufferSize} for piece ({piece.Item1},{piece.Item2}).");
             
             int bytesRead;
@@ -104,17 +110,25 @@ public class OctaneClient
                 child?.Tick();
             } while (bytesRead != 0);
                         
-            memPool.Return(buffer);
+            _memPool.Return(buffer);
             _log.LogInformation("Buffer returned to memory pool.");
             
             child?.Dispose();
             streams.Flush();
         }
 
-        progressBar?.Tick();
+        _progressBar?.Tick();
         _log.LogInformation($"Piece ({piece.Item1},{piece.Item2}) done.");
         stopwatch.Stop();
         
         _log.LogInformation($"Piece ({piece.Item1},{piece.Item2}) finished in {stopwatch.ElapsedMilliseconds} ms.");
+    }
+
+    public void Dispose()
+    {
+        _client?.Dispose();
+        _loggerFactory?.Dispose();
+        _mmf?.Dispose();
+        _progressBar?.Dispose();
     }
 }
