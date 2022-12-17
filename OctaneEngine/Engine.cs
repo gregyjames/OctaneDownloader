@@ -33,8 +33,9 @@ using System.Net.Http.Headers;
 using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Text;
 using Microsoft.Extensions.Logging;
-using ShellProgressBar;
+using OctaneEngineCore.ShellProgressBar;
 
 // ReSharper disable All
 
@@ -50,11 +51,11 @@ namespace OctaneEngine
             while (len >= 1024 && order < sizes.Length - 1)
             {
                 order++;
-                len = len / 1024;
+                len = len >> 10;
             }
-
-            string result = String.Format("{0:0.##} {1}", len, sizes[order]);
-
+            
+            string result = ZString.Format("{0:0.##} {1}", len, sizes[order]); 
+            
             return result;
         }
 
@@ -104,9 +105,9 @@ namespace OctaneEngine
             ServicePointManager.DefaultConnectionLimit = 10000;
             ServicePointManager.FindServicePoint(new Uri(url)).ConnectionLimit = config.Parts;
 
-#if NET6_0_OR_GREATER
+            #if NET6_0_OR_GREATER
                 ServicePointManager.ReusePort = true;
-#endif
+            #endif
 
             logger.LogInformation($"TOTAL SIZE: {prettySize(responseLength)}");
             logger.LogInformation($"PART SIZE: {prettySize(partSize)}");

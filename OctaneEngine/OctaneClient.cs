@@ -29,7 +29,7 @@ using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using ShellProgressBar;
+using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngine;
 
