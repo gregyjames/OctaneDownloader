@@ -26,7 +26,7 @@ namespace OctaneTester
 
             var seriLog = new LoggerConfiguration()
                 .Enrich.FromLogContext()
-                .MinimumLevel.Verbose()
+                .MinimumLevel.Error()
                 .WriteTo.File("./OctaneLog.txt")
                 .WriteTo.Console(theme: AnsiConsoleTheme.Sixteen)
                 .CreateLogger();
