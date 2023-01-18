@@ -204,6 +204,7 @@ namespace OctaneEngine
                                     }
 
                                     Interlocked.Increment(ref tasksDone);
+                                    config?.ProgressCallback((double)((tasksDone + 0.0) / (pieces.Count + 0.0)));
                                     logger.LogTrace($"Finished {tasksDone - 1}/{config.Parts} pieces!");
                                 }
                             });
