@@ -60,6 +60,19 @@ namespace OctaneEngine
             return result;
         }
 
+        private static async Task<(long, bool)> getFileSizeAndRangeSupport(string url)
+        {
+            using (var client = new HttpClient())
+            {
+                var response = await client.GetAsync(url);
+                var responseLength = response.Content.Headers.ContentLength ?? 0;
+                var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
+
+                return (responseLength, rangeSupported);
+            }
+            
+        }
+
         /// <summary>
         ///     The core octane download function.
         /// </summary>
@@ -67,6 +80,7 @@ namespace OctaneEngine
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
         /// <param name="loggerFactory">The ILoggerFactory instance to use for logging.</param>
         /// <param name="config">The OctaneConfiguration object used for configuring the downloader.</param>
+        /// <param name="pauseTokenSource">The pause token source to use for pausing and resuming.</param>
         public async static Task DownloadFile(string url, ILoggerFactory loggerFactory = null, string outFile = null,
             OctaneConfiguration config = null, PauseTokenSource pauseTokenSource = null)
         {
@@ -95,8 +109,7 @@ namespace OctaneEngine
             var memPool = ArrayPool<byte>.Shared;
 
             //Get response length and calculate part sizes
-            var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
-            var rangeSupported = (await WebRequest.Create(url).GetResponseAsync()).Headers["Accept-Ranges"] == "bytes";
+            var (responseLength, rangeSupported) = getFileSizeAndRangeSupport(url).Result;
             logger.LogInformation($"Range supported: {rangeSupported}");
             var partSize = (long)Math.Floor(responseLength / (config.Parts + 0.0));
             var pieces = new List<ValueTuple<long, long>>();
@@ -106,9 +119,8 @@ namespace OctaneEngine
             logger.LogInformation($"Server file name: {filename}.");
             ServicePointManager.Expect100Continue = false;
             ServicePointManager.DefaultConnectionLimit = 10000;
-            ServicePointManager.FindServicePoint(new Uri(url)).ConnectionLimit = config.Parts;
 
-            #if NET6_0_OR_GREATER
+    #if NET6_0_OR_GREATER
                 ServicePointManager.ReusePort = true;
             #endif
 
