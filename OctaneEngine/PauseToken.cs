@@ -20,17 +20,29 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-using System;
-using System.Net.Http;
-using System.Threading;
+
 using System.Threading.Tasks;
-using OctaneEngineCore;
+using Microsoft.Extensions.Logging;
 
-namespace OctaneEngine;
+namespace OctaneEngineCore;
 
-public interface IClient : IDisposable
+public readonly struct PauseToken
 {
-    public Task<HttpResponseMessage> SendMessage(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken);
+    private readonly PauseTokenSource _tokenSource;
+    private readonly ILogger _log;
+    public bool IsPaused => _tokenSource?.IsPaused == true;
 
-    public Task ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken);
+    public PauseToken(PauseTokenSource source, ILogger log)
+    {
+        _tokenSource = source;
+        _log = log;
+    }
+
+    public Task WaitWhilePausedAsync()
+    {
+        _log.LogInformation("Waiting for task to resume...");
+        return IsPaused
+            ? _tokenSource.WaitWhilePausedAsync()
+            : PauseTokenSource._completedTask;
+    }
 }

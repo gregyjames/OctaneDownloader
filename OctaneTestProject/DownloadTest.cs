@@ -1,8 +1,10 @@
 ﻿using System;
 using System.IO;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngine;
+using OctaneEngineCore;
 using Serilog;
 
 namespace OctaneTestProject
@@ -10,8 +12,10 @@ namespace OctaneTestProject
     [TestFixture]
     public class DownloadTest
     {
-        private ILoggerFactory _factory = null;
-        
+        private ILoggerFactory _factory;
+        private PauseTokenSource _pauseTokenSource;
+        private CancellationTokenSource _cancelTokenSource;
+
         [SetUp]
         public void Init()
         {
@@ -26,6 +30,9 @@ namespace OctaneTestProject
             {
                 logging.AddSerilog(seriLog);
             });
+
+            _pauseTokenSource = new PauseTokenSource(_factory);
+            _cancelTokenSource = new CancellationTokenSource();
         }
 
         [TearDown]
@@ -45,7 +52,7 @@ namespace OctaneTestProject
                 Parts = 2,
                 BufferSize = 8192,
                 ShowProgress = false,
-                DoneCallback = x => Assert.IsTrue(File.Exists(outFile)),
+                DoneCallback = _ => Assert.IsTrue(File.Exists(outFile)),
                 ProgressCallback = Console.WriteLine,
                 NumRetries = 20,
                 BytesPerSecond = 1,
@@ -53,7 +60,7 @@ namespace OctaneTestProject
                 Proxy = null
             };
             
-            Engine.DownloadFile(url, _factory, outFile, config).Wait();
+            Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource, _cancelTokenSource).Wait();
         }
     }
 }

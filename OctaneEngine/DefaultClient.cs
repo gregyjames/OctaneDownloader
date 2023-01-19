@@ -25,6 +25,7 @@ using System.IO.MemoryMappedFiles;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using OctaneEngineCore;
 
 namespace OctaneEngine;
 
@@ -40,19 +41,26 @@ public class DefaultClient : IClient
     }
 
     public async Task<HttpResponseMessage> SendMessage(string url, (long, long) piece,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, PauseToken pauseToken)
     {
+        if (pauseToken.IsPaused)
+        {
+            await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
+        }
+
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
         return await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
     }
 
-    public async Task ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken)
+    public async Task ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
-        using (var stream = _mmf.CreateViewStream())
+        if (pauseToken.IsPaused)
         {
-            await message.Content.CopyToAsync(stream);
+            await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
         }
+        using var stream = _mmf.CreateViewStream();
+        await message.Content.CopyToAsync(stream);
     }
 
     public void Dispose()

@@ -35,6 +35,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Cysharp.Text;
 using Microsoft.Extensions.Logging;
+using OctaneEngineCore;
 using OctaneEngineCore.ShellProgressBar;
 
 // ReSharper disable All
@@ -43,7 +44,7 @@ namespace OctaneEngine
 {
     public static class Engine
     {
-        static readonly string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        private static readonly string[] sizes = { "B", "KB", "MB", "GB", "TB" };
 
         private static string prettySize(long len)
         {
@@ -59,14 +60,43 @@ namespace OctaneEngine
             return result;
         }
 
+        private static async Task<(long, bool)> getFileSizeAndRangeSupport(string url)
+        {
+            using (var client = new HttpClient())
+            {
+                var response = await client.GetAsync(url);
+                var responseLength = response.Content.Headers.ContentLength ?? 0;
+                var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
+
+                return (responseLength, rangeSupported);
+            }
+            
+        }
+
         /// <summary>
         ///     The core octane download function.
         /// </summary>
         /// <param name="url">The string url of the file to be downloaded.</param>
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
+        /// <param name="loggerFactory">The ILoggerFactory instance to use for logging.</param>
+        /// <param name="config">The OctaneConfiguration object used for configuring the downloader.</param>
+        /// <param name="pauseTokenSource">The pause token source to use for pausing and resuming.</param>
+        /// <param name="cancelTokenSource">The cancellation token for canceling the task.</param>
         public async static Task DownloadFile(string url, ILoggerFactory loggerFactory = null, string outFile = null,
-            OctaneConfiguration config = null)
+            OctaneConfiguration config = null, PauseTokenSource pauseTokenSource = null, CancellationTokenSource cancelTokenSource = null)
         {
+            var success = false;
+            var cancellation_token = cancelTokenSource?.Token ?? new CancellationToken();
+            cancellation_token.Register(new Action(() =>
+            {
+                config.DoneCallback?.Invoke(false);
+                if (File.Exists(outFile))
+                {
+                    File.Delete(outFile);
+                }
+            }));
+
+            var pause_token = pauseTokenSource ?? new PauseTokenSource(loggerFactory);
             var stopwatch = new Stopwatch();
 
             loggerFactory ??= new LoggerFactory();
@@ -92,8 +122,7 @@ namespace OctaneEngine
             var memPool = ArrayPool<byte>.Shared;
 
             //Get response length and calculate part sizes
-            var responseLength = (await WebRequest.Create(url).GetResponseAsync()).ContentLength;
-            var rangeSupported = (await WebRequest.Create(url).GetResponseAsync()).Headers["Accept-Ranges"] == "bytes";
+            var (responseLength, rangeSupported) = getFileSizeAndRangeSupport(url).Result;
             logger.LogInformation($"Range supported: {rangeSupported}");
             var partSize = (long)Math.Floor(responseLength / (config.Parts + 0.0));
             var pieces = new List<ValueTuple<long, long>>();
@@ -103,9 +132,8 @@ namespace OctaneEngine
             logger.LogInformation($"Server file name: {filename}.");
             ServicePointManager.Expect100Continue = false;
             ServicePointManager.DefaultConnectionLimit = 10000;
-            ServicePointManager.FindServicePoint(new Uri(url)).ConnectionLimit = config.Parts;
 
-            #if NET6_0_OR_GREATER
+    #if NET6_0_OR_GREATER
                 ServicePointManager.ReusePort = true;
             #endif
 
@@ -181,7 +209,7 @@ namespace OctaneEngine
                         logger.LogInformation("Using Octane Client to download file.");
                         await Parallel.ForEachAsync(pieces,
                             new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount },
-                            async (piece, cancellationToken) =>
+                            async (piece, t) =>
                             {
                                 Trace.Listeners.Clear();
 
@@ -195,8 +223,8 @@ namespace OctaneEngine
                                     //Request headers so we dont cache the file into memory
                                     if (client != null)
                                     {
-                                        var message = client.SendMessage(url, piece, cancellationToken).Result;
-                                        await client.ReadResponse(message, piece, cancellationToken);
+                                        var message = client.SendMessage(url, piece, cancellation_token, pause_token.Token).Result;
+                                        await client.ReadResponse(message, piece, cancellation_token, pause_token.Token);
                                     }
                                     else
                                     {
@@ -213,15 +241,16 @@ namespace OctaneEngine
                     {
                         logger.LogInformation("Using Default Client to download file.");
                         client = new DefaultClient(_client, mmf);
-                        var cancellationToken = new CancellationToken();
-                        var message = client.SendMessage(url, (0, 0), cancellationToken).Result;
-                        await client.ReadResponse(message, (0, 0), cancellationToken);
+                        var message = client.SendMessage(url, (0, 0), cancellation_token, pause_token.Token).Result;
+                        await client.ReadResponse(message, (0, 0), cancellation_token, pause_token.Token);
                     }
+
+                    success = true;
                 }
                 catch (Exception ex)
                 {
                     logger.LogError(ex.Message);
-                    config.DoneCallback(false);
+                    success = false;
                 }
                 finally
                 {
@@ -231,7 +260,12 @@ namespace OctaneEngine
                     stopwatch.Stop();
                     logger.LogInformation($"File downloaded in {stopwatch.ElapsedMilliseconds} ms.");
                     logger.LogTrace("Calling callback function...");
-                    config.DoneCallback(true);
+                    config.DoneCallback.Invoke(success);
+
+                    if (success == false)
+                    {
+                        logger.LogError("Download Failed.");
+                    }
                 }
             }
         }

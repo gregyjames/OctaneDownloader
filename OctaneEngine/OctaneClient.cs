@@ -29,10 +29,10 @@ using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using OctaneEngineCore;
 using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngine;
-
 public class OctaneClient : IClient
 {
     private readonly ProgressBarOptions _childOptions = new()
@@ -66,8 +66,12 @@ public class OctaneClient : IClient
     }
 
     public async Task<HttpResponseMessage> SendMessage(string url, (long, long) piece,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, PauseToken pauseToken)
     {
+        if (pauseToken.IsPaused)
+        {
+            await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
+        }
         _log.LogTrace("Sending request for range ({PieceItem1},{PieceItem2})...", piece.Item1, piece.Item2);
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
         request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
@@ -75,8 +79,12 @@ public class OctaneClient : IClient
             .ConfigureAwait(false);
     }
 
-    public async Task ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken)
+    public async Task ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
+        if (pauseToken.IsPaused)
+        {
+            await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
+        }
         var stopwatch = new Stopwatch();
         stopwatch.Start();
         var programBps = _config.BytesPerSecond / _config.Parts;

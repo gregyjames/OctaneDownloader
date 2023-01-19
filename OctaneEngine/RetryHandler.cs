@@ -20,6 +20,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+#nullable enable
 using System.Diagnostics;
 using System.Net.Http;
 using System.Threading;
@@ -36,10 +38,6 @@ public class RetryHandler : DelegatingHandler
     // probably not the most user friendly way you could respond to "the
     // network cable got pulled out."
     private readonly int _maxRetries = 3;
-
-    public RetryHandler(HttpMessageHandler innerHandler) : base(innerHandler)
-    {
-    }
 
     public RetryHandler(HttpMessageHandler innerHandler, int maxRetries, ILoggerFactory loggerFactory) :
         base(innerHandler)
