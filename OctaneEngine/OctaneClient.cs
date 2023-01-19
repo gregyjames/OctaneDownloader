@@ -68,7 +68,10 @@ public class OctaneClient : IClient
     public async Task<HttpResponseMessage> SendMessage(string url, (long, long) piece,
         CancellationToken cancellationToken, PauseToken pauseToken)
     {
-        await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
+        if (pauseToken.IsPaused)
+        {
+            await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
+        }
         _log.LogTrace("Sending request for range ({PieceItem1},{PieceItem2})...", piece.Item1, piece.Item2);
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
         request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
@@ -78,7 +81,10 @@ public class OctaneClient : IClient
 
     public async Task ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
-        await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
+        if (pauseToken.IsPaused)
+        {
+            await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
+        }
         var stopwatch = new Stopwatch();
         stopwatch.Start();
         var programBps = _config.BytesPerSecond / _config.Parts;
