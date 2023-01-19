@@ -3,6 +3,7 @@ using System.IO;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngine;
+using OctaneEngineCore;
 using Serilog;
 
 namespace OctaneTestProject
@@ -11,6 +12,7 @@ namespace OctaneTestProject
     public class DownloadTest
     {
         private ILoggerFactory _factory = null;
+        private PauseTokenSource _pauseTokenSource = null;
         
         [SetUp]
         public void Init()
@@ -26,6 +28,8 @@ namespace OctaneTestProject
             {
                 logging.AddSerilog(seriLog);
             });
+
+            _pauseTokenSource = new PauseTokenSource(_factory);
         }
 
         [TearDown]
@@ -53,7 +57,7 @@ namespace OctaneTestProject
                 Proxy = null
             };
             
-            Engine.DownloadFile(url, _factory, outFile, config).Wait();
+            Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource).Wait();
         }
     }
 }

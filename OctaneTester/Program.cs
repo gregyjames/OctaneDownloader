@@ -2,6 +2,7 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
 using OctaneEngine;
+using OctaneEngineCore;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 
@@ -36,7 +37,9 @@ namespace OctaneTester
                 logging.AddSerilog(seriLog);
             });
             
-            Engine.DownloadFile("https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png", factory, null, config).Wait();
+            var pauseTokenSource = new PauseTokenSource(factory);
+            
+            Engine.DownloadFile("https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png", factory, null, config, pauseTokenSource).Wait();
         }
     }
 }

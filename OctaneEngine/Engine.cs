@@ -35,6 +35,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Cysharp.Text;
 using Microsoft.Extensions.Logging;
+using OctaneEngineCore;
 using OctaneEngineCore.ShellProgressBar;
 
 // ReSharper disable All
@@ -64,8 +65,10 @@ namespace OctaneEngine
         /// </summary>
         /// <param name="url">The string url of the file to be downloaded.</param>
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
+        /// <param name="loggerFactory">The ILoggerFactory instance to use for logging.</param>
+        /// <param name="config">The OctaneConfiguration object used for configuring the downloader.</param>
         public async static Task DownloadFile(string url, ILoggerFactory loggerFactory = null, string outFile = null,
-            OctaneConfiguration config = null)
+            OctaneConfiguration config = null, PauseTokenSource pauseTokenSource = null)
         {
             var stopwatch = new Stopwatch();
 
@@ -195,8 +198,8 @@ namespace OctaneEngine
                                     //Request headers so we dont cache the file into memory
                                     if (client != null)
                                     {
-                                        var message = client.SendMessage(url, piece, cancellationToken).Result;
-                                        await client.ReadResponse(message, piece, cancellationToken);
+                                        var message = client.SendMessage(url, piece, cancellationToken, pauseTokenSource.Token).Result;
+                                        await client.ReadResponse(message, piece, cancellationToken, pauseTokenSource.Token);
                                     }
                                     else
                                     {
@@ -214,8 +217,8 @@ namespace OctaneEngine
                         logger.LogInformation("Using Default Client to download file.");
                         client = new DefaultClient(_client, mmf);
                         var cancellationToken = new CancellationToken();
-                        var message = client.SendMessage(url, (0, 0), cancellationToken).Result;
-                        await client.ReadResponse(message, (0, 0), cancellationToken);
+                        var message = client.SendMessage(url, (0, 0), cancellationToken, pauseTokenSource.Token).Result;
+                        await client.ReadResponse(message, (0, 0), cancellationToken, pauseTokenSource.Token);
                     }
                 }
                 catch (Exception ex)

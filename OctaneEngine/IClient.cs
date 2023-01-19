@@ -24,12 +24,13 @@ using System;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using OctaneEngineCore;
 
 namespace OctaneEngine;
 
 public interface IClient : IDisposable
 {
-    public Task<HttpResponseMessage> SendMessage(string url, (long, long) piece, CancellationToken cancellationToken);
+    public Task<HttpResponseMessage> SendMessage(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken);
 
-    public Task ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken);
+    public Task ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken);
 }
