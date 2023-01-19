@@ -85,7 +85,16 @@ namespace OctaneEngine
         public async static Task DownloadFile(string url, ILoggerFactory loggerFactory = null, string outFile = null,
             OctaneConfiguration config = null, PauseTokenSource pauseTokenSource = null, CancellationTokenSource cancelTokenSource = null)
         {
+            var success = false;
             var token = cancelTokenSource?.Token ?? new CancellationToken();
+            token.Register(new Action(() =>
+            {
+                config.DoneCallback?.Invoke(false);
+                if (File.Exists(outFile))
+                {
+                    File.Delete(outFile);
+                }
+            }));
             var stopwatch = new Stopwatch();
 
             loggerFactory ??= new LoggerFactory();
@@ -233,11 +242,13 @@ namespace OctaneEngine
                         var message = client.SendMessage(url, (0, 0), token, pauseTokenSource.Token).Result;
                         await client.ReadResponse(message, (0, 0), token, pauseTokenSource.Token);
                     }
+
+                    success = true;
                 }
                 catch (Exception ex)
                 {
                     logger.LogError(ex.Message);
-                    config.DoneCallback(false);
+                    success = false;
                 }
                 finally
                 {
@@ -247,7 +258,12 @@ namespace OctaneEngine
                     stopwatch.Stop();
                     logger.LogInformation($"File downloaded in {stopwatch.ElapsedMilliseconds} ms.");
                     logger.LogTrace("Calling callback function...");
-                    config.DoneCallback(true);
+                    config.DoneCallback.Invoke(success);
+
+                    if (success == false)
+                    {
+                        logger.LogError("Download Failed.");
+                    }
                 }
             }
         }
