@@ -7,7 +7,6 @@ using NUnit.Framework;
 using OctaneEngine;
 using OctaneEngineCore;
 using Serilog;
-
 namespace OctaneTestProject
 {
     [TestFixture]
@@ -41,7 +40,7 @@ namespace OctaneTestProject
         }
 
         [Test]
-        public void DownloadFile()
+        public async Task DownloadFile()
         {
             const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
             const string outFile = @"Chershire_Cat.24ee16b9.png";
@@ -59,13 +58,19 @@ namespace OctaneTestProject
                 Proxy = null
             };
             
-            Task.Run(() =>
-            {
-                _pauseTokenSource.Pause();
-                Thread.Sleep(5000);
-            }).Wait();
-            _pauseTokenSource.Resume();
-            Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource).Wait();
+            _pauseTokenSource.Pause();
+            
+            
+            System.Threading.Tasks.Parallel.Invoke(
+                () => Action(_pauseTokenSource),
+                () => Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource).Wait()
+            );
+        }
+
+        private void Action(PauseTokenSource pcs)
+        {
+            Thread.Sleep(5000);
+            pcs.Resume();
         }
     }
 }

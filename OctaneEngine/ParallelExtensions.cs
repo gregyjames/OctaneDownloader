@@ -21,10 +21,13 @@
  * SOFTWARE.
  */
 #if NET461 || NET472
+using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Dasync.Collections;
 
-namespace System.Threading.Tasks
+namespace OctaneEngine
 {
     public static class Parallel
     {
