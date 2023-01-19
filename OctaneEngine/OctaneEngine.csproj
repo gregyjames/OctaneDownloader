@@ -6,7 +6,7 @@
         <NeutralLanguage>en-US</NeutralLanguage>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <PackageId>OctaneEngineCore</PackageId>
-        <PackageVersion>3.2.0</PackageVersion>
+        <PackageVersion>4.0.0</PackageVersion>
         <Authors>Greg James</Authors>
         <Description>A high Performance C# file downloader that asyncrounously downloads files as pieces. Made as a faster, more efficent replacement to Microsoft's WebClient.</Description>
         <Copyright>2015, Greg James</Copyright>
@@ -15,7 +15,7 @@
         <PackageTags>c-sharp download parallel downloader multithreading threading networking</PackageTags>
         <SignAssembly>true</SignAssembly>
         <AssemblyOriginatorKeyFile>../build/key.snk</AssemblyOriginatorKeyFile>
-        <AssemblyVersion>3.1.0</AssemblyVersion>
+        <AssemblyVersion>4.0.0</AssemblyVersion>
         <AssemblyName>OctaneEngineCore</AssemblyName>
         <RootNamespace>OctaneEngineCore</RootNamespace>
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
@@ -26,6 +26,7 @@
         <DebugSymbols>false</DebugSymbols>
         <PlatformTarget>AnyCPU</PlatformTarget>
         <WarningLevel>0</WarningLevel>
+        <DebugType>none</DebugType>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
