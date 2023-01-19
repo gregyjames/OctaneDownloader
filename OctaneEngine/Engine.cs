@@ -36,6 +36,7 @@ using System.Threading.Tasks;
 using Cysharp.Text;
 using Microsoft.Extensions.Logging;
 using OctaneEngineCore;
+using OctaneEngineCore.ColorConsoleLogger;
 using OctaneEngineCore.ShellProgressBar;
 
 // ReSharper disable All
@@ -78,7 +79,7 @@ namespace OctaneEngine
         /// </summary>
         /// <param name="url">The string url of the file to be downloaded.</param>
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
-        /// <param name="loggerFactory">The ILoggerFactory instance to use for logging.</param>
+        /// <param name="factory">The ILoggerFactory instance to use for logging.</param>
         /// <param name="config">The OctaneConfiguration object used for configuring the downloader.</param>
         /// <param name="pauseTokenSource">The pause token source to use for pausing and resuming.</param>
         /// <param name="cancelTokenSource">The cancellation token for canceling the task.</param>
@@ -95,13 +96,17 @@ namespace OctaneEngine
                     File.Delete(outFile);
                 }
             }));
-
-            var pause_token = pauseTokenSource ?? new PauseTokenSource(loggerFactory);
-            var stopwatch = new Stopwatch();
-
-            loggerFactory ??= new LoggerFactory();
             
-            var logger = loggerFactory.CreateLogger("OctaneEngine");
+            var factory = loggerFactory ?? new LoggerFactory();
+            if (loggerFactory == null)
+            {
+                factory.AddProvider(new ColorConsoleLoggerProvider(new ColorConsoleLoggerConfiguration()));
+            }
+            
+            var pause_token = pauseTokenSource ?? new PauseTokenSource(factory);
+            var stopwatch = new Stopwatch();
+            
+            var logger = factory.CreateLogger("OctaneEngine");
 
             stopwatch.Start();
             if (config == null)
@@ -176,7 +181,7 @@ namespace OctaneEngine
                 ServerCertificateCustomValidationCallback = (_, _, _, _) => true
             };
 
-            var retryHandler = new RetryHandler(clientHandler, config.NumRetries, loggerFactory);
+            var retryHandler = new RetryHandler(clientHandler, config.NumRetries, factory);
 
             var _client = new HttpClient(retryHandler)
             {
@@ -214,7 +219,7 @@ namespace OctaneEngine
                                 Trace.Listeners.Clear();
 
                                 //Get a client from the pool and request for the content range
-                                client = new OctaneClient(config, _client, loggerFactory, mmf, pbar, memPool);
+                                client = new OctaneClient(config, _client, factory, mmf, pbar, memPool);
 
                                 using (var request = new HttpRequestMessage { RequestUri = new Uri(url) })
                                 {
