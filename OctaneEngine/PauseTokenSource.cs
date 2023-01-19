@@ -23,6 +23,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using OctaneEngineCore.ColorConsoleLogger;
 
 namespace OctaneEngineCore;
 
@@ -32,10 +33,18 @@ public class PauseTokenSource
     private ILoggerFactory _factory;
     private ILogger _log;
     internal static readonly Task _completedTask = Task.FromResult(true);
-
-    public PauseTokenSource(ILoggerFactory factory)
+    public PauseTokenSource(ILoggerFactory factory = null)
     {
-        _factory = factory;
+        if (factory == null)
+        {
+            _factory = new LoggerFactory();
+            _factory.AddProvider(new ColorConsoleLoggerProvider(new ColorConsoleLoggerConfiguration()));
+        }
+        else
+        {
+            _factory = factory;
+        }
+        
         _log = _factory.CreateLogger<PauseTokenSource>();
     }
     public PauseToken Token => new PauseToken(this, _log);
