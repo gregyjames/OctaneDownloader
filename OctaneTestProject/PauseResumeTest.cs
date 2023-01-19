@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngine;
@@ -40,7 +39,7 @@ namespace OctaneTestProject
         }
 
         [Test]
-        public async Task DownloadFile()
+        public void DownloadFile()
         {
             const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
             const string outFile = @"Chershire_Cat.24ee16b9.png";

@@ -18,6 +18,7 @@
         <AssemblyVersion>3.1.0</AssemblyVersion>
         <AssemblyName>OctaneEngineCore</AssemblyName>
         <RootNamespace>OctaneEngineCore</RootNamespace>
+        <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
