@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngine;
@@ -13,7 +14,8 @@ namespace OctaneTestProject
     {
         private ILoggerFactory _factory;
         private PauseTokenSource _pauseTokenSource;
-        
+        private CancellationTokenSource _cancelTokenSource;
+
         [SetUp]
         public void Init()
         {
@@ -30,6 +32,7 @@ namespace OctaneTestProject
             });
 
             _pauseTokenSource = new PauseTokenSource(_factory);
+            _cancelTokenSource = new CancellationTokenSource();
         }
 
         [TearDown]
@@ -57,7 +60,7 @@ namespace OctaneTestProject
                 Proxy = null
             };
             
-            Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource).Wait();
+            Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource, _cancelTokenSource).Wait();
         }
     }
 }

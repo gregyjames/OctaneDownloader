@@ -44,7 +44,7 @@ namespace OctaneEngine
 {
     public static class Engine
     {
-        static readonly string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        private static readonly string[] sizes = { "B", "KB", "MB", "GB", "TB" };
 
         private static string prettySize(long len)
         {
@@ -81,9 +81,11 @@ namespace OctaneEngine
         /// <param name="loggerFactory">The ILoggerFactory instance to use for logging.</param>
         /// <param name="config">The OctaneConfiguration object used for configuring the downloader.</param>
         /// <param name="pauseTokenSource">The pause token source to use for pausing and resuming.</param>
+        /// <param name="cancelTokenSource">The cancellation token for canceling the task.</param>
         public async static Task DownloadFile(string url, ILoggerFactory loggerFactory = null, string outFile = null,
-            OctaneConfiguration config = null, PauseTokenSource pauseTokenSource = null)
+            OctaneConfiguration config = null, PauseTokenSource pauseTokenSource = null, CancellationTokenSource cancelTokenSource = null)
         {
+            var token = cancelTokenSource?.Token ?? new CancellationToken();
             var stopwatch = new Stopwatch();
 
             loggerFactory ??= new LoggerFactory();
@@ -196,7 +198,7 @@ namespace OctaneEngine
                         logger.LogInformation("Using Octane Client to download file.");
                         await Parallel.ForEachAsync(pieces,
                             new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount },
-                            async (piece, cancellationToken) =>
+                            async (piece, t) =>
                             {
                                 Trace.Listeners.Clear();
 
@@ -210,8 +212,8 @@ namespace OctaneEngine
                                     //Request headers so we dont cache the file into memory
                                     if (client != null)
                                     {
-                                        var message = client.SendMessage(url, piece, cancellationToken, pauseTokenSource.Token).Result;
-                                        await client.ReadResponse(message, piece, cancellationToken, pauseTokenSource.Token);
+                                        var message = client.SendMessage(url, piece, token, pauseTokenSource.Token).Result;
+                                        await client.ReadResponse(message, piece, token, pauseTokenSource.Token);
                                     }
                                     else
                                     {
@@ -228,9 +230,8 @@ namespace OctaneEngine
                     {
                         logger.LogInformation("Using Default Client to download file.");
                         client = new DefaultClient(_client, mmf);
-                        var cancellationToken = new CancellationToken();
-                        var message = client.SendMessage(url, (0, 0), cancellationToken, pauseTokenSource.Token).Result;
-                        await client.ReadResponse(message, (0, 0), cancellationToken, pauseTokenSource.Token);
+                        var message = client.SendMessage(url, (0, 0), token, pauseTokenSource.Token).Result;
+                        await client.ReadResponse(message, (0, 0), token, pauseTokenSource.Token);
                     }
                 }
                 catch (Exception ex)

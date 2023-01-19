@@ -13,7 +13,8 @@ namespace OctaneTestProject
     {
         private ILoggerFactory _factory;
         private PauseTokenSource _pauseTokenSource;
-        
+        private CancellationTokenSource _cancelTokenSource;
+
         [SetUp]
         public void Init()
         {
@@ -30,6 +31,7 @@ namespace OctaneTestProject
             });
 
             _pauseTokenSource = new PauseTokenSource(_factory);
+            _cancelTokenSource = new CancellationTokenSource();
         }
 
         [TearDown]
@@ -62,7 +64,7 @@ namespace OctaneTestProject
             
             System.Threading.Tasks.Parallel.Invoke(
                 () => Action(_pauseTokenSource),
-                () => Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource).Wait()
+                () => Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource, _cancelTokenSource).Wait()
             );
         }
 
