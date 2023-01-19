@@ -11,8 +11,8 @@ namespace OctaneTestProject
     [TestFixture]
     public class DownloadTest
     {
-        private ILoggerFactory _factory = null;
-        private PauseTokenSource _pauseTokenSource = null;
+        private ILoggerFactory _factory;
+        private PauseTokenSource _pauseTokenSource;
         
         [SetUp]
         public void Init()
@@ -49,7 +49,7 @@ namespace OctaneTestProject
                 Parts = 2,
                 BufferSize = 8192,
                 ShowProgress = false,
-                DoneCallback = x => Assert.IsTrue(File.Exists(outFile)),
+                DoneCallback = _ => Assert.IsTrue(File.Exists(outFile)),
                 ProgressCallback = Console.WriteLine,
                 NumRetries = 20,
                 BytesPerSecond = 1,
