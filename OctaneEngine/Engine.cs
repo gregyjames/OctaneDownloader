@@ -86,8 +86,8 @@ namespace OctaneEngine
             OctaneConfiguration config = null, PauseTokenSource pauseTokenSource = null, CancellationTokenSource cancelTokenSource = null)
         {
             var success = false;
-            var token = cancelTokenSource?.Token ?? new CancellationToken();
-            token.Register(new Action(() =>
+            var cancellation_token = cancelTokenSource?.Token ?? new CancellationToken();
+            cancellation_token.Register(new Action(() =>
             {
                 config.DoneCallback?.Invoke(false);
                 if (File.Exists(outFile))
@@ -95,6 +95,8 @@ namespace OctaneEngine
                     File.Delete(outFile);
                 }
             }));
+
+            var pause_token = pauseTokenSource ?? new PauseTokenSource(loggerFactory);
             var stopwatch = new Stopwatch();
 
             loggerFactory ??= new LoggerFactory();
@@ -221,8 +223,8 @@ namespace OctaneEngine
                                     //Request headers so we dont cache the file into memory
                                     if (client != null)
                                     {
-                                        var message = client.SendMessage(url, piece, token, pauseTokenSource.Token).Result;
-                                        await client.ReadResponse(message, piece, token, pauseTokenSource.Token);
+                                        var message = client.SendMessage(url, piece, cancellation_token, pause_token.Token).Result;
+                                        await client.ReadResponse(message, piece, cancellation_token, pause_token.Token);
                                     }
                                     else
                                     {
@@ -239,8 +241,8 @@ namespace OctaneEngine
                     {
                         logger.LogInformation("Using Default Client to download file.");
                         client = new DefaultClient(_client, mmf);
-                        var message = client.SendMessage(url, (0, 0), token, pauseTokenSource.Token).Result;
-                        await client.ReadResponse(message, (0, 0), token, pauseTokenSource.Token);
+                        var message = client.SendMessage(url, (0, 0), cancellation_token, pause_token.Token).Result;
+                        await client.ReadResponse(message, (0, 0), cancellation_token, pause_token.Token);
                     }
 
                     success = true;
