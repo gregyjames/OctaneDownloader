@@ -1,6 +1,10 @@
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace OctaneEngineCore;
 
-public interface IStream
+internal interface IStream
 {
-    
+    public int Read(byte[] buffer, int offset, int count);
+    public Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken);
 }

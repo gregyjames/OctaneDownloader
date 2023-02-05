@@ -28,7 +28,7 @@ using OctaneEngineCore;
 
 namespace OctaneEngine;
 
-public interface IClient : IDisposable
+internal interface IClient : IDisposable
 {
     public Task<HttpResponseMessage> SendMessage(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken);
 

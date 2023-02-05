@@ -81,6 +81,10 @@ public class OctaneClient : IClient
 
     public async Task ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
+        //Copy from the content stream to the mmf stream
+        var buffer = _memPool.Rent(_config.BufferSize);
+        _log.LogInformation("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
+
         if (pauseToken.IsPaused)
         {
             await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
@@ -95,23 +99,16 @@ public class OctaneClient : IClient
             //Get the content stream from the message request
             using var streamToRead = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             //Throttle stream to over BPS divided among the parts
-            var source = _config.BytesPerSecond != 1
-                ? new ThrottleStream(streamToRead, programBps, _loggerFactory)
-                : null;
+            IStream source = _config.BytesPerSecond != 1 ? new ThrottleStream(streamToRead, programBps, _loggerFactory) : new NormalStream(streamToRead);
             if (source != null)
                 _log.LogTrace("Throttling stream for piece ({PieceItem1},{PieceItem2}) to {ProgramBps} bytes per second", piece.Item1, piece.Item2, programBps);
 
             //Create a memory mapped stream to the mmf with the piece offset and size equal to the response size
-            using var streams = _mmf.CreateViewStream(piece.Item1, message.Content.Headers.ContentLength!.Value,
-                MemoryMappedFileAccess.Write);
+            using var streams = _mmf.CreateViewStream(piece.Item1, message.Content.Headers.ContentLength!.Value, MemoryMappedFileAccess.Write);
             var child = _progressBar?.Spawn(
                 (int)Math.Round((double)(message.Content.Headers.ContentLength / _config.BufferSize)), "",
                 _childOptions);
-
-            //Copy from the content stream to the mmf stream
-            var buffer = _memPool.Rent(_config.BufferSize);
-            _log.LogInformation("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
-
+            
             int bytesRead;
             // Until we've read everything
             do
@@ -120,29 +117,10 @@ public class OctaneClient : IClient
                 // Until the buffer is very nearly full or there's nothing left to read
                 do
                 {
-                    if (_config.BytesPerSecond == 1)
-                    {
-                        bytesRead = await streamToRead
-                            .ReadAsync(buffer, offset, _config.BufferSize - offset, cancellationToken)
-                            .ConfigureAwait(false);
-                        offset += bytesRead;
-                        _log.LogTrace("Read {Offset} bytes from piece ({PieceItem1},{PieceItem2})", offset, piece.Item1, piece.Item2);
-                    }
-                    else
-                    {
-                        if (source != null)
-                        {
-                            bytesRead = await source
-                                .ReadAsync(buffer, offset, _config.BufferSize - offset, cancellationToken)
-                                .ConfigureAwait(false);
-                            offset += bytesRead;
-                        }
-                        else
-                        {
-                            bytesRead = 0;
-                            Console.WriteLine("Error reading stream!");
-                        }
-                    }
+                    bytesRead = await source.ReadAsync(buffer, offset, _config.BufferSize - offset, cancellationToken).ConfigureAwait(false);
+                    offset += bytesRead;
+                    _log.LogTrace("Read {Offset} bytes from piece ({PieceItem1},{PieceItem2})", offset, piece.Item1, piece.Item2);
+
                 } while (bytesRead != 0 && offset < _config.BufferSize);
 
                 // Empty the buffer

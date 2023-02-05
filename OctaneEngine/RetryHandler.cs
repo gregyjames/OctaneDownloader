@@ -30,7 +30,7 @@ using Microsoft.Extensions.Logging;
 
 namespace OctaneEngine;
 
-public class RetryHandler : DelegatingHandler
+internal class RetryHandler : DelegatingHandler
 {
     private readonly ILogger<RetryHandler> _log;
 

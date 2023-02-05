@@ -29,7 +29,7 @@ using Dasync.Collections;
 
 namespace OctaneEngine
 {
-    public static class Parallel
+    internal static class Parallel
     {
         /// <summary>
         ///     Executes a for each operation on an <see cref="System.Collections.Generic.IEnumerable{TSource}" /> in which

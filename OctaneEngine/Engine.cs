@@ -137,8 +137,9 @@ namespace OctaneEngine
             logger.LogInformation($"Server file name: {filename}.");
             ServicePointManager.Expect100Continue = false;
             ServicePointManager.DefaultConnectionLimit = 10000;
-
-    #if NET6_0_OR_GREATER
+            ServicePointManager.SetTcpKeepAlive(true, Int32.MaxValue,1);
+            ServicePointManager.MaxServicePoints = config.Parts;
+            #if NET6_0_OR_GREATER
                 ServicePointManager.ReusePort = true;
             #endif
 
@@ -150,18 +151,14 @@ namespace OctaneEngine
             {
                 for (long i = 0; i < responseLength; i += partSize)
                 {
+                    //Increment the start by one byte for all parts but the first which starts from zero.
                     if (i != 0)
                     {
                         i += 1;
                     }
-                    var j = i + partSize;
-                    if (j > responseLength)
-                    {
-                        j = responseLength;
-                    }
+                    var j = Math.Min(i + partSize, responseLength);
                     pieces.Insert(0, new ValueTuple<long, long>(i, j));
-                    logger.LogTrace(
-                        $"Piece with range ({pieces.First().Item1},{pieces.First().Item2}) added to tasks queue.");
+                    logger.LogTrace($"Piece with range ({pieces.First().Item1},{pieces.First().Item2}) added to tasks queue.");
                 }
             }
 
@@ -197,8 +194,7 @@ namespace OctaneEngine
             #endregion
 
             //Create memory mapped file to hold the file
-            using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, responseLength,
-                       MemoryMappedFileAccess.ReadWrite))
+            using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, responseLength, MemoryMappedFileAccess.ReadWrite))
             {
                 int tasksDone = 0;
                 try

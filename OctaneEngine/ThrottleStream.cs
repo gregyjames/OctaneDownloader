@@ -25,10 +25,11 @@ using System.IO;
 using System.Reactive.Concurrency;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+using OctaneEngineCore;
 
 namespace OctaneEngine;
 
-public class ThrottleStream : Stream
+internal class ThrottleStream : Stream, IStream
 {
     private readonly ILogger<ThrottleStream> _log;
     private readonly int _maxBps;
