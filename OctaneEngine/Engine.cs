@@ -29,7 +29,6 @@ using System.IO.MemoryMappedFiles;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
@@ -130,7 +129,7 @@ namespace OctaneEngine
             //Get response length and calculate part sizes
             var (responseLength, rangeSupported) = getFileSizeAndRangeSupport(url).Result;
             logger.LogInformation($"Range supported: {rangeSupported}");
-            var partSize = (long)Math.Floor(responseLength / (config.Parts + 0.0));
+            var partSize = Convert.ToInt64(responseLength / config.Parts);
             var pieces = new List<ValueTuple<long, long>>();
             var uri = new Uri(url);
             var filename = outFile ?? Path.GetFileName(uri.LocalPath);
@@ -185,7 +184,7 @@ namespace OctaneEngine
                 ServerCertificateCustomValidationCallback = (_, _, _, _) => true
             };
 
-            var retryHandler = new RetryHandler(clientHandler, config.NumRetries, factory);
+            var retryHandler = new RetryHandler(clientHandler, factory, config.NumRetries);
 
             var _client = new HttpClient(retryHandler)
             {
@@ -223,30 +222,18 @@ namespace OctaneEngine
 
                                 //Get a client from the pool and request for the content range
                                 client = new OctaneClient(config, _client, factory, mmf, pbar, memPool);
+                                
+                                //Request headers so we dont cache the file into memory
+                                var message = client.SendMessage(url, piece, cancellation_token, pause_token.Token).Result;
+                                await client.ReadResponse(message, piece, cancellation_token, pause_token.Token);
 
-                                using (var request = new HttpRequestMessage { RequestUri = new Uri(url) })
+                                Interlocked.Increment(ref tasksDone);
+                                if (config?.ProgressCallback != null)
                                 {
-                                    request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
-
-                                    //Request headers so we dont cache the file into memory
-                                    if (client != null)
-                                    {
-                                        var message = client.SendMessage(url, piece, cancellation_token, pause_token.Token).Result;
-                                        await client.ReadResponse(message, piece, cancellation_token, pause_token.Token);
-                                    }
-                                    else
-                                    {
-                                        logger.LogCritical("Error creating client.");
-                                    }
-
-                                    Interlocked.Increment(ref tasksDone);
-                                    if (config?.ProgressCallback != null)
-                                    {
-                                        config?.ProgressCallback((double)((tasksDone + 0.0) / (pieces.Count + 0.0)));
-                                    }
-
-                                    logger.LogTrace($"Finished {tasksDone - 1}/{config.Parts} pieces!");
+                                    config?.ProgressCallback((tasksDone + 0.0) / (pieces.Count + 0.0));
                                 }
+
+                                logger.LogTrace($"Finished {tasksDone - 1}/{config.Parts} pieces!");
                             });
                     }
                     else
@@ -274,7 +261,7 @@ namespace OctaneEngine
                     logger.LogTrace("Calling callback function...");
                     config.DoneCallback.Invoke(success);
 
-                    if (success == false)
+                    if (!success)
                     {
                         logger.LogError("Download Failed.");
                     }

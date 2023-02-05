@@ -37,9 +37,9 @@ internal class RetryHandler : DelegatingHandler
     // Strongly consider limiting the number of retries - "retry forever" is
     // probably not the most user friendly way you could respond to "the
     // network cable got pulled out."
-    private readonly int _maxRetries = 3;
+    private readonly int _maxRetries;
 
-    public RetryHandler(HttpMessageHandler innerHandler, int maxRetries, ILoggerFactory loggerFactory) :
+    public RetryHandler(HttpMessageHandler innerHandler, ILoggerFactory loggerFactory, int maxRetries = 3) :
         base(innerHandler)
     {
         _maxRetries = maxRetries;
@@ -61,7 +61,7 @@ internal class RetryHandler : DelegatingHandler
 
         Debug.Assert(response != null, nameof(response) + " != null");
 
-        if (response.IsSuccessStatusCode == false) _log.LogError("HTTP Response code unsuccessful");
+        if (!response.IsSuccessStatusCode) _log.LogError("HTTP Response code unsuccessful");
 
         return response;
     }
