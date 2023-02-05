@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,27 @@ namespace OctaneTestProject
         private PauseTokenSource _pauseTokenSource;
         private CancellationTokenSource _cancelTokenSource;
 
+        private static bool AreFilesEqual(string file1, string file2)
+        {
+            byte[] file1Bytes = File.ReadAllBytes(file1);
+            byte[] file2Bytes = File.ReadAllBytes(file2);
+
+            if (file1Bytes.Length != file2Bytes.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < file1Bytes.Length; i++)
+            {
+                if (file1Bytes[i] != file2Bytes[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        
         [SetUp]
         public void Init()
         {
@@ -47,24 +69,35 @@ namespace OctaneTestProject
         {
             const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
             const string outFile = @"Chershire_Cat.24ee16b9.png";
+            
+            var client = new HttpClient();
+            var response = client.GetAsync(url).Result;
+            var stream = response.Content.ReadAsStreamAsync().Result;
 
-            var config = new OctaneConfiguration
+            var fileStream = File.Create("original.png");
+            stream.CopyTo(fileStream);
+            fileStream.Close();
+
+            if (File.Exists("original.png"))
             {
-                Parts = 2,
-                BufferSize = 8192,
-                ShowProgress = false,
-                DoneCallback = c => Assert.IsTrue(!File.Exists(outFile) || c == false),
-                ProgressCallback = Console.WriteLine,
-                NumRetries = 20,
-                BytesPerSecond = 1,
-                UseProxy = false,
-                Proxy = null
-            };
+                var config = new OctaneConfiguration
+                {
+                    Parts = 2,
+                    BufferSize = 8192,
+                    ShowProgress = false,
+                    DoneCallback = c => Assert.IsTrue(!File.Exists(outFile) || !c || !AreFilesEqual(outFile, "original.png")),
+                    ProgressCallback = Console.WriteLine,
+                    NumRetries = 20,
+                    BytesPerSecond = 1,
+                    UseProxy = false,
+                    Proxy = null
+                };
 
-            System.Threading.Tasks.Parallel.Invoke(
-                () => _cancelTokenSource.Cancel(),
-                () => Action(url, _factory, outFile, config, _pauseTokenSource, _cancelTokenSource).Wait()
-            );
+                Parallel.Invoke(
+                    () => _cancelTokenSource.Cancel(),
+                    () => Action(url, _factory, outFile, config, _pauseTokenSource, _cancelTokenSource).Wait()
+                );
+            }
         }
 
         private async Task Action(string url, ILoggerFactory factory, string outfile, OctaneConfiguration config, PauseTokenSource pauseTokenSource, CancellationTokenSource cancelTokenSource)

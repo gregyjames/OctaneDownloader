@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using OctaneEngine;
 using OctaneEngineCore;
 using Serilog;
-using Serilog.Extensions.Logging;
 using Serilog.Sinks.SystemConsole.Themes;
 
 namespace OctaneTester
@@ -16,9 +15,9 @@ namespace OctaneTester
         {
             var config = new OctaneConfiguration
             {
-                Parts = 2,
-                BufferSize = 8192,
-                ShowProgress = false,
+                Parts = Environment.ProcessorCount,
+                BufferSize = 2097152,
+                ShowProgress = true,
                 BytesPerSecond = 1,
                 UseProxy = false,
                 Proxy = null,
@@ -31,7 +30,7 @@ namespace OctaneTester
             //SERILOG EXAMPLE 
             var seriLog = new LoggerConfiguration()
                 .Enrich.FromLogContext()
-                .MinimumLevel.Verbose()
+                .MinimumLevel.Fatal()
                 .WriteTo.File("./OctaneLog.txt")
                 .WriteTo.Console(theme: AnsiConsoleTheme.Sixteen)
                 .CreateLogger();
@@ -45,7 +44,7 @@ namespace OctaneTester
             var pauseTokenSource = new PauseTokenSource();
             var cancelTokenSource = new CancellationTokenSource();
             
-            Engine.DownloadFile("https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png", factory, null, config, pauseTokenSource, cancelTokenSource).Wait();
+            Engine.DownloadFile("https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ", factory, null, config, pauseTokenSource, cancelTokenSource).Wait();
         }
     }
 }
