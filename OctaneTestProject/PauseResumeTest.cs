@@ -9,6 +9,7 @@ using Serilog;
 namespace OctaneTestProject
 {
     [TestFixture]
+    // Checks if pausing and resume during downloads works.
     public class PauseResumeTest
     {
         private ILoggerFactory _factory;

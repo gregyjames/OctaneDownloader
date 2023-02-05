@@ -10,6 +10,7 @@ using Serilog;
 namespace OctaneTestProject
 {
     [TestFixture]
+    // Checks if canceling a download works.
     public class CancelTest
     {
         private ILoggerFactory _factory;

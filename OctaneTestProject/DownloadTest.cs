@@ -10,6 +10,7 @@ using Serilog;
 namespace OctaneTestProject
 {
     [TestFixture]
+    // Checks if octane can successfully download a file.
     public class DownloadTest
     {
         private ILoggerFactory _factory;
