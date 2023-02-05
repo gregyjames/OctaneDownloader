@@ -65,7 +65,7 @@ namespace OctaneEngine
         {
             using (var client = new HttpClient())
             {
-                var response = await client.GetAsync(url);
+                var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
                 var responseLength = response.Content.Headers.ContentLength ?? 0;
                 var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
 
