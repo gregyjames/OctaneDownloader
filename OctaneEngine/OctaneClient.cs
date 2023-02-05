@@ -157,6 +157,7 @@ public class OctaneClient : IClient
 
             child?.Dispose();
             streams.Flush();
+            streams.Close();
         }
 
         _progressBar?.Tick();

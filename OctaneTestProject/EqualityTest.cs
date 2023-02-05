@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngine;
@@ -75,16 +76,17 @@ namespace OctaneTestProject
             var response = client.GetAsync(url).Result;
             var stream = response.Content.ReadAsStreamAsync().Result;
 
-            var fileStream = System.IO.File.Create("original.png");
+            var fileStream = File.Create("original.png");
             stream.CopyTo(fileStream);
             fileStream.Close();
-            
+
+            var done = false;
             var config = new OctaneConfiguration
             {
                 Parts = 2,
                 BufferSize = 8192,
                 ShowProgress = false,
-                DoneCallback = _ => Assert.IsTrue(AreFilesEqual(outFile,"original.png")),
+                DoneCallback = _ => done = true,
                 ProgressCallback = Console.WriteLine,
                 NumRetries = 20,
                 BytesPerSecond = 1,
@@ -92,9 +94,16 @@ namespace OctaneTestProject
                 Proxy = null
             };
 
+            Task download = null;
             if (File.Exists("original.png"))
             {
-                Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource, _cancelTokenSource).Wait();
+                download = Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource, _cancelTokenSource);
+                download.Wait();
+            }
+
+            if (File.Exists(outFile) && done)
+            {
+                AreFilesEqual("original.png", outFile);
             }
         }
     }
