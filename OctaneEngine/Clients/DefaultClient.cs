@@ -20,14 +20,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 using System;
 using System.IO.MemoryMappedFiles;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using OctaneEngineCore;
 
-namespace OctaneEngine;
+namespace OctaneEngineCore.Clients;
 
 public class DefaultClient : IClient
 {

@@ -36,6 +36,7 @@ using System.Threading.Tasks;
 using Cysharp.Text;
 using Microsoft.Extensions.Logging;
 using OctaneEngineCore;
+using OctaneEngineCore.Clients;
 using OctaneEngineCore.ColorConsoleLogger;
 using OctaneEngineCore.ShellProgressBar;
 

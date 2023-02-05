@@ -20,13 +20,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 using System;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using OctaneEngineCore;
 
-namespace OctaneEngine;
+namespace OctaneEngineCore.Clients;
 
 internal interface IClient : IDisposable
 {

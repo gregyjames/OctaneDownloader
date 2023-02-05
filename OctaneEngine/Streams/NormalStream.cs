@@ -2,7 +2,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace OctaneEngineCore;
+namespace OctaneEngineCore.Streams;
 
 internal class NormalStream: IStream
 {

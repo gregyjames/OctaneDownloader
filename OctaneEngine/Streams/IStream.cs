@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace OctaneEngineCore;
+namespace OctaneEngineCore.Streams;
 
 internal interface IStream
 {

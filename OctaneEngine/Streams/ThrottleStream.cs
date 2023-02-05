@@ -20,14 +20,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 using System;
 using System.IO;
 using System.Reactive.Concurrency;
 using System.Threading;
 using Microsoft.Extensions.Logging;
-using OctaneEngineCore;
 
-namespace OctaneEngine;
+namespace OctaneEngineCore.Streams;
 
 internal class ThrottleStream : Stream, IStream
 {

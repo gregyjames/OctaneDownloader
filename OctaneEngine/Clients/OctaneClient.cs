@@ -30,7 +30,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using OctaneEngineCore;
+using OctaneEngineCore.Clients;
 using OctaneEngineCore.ShellProgressBar;
+using OctaneEngineCore.Streams;
 
 namespace OctaneEngine;
 public class OctaneClient : IClient
