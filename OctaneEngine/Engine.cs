@@ -150,10 +150,16 @@ namespace OctaneEngine
             {
                 for (long i = 0; i < responseLength; i += partSize)
                 {
-                    pieces.Insert(0,
-                        (i + partSize < responseLength
-                            ? new ValueTuple<long, long>(i, i + partSize)
-                            : new ValueTuple<long, long>(i, responseLength)));
+                    if (i != 0)
+                    {
+                        i += 1;
+                    }
+                    var j = i + partSize;
+                    if (j > responseLength)
+                    {
+                        j = responseLength;
+                    }
+                    pieces.Insert(0, new ValueTuple<long, long>(i, j));
                     logger.LogTrace(
                         $"Piece with range ({pieces.First().Item1},{pieces.First().Item2}) added to tasks queue.");
                 }
