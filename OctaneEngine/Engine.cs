@@ -262,7 +262,6 @@ namespace OctaneEngine
                                 //Get a client from the pool and request for the content range
                                 client = new OctaneClient(config, _client, factory, mmf, pbar, memPool);
                                 
-                                //Request headers so we dont cache the file into memory
                                 var message = await client.SendMessage(url, piece, cancellation_token, pause_token.Token);
                                 await client.ReadResponse(message, piece, cancellation_token, pause_token.Token);
 
