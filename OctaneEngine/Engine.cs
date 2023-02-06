@@ -198,7 +198,7 @@ namespace OctaneEngine
         #endregion
         
         /// <summary>
-        ///     The core octane download function.
+        ///     The core octane download function. 
         /// </summary>
         /// <param name="url">The string url of the file to be downloaded.</param>
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
@@ -209,6 +209,9 @@ namespace OctaneEngine
         public async static Task DownloadFile(string url, ILoggerFactory loggerFactory = null, string outFile = null, OctaneConfiguration config = null, PauseTokenSource pauseTokenSource = null, CancellationTokenSource cancelTokenSource = null)
         {
             #region Varible Initilization
+            var old_mode = GCSettings.LatencyMode;
+            GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
+            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
             var success = false;
             var cancellation_token = createCancellationToken(cancelTokenSource, config, outFile);
             var factory = createLoggerFactory(loggerFactory);
@@ -217,7 +220,6 @@ namespace OctaneEngine
             config = createConfiguration(config, logger);
             var pause_token = pauseTokenSource ?? new PauseTokenSource(factory);
             var filename = outFile ?? Path.GetFileName(new Uri(url).LocalPath);
-            var old_mode = GCSettings.LatencyMode;
             var stopwatch = new Stopwatch();
             var memPool = ArrayPool<byte>.Shared;
             var (responseLength, rangeSupported) = await getFileSizeAndRangeSupport(url);
@@ -249,14 +251,12 @@ namespace OctaneEngine
             {
                 try
                 {
-                    GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
                     logger.LogTrace("Setting GC to sustained low latency mode.");
                     var pbar = createProgressBar(config, logger);
 
                     if (rangeSupported)
                     {
                         logger.LogInformation("Using Octane Client to download file.");
-                        GC.TryStartNoGCRegion(responseLength, true);
                         await Parallel.ForEachAsync(pieces, new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, async (piece, t) =>
                             {
                                 //Get a client from the pool and request for the content range
@@ -274,7 +274,6 @@ namespace OctaneEngine
 
                                 logger.LogTrace($"Finished {tasksDone - 1}/{config.Parts} pieces!");
                             });
-                        GC.EndNoGCRegion();
                     }
                     else
                     {
