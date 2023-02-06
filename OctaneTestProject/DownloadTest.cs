@@ -86,8 +86,15 @@ namespace OctaneTestProject
                 UseProxy = false,
                 Proxy = null
             };
-            
-            Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource, _cancelTokenSource).Wait();
+
+            try
+            {
+                Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource, _cancelTokenSource).Wait();
+            }
+            catch
+            {
+                Console.WriteLine("Error!");
+            }
         }
     }
 }
