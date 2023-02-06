@@ -26,7 +26,6 @@ using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -103,8 +102,7 @@ public class OctaneClient : IClient
             using var streamToRead = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             //Throttle stream to over BPS divided among the parts
             IStream source = _config.BytesPerSecond != 1 ? new ThrottleStream(streamToRead, programBps, _loggerFactory) : new NormalStream(streamToRead);
-            if (source != null)
-                _log.LogTrace("Throttling stream for piece ({PieceItem1},{PieceItem2}) to {ProgramBps} bytes per second", piece.Item1, piece.Item2, programBps);
+            _log.LogTrace("Throttling stream for piece ({PieceItem1},{PieceItem2}) to {ProgramBps} bytes per second", piece.Item1, piece.Item2, programBps);
 
             //Create a memory mapped stream to the mmf with the piece offset and size equal to the response size
             using var streams = _mmf.CreateViewStream(piece.Item1, message.Content.Headers.ContentLength!.Value, MemoryMappedFileAccess.Write);
@@ -139,6 +137,7 @@ public class OctaneClient : IClient
             child?.Dispose();
             streams.Flush();
             streams.Close();
+            streamToRead.Close();
         }
 
         _progressBar?.Tick();

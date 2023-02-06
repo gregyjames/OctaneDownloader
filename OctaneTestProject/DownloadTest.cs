@@ -36,10 +36,36 @@ namespace OctaneTestProject
             _cancelTokenSource = new CancellationTokenSource();
         }
 
+        protected virtual bool IsFileLocked(FileInfo file)
+        {
+            try
+            {
+                using(FileStream stream = file.Open(FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    stream.Close();
+                }
+            }
+            catch (IOException)
+            {
+                //the file is unavailable because it is:
+                //still being written to
+                //or being processed by another thread
+                //or does not exist (has already been processed)
+                return true;
+            }
+
+            //file is not locked
+            return false;
+        }
+        
         [TearDown]
         public void CleanUp()
         {
-            File.Delete("Chershire_Cat.24ee16b9.png");
+            const string outFile = @"Chershire_Cat.24ee16b9.png";
+            if (!IsFileLocked(new FileInfo(outFile)))
+            {
+                File.Delete("Chershire_Cat.24ee16b9.png");
+            }
         }
 
         [Test]
