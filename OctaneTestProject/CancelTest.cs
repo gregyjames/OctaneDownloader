@@ -17,27 +17,6 @@ namespace OctaneTestProject
         private ILoggerFactory _factory;
         private PauseTokenSource _pauseTokenSource;
         private CancellationTokenSource _cancelTokenSource;
-
-        private static bool AreFilesEqual(string file1, string file2)
-        {
-            byte[] file1Bytes = File.ReadAllBytes(file1);
-            byte[] file2Bytes = File.ReadAllBytes(file2);
-
-            if (file1Bytes.Length != file2Bytes.Length)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < file1Bytes.Length; i++)
-            {
-                if (file1Bytes[i] != file2Bytes[i])
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
         
         [SetUp]
         public void Init()
@@ -85,7 +64,7 @@ namespace OctaneTestProject
                     Parts = 2,
                     BufferSize = 8192,
                     ShowProgress = false,
-                    DoneCallback = c => Assert.IsTrue(!File.Exists(outFile) || !c || !AreFilesEqual(outFile, "original.png")),
+                    DoneCallback = c => Assert.IsTrue(!File.Exists(outFile) || !c || !Helpers.AreFilesEqual(outFile, "original.png")),
                     ProgressCallback = Console.WriteLine,
                     NumRetries = 20,
                     BytesPerSecond = 1,
