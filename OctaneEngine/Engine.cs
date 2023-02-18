@@ -257,22 +257,34 @@ namespace OctaneEngine
                     if (rangeSupported)
                     {
                         logger.LogInformation("Using Octane Client to download file.");
-                        await Parallel.ForEachAsync(pieces, new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, async (piece, t) =>
-                            {
-                                //Get a client from the pool and request for the content range
-                                client = new OctaneClient(config, _client, factory, mmf, pbar, memPool);
-                                
-                                var message = await client.SendMessage(url, piece, cancellation_token, pause_token.Token);
-                                await client.ReadResponse(message, piece, cancellation_token, pause_token.Token);
-
-                                Interlocked.Increment(ref tasksDone);
-                                if (config?.ProgressCallback != null)
+                        #if NET6_0_OR_GREATER
+                            GC.TryStartNoGCRegion(1000000, false);
+                        #endif
+                        try
+                        {
+                            await Parallel.ForEachAsync(pieces, new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, async (piece, t) =>
                                 {
-                                    config?.ProgressCallback((tasksDone + 0.0) / (pieces.Count + 0.0));
-                                }
+                                    //Get a client from the pool and request for the content range
+                                    client = new OctaneClient(config, _client, factory, mmf, pbar, memPool);
 
-                                logger.LogTrace($"Finished {tasksDone - 1}/{config.Parts} pieces!");
-                            });
+                                    var message = await client.SendMessage(url, piece, cancellation_token, pause_token.Token);
+                                    await client.ReadResponse(message, piece, cancellation_token, pause_token.Token);
+
+                                    Interlocked.Increment(ref tasksDone);
+                                    if (config?.ProgressCallback != null)
+                                    {
+                                        config?.ProgressCallback((tasksDone + 0.0) / (pieces.Count + 0.0));
+                                    }
+
+                                    logger.LogTrace($"Finished {tasksDone - 1}/{config.Parts} pieces!");
+                                });
+                        }
+                        finally
+                        {
+                            #if NET6_0_OR_GREATER
+                            GC.EndNoGCRegion();
+                            #endif
+                        }
                     }
                     else
                     {

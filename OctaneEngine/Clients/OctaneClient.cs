@@ -119,9 +119,9 @@ public class OctaneClient : IClient
                     }
                 }
             }
-
             
             _log.LogInformation("Buffer returned to memory pool");
+            _memPool.Return(buffer);
         }
 
         _progressBar?.Tick();

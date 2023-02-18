@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using OctaneEngine;
@@ -30,7 +30,7 @@ namespace OctaneTester
             //SERILOG EXAMPLE 
             var seriLog = new LoggerConfiguration()
                 .Enrich.FromLogContext()
-                .MinimumLevel.Verbose()
+                .MinimumLevel.Fatal()
                 .WriteTo.File("./OctaneLog.txt")
                 .WriteTo.Console(theme: AnsiConsoleTheme.Sixteen)
                 .CreateLogger();
