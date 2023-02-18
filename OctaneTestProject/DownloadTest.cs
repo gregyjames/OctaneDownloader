@@ -63,11 +63,7 @@ namespace OctaneTestProject
         {
             try
             {
-                const string outFile = @"Chershire_Cat.24ee16b9.png";
-                if (!IsFileLocked(new FileInfo(outFile)))
-                {
-                    File.Delete("Chershire_Cat.24ee16b9.png");
-                }
+                File.Delete("Chershire_Cat.24ee16b9.png");
             }
             catch
             {
@@ -88,7 +84,11 @@ namespace OctaneTestProject
                     Parts = 2,
                     BufferSize = 8192,
                     ShowProgress = false,
-                    DoneCallback = _ =>  Console.WriteLine("Done!"),
+                    DoneCallback = _ =>
+                    {
+                        Console.WriteLine("Done!");
+                        Assert.IsTrue(File.Exists(outFile));
+                    },
                     ProgressCallback = Console.WriteLine,
                     NumRetries = 20,
                     BytesPerSecond = 1,

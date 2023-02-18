@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -103,7 +102,7 @@ namespace OctaneTestProject
 
             if (File.Exists(outFile) && done)
             {
-                AreFilesEqual("original.png", outFile);
+                Assert.IsTrue(AreFilesEqual("original.png", outFile));
             }
         }
     }

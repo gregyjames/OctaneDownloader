@@ -6,7 +6,7 @@ namespace OctaneEngineCore.Streams;
 
 internal class NormalStream: Stream, IStream
 {
-    private Stream _stream;
+    private readonly Stream _stream;
     public NormalStream(Stream stream)
     {
         _stream = stream;
@@ -50,7 +50,7 @@ internal class NormalStream: Stream, IStream
         _stream.Flush();
     }
 
-    public async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+    public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
     {
         return await _stream.ReadAsync(buffer, offset, count, cancellationToken);
     }
