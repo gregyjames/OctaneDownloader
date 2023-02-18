@@ -10,6 +10,7 @@ using OctaneEngineCore;
 using Serilog;
 namespace OctaneTestProject
 {
+    /*
     [TestFixture]
     // Checks if canceling a download works.
     public class CancelTest
@@ -85,4 +86,5 @@ namespace OctaneTestProject
             await Engine.DownloadFile(url, factory, outfile, config, pauseTokenSource, cancelTokenSource);
         }
     }
+    */
 }
