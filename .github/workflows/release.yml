@@ -29,7 +29,7 @@ jobs:
         uses: NuGet/setup-nuget@v1.0.5
       - name: Restore NuGet
         if: steps.cacheStep.outputs.cache-hit != 'true'
-          run: nuget restore Octane.sln
+        run: nuget restore Octane.sln
       - name: Build and pack
         run: dotnet build -c Release && dotnet pack -c Release -o ./nupkg
       - name: Publish NuGet package
