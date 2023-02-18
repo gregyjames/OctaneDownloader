@@ -19,8 +19,15 @@
         <AssemblyName>OctaneEngineCore</AssemblyName>
         <RootNamespace>OctaneEngineCore</RootNamespace>
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseFile>README.md</PackageLicenseFile>
     </PropertyGroup>
 
+    <ItemGroup>
+        <None Include="docs\README.md" Pack="true" PackagePath="\" />
+        <None Include="docs\LICENSE.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
+    
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
         <Optimize>true</Optimize>
         <DebugSymbols>false</DebugSymbols>
