@@ -23,6 +23,7 @@
 using System;
 using System.Buffers;
 using System.Diagnostics;
+using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -37,16 +38,6 @@ using OctaneEngineCore.Streams;
 namespace OctaneEngine;
 public class OctaneClient : IClient
 {
-    private readonly ProgressBarOptions _childOptions = new()
-    {
-        ForegroundColor = ConsoleColor.Cyan,
-        BackgroundColor = ConsoleColor.Black,
-        CollapseWhenFinished = true,
-        DenseProgressBar = true,
-        BackgroundCharacter = '\u2591',
-        DisplayTimeInRealTime = false
-    };
-
     private readonly HttpClient _client;
     private readonly OctaneConfiguration _config;
     private readonly ILogger<IClient> _log;
@@ -94,50 +85,43 @@ public class OctaneClient : IClient
         var stopwatch = new Stopwatch();
         stopwatch.Start();
         var programBps = _config.BytesPerSecond / _config.Parts;
-
         if (message.IsSuccessStatusCode)
         {
             _log.LogInformation("HTTP request returned success status code for piece ({PieceItem1},{PieceItem2})", piece.Item1, piece.Item2);
-            //Get the content stream from the message request
-            using var streamToRead = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            //Throttle stream to over BPS divided among the parts
-            IStream source = _config.BytesPerSecond != 1 ? new ThrottleStream(streamToRead, programBps, _loggerFactory) : new NormalStream(streamToRead);
-            _log.LogTrace("Throttling stream for piece ({PieceItem1},{PieceItem2}) to {ProgramBps} bytes per second", piece.Item1, piece.Item2, programBps);
-
-            //Create a memory mapped stream to the mmf with the piece offset and size equal to the response size
-            using var streams = _mmf.CreateViewStream(piece.Item1, message.Content.Headers.ContentLength!.Value, MemoryMappedFileAccess.Write);
-            var child = _progressBar?.Spawn(
-                (int)Math.Round((double)(message.Content.Headers.ContentLength / _config.BufferSize)), "",
-                _childOptions);
             
-            int bytesRead;
-            // Until we've read everything
-            do
+            using (var streams = _mmf.CreateViewStream(piece.Item1, message.Content.Headers.ContentLength!.Value, MemoryMappedFileAccess.Write))
             {
-                var offset = 0;
-                // Until the buffer is very nearly full or there's nothing left to read
-                do
+                using (var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    bytesRead = await source.ReadAsync(buffer, offset, _config.BufferSize - offset, cancellationToken).ConfigureAwait(false);
-                    offset += bytesRead;
-                    _log.LogTrace("Read {Offset} bytes from piece ({PieceItem1},{PieceItem2})", offset, piece.Item1, piece.Item2);
+                    IStream streamToRead = new NormalStream(networkStream);
+                    // If throttling is enabled, wrap the stream in a ThrottleStream
+                    if (_config.BytesPerSecond != 1)
+                    {
+                        streamToRead = new ThrottleStream(networkStream, programBps, _loggerFactory);
+                        _log.LogTrace("Throttling stream for piece ({PieceItem1},{PieceItem2}) to {ProgramBps} bytes per second", piece.Item1, piece.Item2, programBps);
+                    }
 
-                } while (bytesRead != 0 && offset < _config.BufferSize);
+                    using (var buffered = new BufferedStream((Stream)streamToRead))
+                    {
+                        while (true)
+                        {
+                            // Read asynchronously from the input stream
+                            var bytesRead = await buffered.ReadAsync(buffer, 0, _config.BufferSize, cancellationToken);
 
-                // Empty the buffer
-                if (offset == 0) continue;
-                await streams.WriteAsync(buffer, 0, offset, cancellationToken).ConfigureAwait(false);
-                _log.LogTrace("Wrote from stream to buffer for piece ({PieceItem1},{PieceItem2})", piece.Item1, piece.Item2);
-                child?.Tick();
-            } while (bytesRead != 0);
+                            if (bytesRead == 0)
+                            {
+                                break;
+                            }
 
-            _memPool.Return(buffer);
+                            // Write asynchronously to the memory-mapped file
+                            await streams.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                        }
+                    }
+                }
+            }
+
+            
             _log.LogInformation("Buffer returned to memory pool");
-
-            child?.Dispose();
-            streams.Flush();
-            streams.Close();
-            streamToRead.Close();
         }
 
         _progressBar?.Tick();

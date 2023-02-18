@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Globalization;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using OctaneEngine;
@@ -11,18 +10,19 @@ namespace OctaneTester
 {
     internal static class Program
     {
+        private const String Url = @"https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
         private static void Main()
         {
             var config = new OctaneConfiguration
             {
                 Parts = Environment.ProcessorCount,
                 BufferSize = 2097152,
-                ShowProgress = true,
+                ShowProgress = false,
                 BytesPerSecond = 1,
                 UseProxy = false,
                 Proxy = null,
-                DoneCallback = x => { Console.WriteLine("Done!"); },
-                ProgressCallback = x => { Console.WriteLine(x.ToString(CultureInfo.InvariantCulture)); },
+                DoneCallback = _ => {  },
+                ProgressCallback = _ => {  },
                 NumRetries = 10
             };
             
@@ -30,7 +30,7 @@ namespace OctaneTester
             //SERILOG EXAMPLE 
             var seriLog = new LoggerConfiguration()
                 .Enrich.FromLogContext()
-                .MinimumLevel.Fatal()
+                .MinimumLevel.Verbose()
                 .WriteTo.File("./OctaneLog.txt")
                 .WriteTo.Console(theme: AnsiConsoleTheme.Sixteen)
                 .CreateLogger();
@@ -44,7 +44,7 @@ namespace OctaneTester
             var pauseTokenSource = new PauseTokenSource();
             var cancelTokenSource = new CancellationTokenSource();
             
-            Engine.DownloadFile("https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ", factory, null, config, pauseTokenSource, cancelTokenSource).Wait();
+            Engine.DownloadFile(Url, factory, null, config, pauseTokenSource, cancelTokenSource).Wait(cancelTokenSource.Token);
         }
     }
 }
