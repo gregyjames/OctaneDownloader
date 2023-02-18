@@ -202,7 +202,7 @@ namespace OctaneEngine
         /// </summary>
         /// <param name="url">The string url of the file to be downloaded.</param>
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
-        /// <param name="factory">The ILoggerFactory instance to use for logging.</param>
+        /// <param name="loggerFactory">The ILoggerFactory instance to use for logging.</param>
         /// <param name="config">The OctaneConfiguration object used for configuring the downloader.</param>
         /// <param name="pauseTokenSource">The pause token source to use for pausing and resuming.</param>
         /// <param name="cancelTokenSource">The cancellation token for canceling the task.</param>

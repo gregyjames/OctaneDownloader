@@ -127,7 +127,6 @@ public class OctaneClient : IClient
         _progressBar?.Tick();
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) done", piece.Item1, piece.Item2);
         stopwatch.Stop();
-
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds} ms", piece.Item1, piece.Item2, stopwatch.ElapsedMilliseconds);
     }
 

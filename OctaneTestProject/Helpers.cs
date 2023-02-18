@@ -1,11 +1,27 @@
 using System;
+using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Threading;
+using Microsoft.Extensions.Logging;
+using Serilog;
+using ILogger = Serilog.ILogger;
 
 namespace OctaneTestProject
 {
     public static class Helpers
     {
+        public static ILogger seriLog = new LoggerConfiguration()
+            .Enrich.FromLogContext()
+            .MinimumLevel.Verbose()
+            .WriteTo.File("./OctaneLog.txt")
+            .WriteTo.Console()
+            .CreateLogger();
+
+        public static ILoggerFactory _factory = LoggerFactory.Create(logging =>
+        {
+            logging.AddSerilog(seriLog);
+        });
         public static bool AreFilesEqual(string file1, string file2)
         {
             int attempts = 0;
@@ -52,5 +68,25 @@ namespace OctaneTestProject
             throw new Exception($"Failed to read files {file1} and {file2} after {maxAttempts} attempts.");
         }
 
+        public static string NameOfCallingClass()
+        {
+            string fullName;
+            Type declaringType;
+            int skipFrames = 2;
+            do
+            {
+                MethodBase method = new StackFrame(skipFrames, false).GetMethod();
+                declaringType = method.DeclaringType;
+                if (declaringType == null)
+                {
+                    return method.Name;
+                }
+                skipFrames++;
+                fullName = declaringType.FullName;
+            }
+            while (declaringType.Module.Name.Equals("mscorlib.dll", StringComparison.OrdinalIgnoreCase));
+
+            return fullName;
+        }
     }
 }
