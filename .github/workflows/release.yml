@@ -2,16 +2,19 @@ name: Publish NuGet package
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
-
+    branches:
+      - main
+  workflow_dispatch:  # Add a manual trigger
+  
 jobs:
   build-and-publish:
     runs-on: windows-2022
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-
+      - name: Get latest tag
+        id: tag
+        run: echo "::set-output name=tag::$(git describe --abbrev=0 --tags)"
       - name: Set up .NET Core
         uses: actions/setup-dotnet@v2
         with:
