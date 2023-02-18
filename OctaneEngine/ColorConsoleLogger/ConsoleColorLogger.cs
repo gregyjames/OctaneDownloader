@@ -1,9 +1,8 @@
 #nullable enable
 using System;
+using Microsoft.Extensions.Logging;
 
 namespace OctaneEngineCore.ColorConsoleLogger;
-
-using Microsoft.Extensions.Logging;
 
 public sealed class ColorConsoleLogger : ILogger
 {

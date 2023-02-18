@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -6,6 +7,16 @@ namespace OctaneEngineCore.Streams;
 
 internal class NormalStream: Stream, IStream
 {
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _stream?.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
     private readonly Stream _stream;
     public NormalStream(Stream stream)
     {
@@ -14,12 +25,12 @@ internal class NormalStream: Stream, IStream
 
     public override long Seek(long offset, SeekOrigin origin)
     {
-        throw new System.NotImplementedException();
+       return _stream.Seek(offset, origin);
     }
 
     public override void SetLength(long value)
     {
-        throw new System.NotImplementedException();
+        _stream.SetLength(value);
     }
 
     public override int Read(byte[] buffer, int offset, int count)

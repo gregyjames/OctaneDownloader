@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using NUnit.Framework;
 using OctaneEngine;
 using OctaneEngineCore;
@@ -51,7 +52,7 @@ namespace OctaneTestProject
             _pauseTokenSource.Pause();
             
             
-            System.Threading.Tasks.Parallel.Invoke(
+            Parallel.Invoke(
                 () => Action(_pauseTokenSource),
                 () => Engine.DownloadFile(url, Helpers._factory, outFile, config, _pauseTokenSource, _cancelTokenSource).Wait()
             );

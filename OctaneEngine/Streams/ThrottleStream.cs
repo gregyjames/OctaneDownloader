@@ -31,6 +31,21 @@ namespace OctaneEngineCore.Streams;
 
 internal class ThrottleStream : Stream, IStream
 {
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _parentStream?.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    ~ThrottleStream()
+    {
+        Dispose(false);
+    }
+
     private readonly ILogger<ThrottleStream> _log;
     private readonly int _maxBps;
     private readonly Stream _parentStream;

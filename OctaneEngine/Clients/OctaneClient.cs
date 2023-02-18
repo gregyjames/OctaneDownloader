@@ -20,6 +20,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 using System;
 using System.Buffers;
 using System.Diagnostics;
@@ -58,8 +59,16 @@ public class OctaneClient : IClient
         _log = loggerFactory.CreateLogger<IClient>();
     }
 
-    public async Task<HttpResponseMessage> SendMessage(string url, (long, long) piece,
-        CancellationToken cancellationToken, PauseToken pauseToken)
+    private async Task<int> ReadWithProgressAsync(Stream stream, byte[] buffer, int offset, int count, IProgress<long> progress)
+    {
+        var bytesRead = await stream.ReadAsync(buffer, offset, count);
+
+        progress?.Report(bytesRead);
+
+        return bytesRead;
+    }
+
+    public async Task<HttpResponseMessage> SendMessage(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         if (pauseToken.IsPaused)
         {
@@ -71,20 +80,31 @@ public class OctaneClient : IClient
         return await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
     }
-
     public async Task ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
-        //Copy from the content stream to the mmf stream
+        #region Variable Declaration
         var buffer = _memPool.Rent(_config.BufferSize);
         _log.LogInformation("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
-
+        var stopwatch = new Stopwatch();
+        var programBps = _config.BytesPerSecond / _config.Parts;
+        long bytesReadOverall = 0;
+        var childOptions = new ProgressBarOptions()
+        {
+            CollapseWhenFinished = true,
+            DisplayTimeInRealTime = false,
+            BackgroundColor = ConsoleColor.Magenta,
+            DenseProgressBar = true,
+            DisableBottomPercentage = true,
+            ShowEstimatedDuration = true
+        };
+        #endregion
+        
         if (pauseToken.IsPaused)
         {
             await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
         }
-        var stopwatch = new Stopwatch();
+        
         stopwatch.Start();
-        var programBps = _config.BytesPerSecond / _config.Parts;
         if (message.IsSuccessStatusCode)
         {
             _log.LogInformation("HTTP request returned success status code for piece ({PieceItem1},{PieceItem2})", piece.Item1, piece.Item2);
@@ -101,29 +121,38 @@ public class OctaneClient : IClient
                         _log.LogTrace("Throttling stream for piece ({PieceItem1},{PieceItem2}) to {ProgramBps} bytes per second", piece.Item1, piece.Item2, programBps);
                     }
 
-                    using (var buffered = new BufferedStream((Stream)streamToRead))
+                    using (var child = _progressBar?.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", childOptions))
                     {
-                        while (true)
+                        var progress = new System.Progress<long>(bytesRead =>
                         {
-                            // Read asynchronously from the input stream
-                            var bytesRead = await buffered.ReadAsync(buffer, 0, _config.BufferSize, cancellationToken);
+                            bytesReadOverall += bytesRead;
+                            child?.Tick((int)bytesReadOverall);
+                        });
 
-                            if (bytesRead == 0)
+                        using (var buffered = new BufferStream((Stream)streamToRead, buffer))
+                        {
+                            while (true)
                             {
-                                break;
-                            }
+                                // Read asynchronously from the input stream
+                                var bytesRead = await ReadWithProgressAsync(buffered, buffer, 0, _config.BufferSize, progress);
+                                if (bytesRead == 0)
+                                {
+                                    break;
+                                }
 
-                            // Write asynchronously to the memory-mapped file
-                            await streams.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                                // Write asynchronously to the memory-mapped file
+                                await streams.WriteAsync(buffer, 0,bytesRead, cancellationToken);
+                                bytesReadOverall += bytesRead;
+                            }
                         }
                     }
                 }
             }
             
             _log.LogInformation("Buffer returned to memory pool");
-            _memPool.Return(buffer);
         }
-
+        
+        _memPool.Return(buffer);
         _progressBar?.Tick();
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) done", piece.Item1, piece.Item2);
         stopwatch.Stop();

@@ -10,14 +10,14 @@ namespace OctaneTester
 {
     internal static class Program
     {
-        private const String Url = @"https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
+        private const string Url = @"https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
         private static void Main()
         {
             var config = new OctaneConfiguration
             {
                 Parts = Environment.ProcessorCount,
                 BufferSize = 2097152,
-                ShowProgress = false,
+                ShowProgress = true,
                 BytesPerSecond = 1,
                 UseProxy = false,
                 Proxy = null,

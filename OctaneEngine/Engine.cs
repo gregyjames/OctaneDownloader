@@ -20,6 +20,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -258,7 +259,7 @@ namespace OctaneEngine
                     {
                         logger.LogInformation("Using Octane Client to download file.");
                         #if NET6_0_OR_GREATER
-                            GC.TryStartNoGCRegion(1000000, false);
+                            GC.TryStartNoGCRegion(1000000, true);
                         #endif
                         try
                         {
@@ -276,7 +277,7 @@ namespace OctaneEngine
                                         config?.ProgressCallback((tasksDone + 0.0) / (pieces.Count + 0.0));
                                     }
 
-                                    logger.LogTrace($"Finished {tasksDone - 1}/{config.Parts} pieces!");
+                                    logger.LogTrace($"Finished {tasksDone - 1}/{config?.Parts} pieces!");
                                 });
                         }
                         finally
@@ -289,7 +290,7 @@ namespace OctaneEngine
                     else
                     {
                         logger.LogInformation("Using Default Client to download file.");
-                        client = new DefaultClient(_client, mmf);
+                        client = new DefaultClient(_client, mmf, memPool, config, pbar, partSize);
                         var message = await client.SendMessage(url, (0, 0), cancellation_token, pause_token.Token);
                         await client.ReadResponse(message, (0, 0), cancellation_token, pause_token.Token);
                     }
