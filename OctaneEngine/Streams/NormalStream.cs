@@ -35,8 +35,21 @@ internal class NormalStream: Stream, IStream
 
     public override int Read(byte[] buffer, int offset, int count)
     {
-        return _stream.Read(buffer, offset, count);
+        int bytesRead = 0;
+        int totalBytesRead = 0;
+
+        while (totalBytesRead < count)
+        {
+            bytesRead = _stream.Read(buffer, offset + totalBytesRead, count - totalBytesRead);
+            if (bytesRead == 0) // End of stream
+            {
+                break;
+            }
+            totalBytesRead += bytesRead;
+        }
+        return totalBytesRead;
     }
+
 
     public override void Write(byte[] buffer, int offset, int count)
     {
@@ -63,6 +76,17 @@ internal class NormalStream: Stream, IStream
 
     public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
     {
-        return await _stream.ReadAsync(buffer, offset, count, cancellationToken);
+        int bytesRead = 0;
+        int totalBytesRead = 0;
+        while (totalBytesRead < count)
+        {
+            bytesRead = await _stream.ReadAsync(buffer, offset + totalBytesRead, count - totalBytesRead, cancellationToken);
+            if (bytesRead == 0) // End of stream
+            {
+                break;
+            }
+            totalBytesRead += bytesRead;
+        }
+        return totalBytesRead;
     }
 }

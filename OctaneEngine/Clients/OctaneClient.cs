@@ -24,7 +24,6 @@
 using System;
 using System.Buffers;
 using System.Diagnostics;
-using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -37,7 +36,7 @@ using OctaneEngineCore.ShellProgressBar;
 using OctaneEngineCore.Streams;
 
 namespace OctaneEngine;
-public class OctaneClient : IClient
+internal class OctaneClient : IClient
 {
     private readonly HttpClient _client;
     private readonly OctaneConfiguration _config;
@@ -59,9 +58,9 @@ public class OctaneClient : IClient
         _log = loggerFactory.CreateLogger<IClient>();
     }
 
-    private async Task<int> ReadWithProgressAsync(Stream stream, byte[] buffer, int offset, int count, IProgress<long> progress)
+    private async Task<int> ReadWithProgressAsync(IStream stream, byte[] buffer, int offset, int count, IProgress<long> progress, CancellationToken ctx)
     {
-        var bytesRead = await stream.ReadAsync(buffer, offset, count);
+        var bytesRead = await stream.ReadAsync(buffer, offset, count, ctx);
 
         progress?.Report(bytesRead);
 
@@ -129,21 +128,18 @@ public class OctaneClient : IClient
                             child?.Tick((int)bytesReadOverall);
                         });
 
-                        using (var buffered = new BufferStream((Stream)streamToRead, buffer))
+                        while (true)
                         {
-                            while (true)
+                            // Read asynchronously from the input stream
+                            var bytesRead = await ReadWithProgressAsync(streamToRead, buffer, 0, _config.BufferSize, progress, cancellationToken);
+                            if (bytesRead == 0)
                             {
-                                // Read asynchronously from the input stream
-                                var bytesRead = await ReadWithProgressAsync(buffered, buffer, 0, _config.BufferSize, progress);
-                                if (bytesRead == 0)
-                                {
-                                    break;
-                                }
-
-                                // Write asynchronously to the memory-mapped file
-                                await streams.WriteAsync(buffer, 0,bytesRead, cancellationToken);
-                                bytesReadOverall += bytesRead;
+                                break;
                             }
+
+                            // Write asynchronously to the memory-mapped file
+                            await streams.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                            bytesReadOverall += bytesRead;
                         }
                     }
                 }

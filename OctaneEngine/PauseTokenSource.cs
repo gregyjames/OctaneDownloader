@@ -48,7 +48,7 @@ public class PauseTokenSource
         
         _log = _factory.CreateLogger<PauseTokenSource>();
     }
-    public PauseToken Token => new PauseToken(this, _log);
+    public PauseToken Token => new(this, _log);
     public bool IsPaused => _paused != null;
 
     public void Pause()

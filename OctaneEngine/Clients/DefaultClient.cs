@@ -33,7 +33,7 @@ using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngineCore.Clients;
 
-public class DefaultClient : IClient
+internal class DefaultClient : IClient
 {
     private readonly HttpClient _httpClient;
     private readonly MemoryMappedFile _mmf;
