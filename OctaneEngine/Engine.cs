@@ -229,7 +229,6 @@ namespace OctaneEngine
             var pieces = createPartsList(rangeSupported, responseLength, partSize, logger);
             var _client = createHTTPClient(config, factory);
             int tasksDone = 0;
-            IClient client = null;
             #endregion
             
             #region ServicePoint Configuration
@@ -247,6 +246,7 @@ namespace OctaneEngine
             logger.LogInformation($"PART SIZE: {prettySize(partSize)}");
             
             stopwatch.Start();
+            
             //Create memory mapped file to hold the file
             using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, responseLength, MemoryMappedFileAccess.ReadWrite))
             {
@@ -255,44 +255,47 @@ namespace OctaneEngine
                     logger.LogTrace("Setting GC to sustained low latency mode.");
                     var pbar = createProgressBar(config, logger);
 
-                    if (rangeSupported)
+                    //Create a client based on if range is supported or not..
+                    using (IClient client = rangeSupported ? new OctaneClient(config, _client, factory, mmf, pbar, memPool) : new DefaultClient(_client, mmf, memPool, config, pbar, partSize))
                     {
-                        logger.LogInformation("Using Octane Client to download file.");
-                        #if NET6_0_OR_GREATER
+
+                        if (rangeSupported)
+                        {
+                            logger.LogInformation("Using Octane Client to download file.");
+#if NET6_0_OR_GREATER
                             GC.TryStartNoGCRegion(1000000, true);
-                        #endif
-                        try
-                        {
-                            await Parallel.ForEachAsync(pieces, new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, async (piece, t) =>
-                                {
-                                    //Get a client from the pool and request for the content range
-                                    client = new OctaneClient(config, _client, factory, mmf, pbar, memPool);
-
-                                    var message = await client.SendMessage(url, piece, cancellation_token, pause_token.Token);
-                                    await client.ReadResponse(message, piece, cancellation_token, pause_token.Token);
-
-                                    Interlocked.Increment(ref tasksDone);
-                                    if (config?.ProgressCallback != null)
+#endif
+                            try
+                            {
+                                await Parallel.ForEachAsync(pieces,
+                                    new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                                    async (piece, t) =>
                                     {
-                                        config?.ProgressCallback((tasksDone + 0.0) / (pieces.Count + 0.0));
-                                    }
+                                        var message = await client.SendMessage(url, piece, cancellation_token, pause_token.Token);
+                                        await client.ReadResponse(message, piece, cancellation_token, pause_token.Token);
 
-                                    logger.LogTrace($"Finished {tasksDone - 1}/{config?.Parts} pieces!");
-                                });
-                        }
-                        finally
-                        {
-                            #if NET6_0_OR_GREATER
+                                        Interlocked.Increment(ref tasksDone);
+                                        if (config?.ProgressCallback != null)
+                                        {
+                                            config?.ProgressCallback((tasksDone + 0.0) / (pieces.Count + 0.0));
+                                        }
+
+                                        logger.LogTrace($"Finished {tasksDone - 1}/{config?.Parts} pieces!");
+                                    });
+                            }
+                            finally
+                            {
+#if NET6_0_OR_GREATER
                             GC.EndNoGCRegion();
-                            #endif
+#endif
+                            }
                         }
-                    }
-                    else
-                    {
-                        logger.LogInformation("Using Default Client to download file.");
-                        client = new DefaultClient(_client, mmf, memPool, config, pbar, partSize);
-                        var message = await client.SendMessage(url, (0, 0), cancellation_token, pause_token.Token);
-                        await client.ReadResponse(message, (0, 0), cancellation_token, pause_token.Token);
+                        else
+                        {
+                            logger.LogInformation("Using Default Client to download file.");
+                            var message = await client.SendMessage(url, (0, 0), cancellation_token, pause_token.Token);
+                            await client.ReadResponse(message, (0, 0), cancellation_token, pause_token.Token);
+                        }
                     }
 
                     success = true;
