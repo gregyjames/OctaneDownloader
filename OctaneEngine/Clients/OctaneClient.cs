@@ -58,15 +58,6 @@ internal class OctaneClient : IClient
         _log = loggerFactory.CreateLogger<IClient>();
     }
 
-    private async Task<int> ReadWithProgressAsync(IStream stream, byte[] buffer, int offset, int count, IProgress<long> progress, CancellationToken ctx)
-    {
-        var bytesRead = await stream.ReadAsync(buffer, offset, count, ctx);
-
-        progress?.Report(bytesRead);
-
-        return bytesRead;
-    }
-
     public async Task<HttpResponseMessage> SendMessage(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         if (pauseToken.IsPaused)
@@ -107,48 +98,40 @@ internal class OctaneClient : IClient
         if (message.IsSuccessStatusCode)
         {
             _log.LogInformation("HTTP request returned success status code for piece ({PieceItem1},{PieceItem2})", piece.Item1, piece.Item2);
-            
-            using (var streams = _mmf.CreateViewStream(piece.Item1, message.Content.Headers.ContentLength!.Value, MemoryMappedFileAccess.Write))
+            using (var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
             {
-                using (var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
+                IStream streamToRead = new NormalStream(networkStream);
+                // If throttling is enabled, wrap the stream in a ThrottleStream
+                if (_config.BytesPerSecond != 1)
                 {
-                    IStream streamToRead = new NormalStream(networkStream);
-                    // If throttling is enabled, wrap the stream in a ThrottleStream
-                    if (_config.BytesPerSecond != 1)
+                    streamToRead = new ThrottleStream(networkStream, programBps, _loggerFactory);
+                    _log.LogTrace("Throttling stream for piece ({PieceItem1},{PieceItem2}) to {ProgramBps} bytes per second", piece.Item1, piece.Item2, programBps);
+                }
+
+                using var child = _progressBar?.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", childOptions);
+                
+                while (true)
+                {
+                    var bytesRead = await streamToRead.ReadAsync(buffer, 0, _config.BufferSize, cancellationToken);
+                    if (bytesRead == 0)
                     {
-                        streamToRead = new ThrottleStream(networkStream, programBps, _loggerFactory);
-                        _log.LogTrace("Throttling stream for piece ({PieceItem1},{PieceItem2}) to {ProgramBps} bytes per second", piece.Item1, piece.Item2, programBps);
+                        break;
                     }
 
-                    using (var child = _progressBar?.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", childOptions))
+                    await Task.Run(() =>
                     {
-                        var progress = new System.Progress<long>(bytesRead =>
-                        {
-                            bytesReadOverall += bytesRead;
-                            child?.Tick((int)bytesReadOverall);
-                        });
-
-                        while (true)
-                        {
-                            // Read asynchronously from the input stream
-                            var bytesRead = await ReadWithProgressAsync(streamToRead, buffer, 0, _config.BufferSize, progress, cancellationToken);
-                            if (bytesRead == 0)
-                            {
-                                break;
-                            }
-
-                            // Write asynchronously to the memory-mapped file
-                            await streams.WriteAsync(buffer, 0, bytesRead, cancellationToken);
-                            bytesReadOverall += bytesRead;
-                        }
-                    }
+                        using var accessor = _mmf.CreateViewAccessor(piece.Item1 + bytesReadOverall, bytesRead, MemoryMappedFileAccess.Write);
+                        accessor.WriteArray(0, buffer, 0, bytesRead);
+                        accessor.Flush();
+                    }, cancellationToken);
+                    bytesReadOverall += bytesRead;
+                    child?.Tick((int)bytesReadOverall);
                 }
             }
-            
+
             _log.LogInformation("Buffer returned to memory pool");
         }
-        
-        _memPool.Return(buffer);
+        _memPool.Return(buffer, true);
         _progressBar?.Tick();
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) done", piece.Item1, piece.Item2);
         stopwatch.Stop();

@@ -15,7 +15,7 @@ namespace OctaneTester
         {
             var config = new OctaneConfiguration
             {
-                Parts = Environment.ProcessorCount,
+                Parts = Environment.ProcessorCount / 2,
                 BufferSize = 2097152,
                 ShowProgress = true,
                 BytesPerSecond = 1,
@@ -25,7 +25,6 @@ namespace OctaneTester
                 ProgressCallback = _ => {  },
                 NumRetries = 10
             };
-            
             
             //SERILOG EXAMPLE 
             var seriLog = new LoggerConfiguration()
@@ -41,9 +40,13 @@ namespace OctaneTester
                 logging.AddSerilog(seriLog);
             });
             
+            var optimalNumberOfParts = Engine.GetOptimalNumberOfParts(Url).Result;
+            config.Parts = optimalNumberOfParts;
+            seriLog.Information($"Speed: {NetworkAnalyzer.GetCurrentNetworkSpeed().Result}");
+            seriLog.Information($"Latency: {NetworkAnalyzer.GetCurrentNetworkLatency().Result}");
+            seriLog.Information($"Optimal number of parts to download file: {optimalNumberOfParts}");
             var pauseTokenSource = new PauseTokenSource();
             var cancelTokenSource = new CancellationTokenSource();
-            
             Engine.DownloadFile(Url, factory, null, config, pauseTokenSource, cancelTokenSource).Wait(cancelTokenSource.Token);
         }
     }

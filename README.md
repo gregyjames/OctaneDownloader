@@ -27,38 +27,43 @@ dotnet add package OctaneEngineCore
 
 # Usage
 ```csharp
-var config = new OctaneConfiguration
-{
-     Parts = 2,
-     BufferSize = 8192,
-     ShowProgress = false,
-     BytesPerSecond = 1,
-     UseProxy = false,
-     Proxy = null,
-     DoneCallback = x => {
-          Console.WriteLine("Done!"); 
-     },
-     ProgressCallback = x => { 
-          Console.WriteLine(x.ToString(CultureInfo.InvariantCulture)); 
-     },
-     NumRetries = 10
-};
+private const string Url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
+private static void Main(){
+     var config = new OctaneConfiguration {
+          Parts = Environment.ProcessorCount / 2,
+          BufferSize = 2097152,
+          ShowProgress = true,
+          BytesPerSecond = 1,
+          UseProxy = false,
+          Proxy = null,
+          DoneCallback = _ => {  },
+          ProgressCallback = _ => {  },
+          NumRetries = 10
+     };
+            
+     //SERILOG EXAMPLE 
+     var seriLog = new LoggerConfiguration()
+          .Enrich.FromLogContext()
+          .MinimumLevel.Fatal()
+          .WriteTo.File("./OctaneLog.txt")
+          .WriteTo.Console(theme: AnsiConsoleTheme.Sixteen)
+          .CreateLogger();
 
-//Pick any logging implementation you want, here we are using Serilog
-var seriLog = new LoggerConfiguration()
-     .Enrich.FromLogContext()
-     .MinimumLevel.Verbose()
-     .WriteTo.File("./OctaneLog.txt")
-     .WriteTo.Console(theme: AnsiConsoleTheme.Sixteen)
-     .CreateLogger();
-
-var factory = LoggerFactory.Create(logging => {
-     logging.AddSerilog(seriLog);
-});
-
-var pauseTokenSource = new PauseTokenSource(factory);
-
-Engine.DownloadFile("https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png", factory, null, config, pauseTokenSource).Wait();
+            
+     var factory = LoggerFactory.Create(logging => {
+          logging.AddSerilog(seriLog);
+     });
+            
+     var optimalNumberOfParts = Engine.getOptimalNumberOfParts(Url).Result;
+     config.Parts = optimalNumberOfParts;
+     seriLog.Information($"Speed: {NetworkAnalyzer.GetCurrentNetworkSpeed().Result}");
+     seriLog.Information($"Latency: {NetworkAnalyzer.GetCurrentNetworkLatency().Result}");
+     seriLog.Information($"Optimal number of parts to download file: {optimalNumberOfParts}");
+     Thread.Sleep(5000);
+     var pauseTokenSource = new PauseTokenSource();
+     var cancelTokenSource = new CancellationTokenSource();
+     Engine.DownloadFile(Url, factory, null, config, pauseTokenSource, cancelTokenSource).Wait(cancelTokenSource.Token);
+}
         
 ```
 

@@ -1,9 +1,12 @@
 ﻿using System;
 using System.IO;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngine;
 using OctaneEngineCore;
+using Serilog;
+using ILogger = Serilog.ILogger;
 
 namespace OctaneTestProject
 {
@@ -13,11 +16,25 @@ namespace OctaneTestProject
     {
         private PauseTokenSource _pauseTokenSource;
         private CancellationTokenSource _cancelTokenSource;
-
+        private ILogger _log;
+        private ILoggerFactory _factory;
+        
         [SetUp]
         public void Init()
         {
-            _pauseTokenSource = new PauseTokenSource(Helpers._factory);
+            _log = new LoggerConfiguration()
+                .Enrich.FromLogContext()
+                .MinimumLevel.Verbose()
+                .WriteTo.File("./OctaneLog.txt")
+                .WriteTo.Console()
+                .CreateLogger();
+
+            _factory = LoggerFactory.Create(logging =>
+            {
+                logging.AddSerilog(_log);
+            });
+            
+            _pauseTokenSource = new PauseTokenSource(_factory);
             _cancelTokenSource = new CancellationTokenSource();
         }
 
@@ -39,8 +56,8 @@ namespace OctaneTestProject
         {
             const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
             const string outFile = @"Chershire_Cat.24ee16b9.png";
-            
-            Helpers.seriLog.Information("Starting File Download Test");
+
+            _log.Information("Starting File Download Test");
             try
             {
                 var config = new OctaneConfiguration
@@ -60,7 +77,7 @@ namespace OctaneTestProject
                     Proxy = null
                 };
 
-                Engine.DownloadFile(url, Helpers._factory, outFile, config, _pauseTokenSource, _cancelTokenSource).Wait();
+                Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource, _cancelTokenSource).Wait();
             }
             catch
             {

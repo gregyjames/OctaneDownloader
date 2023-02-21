@@ -33,7 +33,6 @@ using System.Net.Http;
 using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
-using Cysharp.Text;
 using Microsoft.Extensions.Logging;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
@@ -47,32 +46,6 @@ namespace OctaneEngine
     public static class Engine
     {
         #region Helpers
-        private static readonly string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-        private static string prettySize(long len)
-        {
-            int order = 0;
-            while (len >= 1024 && order < sizes.Length - 1)
-            {
-                order++;
-                len = len >> 10;
-            }
-            
-            string result = ZString.Format("{0:0.##} {1}", len, sizes[order]); 
-            
-            return result;
-        }
-        private static async Task<(long, bool)> getFileSizeAndRangeSupport(string url)
-        {
-            using (var client = new HttpClient())
-            {
-                var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-                var responseLength = response.Content.Headers.ContentLength ?? 0;
-                var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
-
-                return (responseLength, rangeSupported);
-            }
-            
-        }
         private static ILoggerFactory createLoggerFactory(ILoggerFactory loggerFactory)
         {
             var factory = loggerFactory ?? new LoggerFactory();
@@ -108,6 +81,18 @@ namespace OctaneEngine
             }));
 
             return cancellation_token;
+        }
+        private static async Task<(long, bool)> getFileSizeAndRangeSupport(string url)
+        {
+            using (var client = new HttpClient())
+            {
+                var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+                var responseLength = response.Content.Headers.ContentLength ?? 0;
+                var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
+
+                return (responseLength, rangeSupported);
+            }
+            
         }
         private static HttpClient createHTTPClient(OctaneConfiguration config, ILoggerFactory factory)
         {
@@ -199,6 +184,24 @@ namespace OctaneEngine
         #endregion
         
         /// <summary>
+        /// Gets the optimal number of parts to use to download a file by downloading a small test file (1MB) and testing network latency.
+        /// </summary>
+        /// <param name="url">The url of the file you are planning to download.</param>
+        /// <returns>A Task that returns the optimal number of parts to use to download a file.</returns>
+        public async static Task<int> GetOptimalNumberOfParts(string url, NetworkAnalyzer.TestFileSize sizeToUse = NetworkAnalyzer.TestFileSize.Small)
+        {
+            using var client = new HttpClient();
+            var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            var size_of_file = response.Content.Headers.ContentLength ?? 0;
+            var networkSpeed = await NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.GetTestFile(sizeToUse));
+            var networkLatency = await NetworkAnalyzer.GetNetworkLatency();
+            int chunkSize = (int)Math.Ceiling(Math.Sqrt((double)networkSpeed * networkLatency));
+            int numParts = (int)Math.Ceiling((double)size_of_file / chunkSize);
+            numParts = Math.Min(numParts, Environment.ProcessorCount);
+            return numParts;
+        }
+        
+        /// <summary>
         ///     The core octane download function. 
         /// </summary>
         /// <param name="url">The string url of the file to be downloaded.</param>
@@ -210,19 +213,20 @@ namespace OctaneEngine
         public async static Task DownloadFile(string url, ILoggerFactory loggerFactory = null, string outFile = null, OctaneConfiguration config = null, PauseTokenSource pauseTokenSource = null, CancellationTokenSource cancelTokenSource = null)
         {
             #region Varible Initilization
+            var factory = createLoggerFactory(loggerFactory);
+            var logger = factory.CreateLogger("OctaneEngine");
             var old_mode = GCSettings.LatencyMode;
+            logger.LogTrace("Setting GC to sustained low latency mode.");
             GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
             var success = false;
             var cancellation_token = createCancellationToken(cancelTokenSource, config, outFile);
-            var factory = createLoggerFactory(loggerFactory);
-            var logger = factory.CreateLogger("OctaneEngine");
             checkURL(url, logger);
             config = createConfiguration(config, logger);
             var pause_token = pauseTokenSource ?? new PauseTokenSource(factory);
             var filename = outFile ?? Path.GetFileName(new Uri(url).LocalPath);
             var stopwatch = new Stopwatch();
-            var memPool = ArrayPool<byte>.Shared;
+            var memPool = ArrayPool<byte>.Create(config.BufferSize, config.Parts);
             var (responseLength, rangeSupported) = await getFileSizeAndRangeSupport(url);
             logger.LogInformation($"Range supported: {rangeSupported}");
             var partSize = Convert.ToInt64(responseLength / config.Parts);
@@ -242,8 +246,8 @@ namespace OctaneEngine
             #endif
             #endregion
             
-            logger.LogInformation($"TOTAL SIZE: {prettySize(responseLength)}");
-            logger.LogInformation($"PART SIZE: {prettySize(partSize)}");
+            logger.LogInformation($"TOTAL SIZE: {NetworkAnalyzer.prettySize(responseLength)}");
+            logger.LogInformation($"PART SIZE: {NetworkAnalyzer.prettySize(partSize)}");
             
             stopwatch.Start();
             
@@ -252,27 +256,25 @@ namespace OctaneEngine
             {
                 try
                 {
-                    logger.LogTrace("Setting GC to sustained low latency mode.");
                     var pbar = createProgressBar(config, logger);
 
                     //Create a client based on if range is supported or not..
                     using (IClient client = rangeSupported ? new OctaneClient(config, _client, factory, mmf, pbar, memPool) : new DefaultClient(_client, mmf, memPool, config, pbar, partSize))
                     {
-
+                        //Check if range is supported
                         if (rangeSupported)
                         {
                             logger.LogInformation("Using Octane Client to download file.");
-#if NET6_0_OR_GREATER
-                            GC.TryStartNoGCRegion(1000000, true);
-#endif
+                            //No GC Mode if supported
+                            #if NET6_0_OR_GREATER
+                                GC.TryStartNoGCRegion(Environment.ProcessorCount*config.BufferSize, true);
+                            #endif
                             try
                             {
-                                await Parallel.ForEachAsync(pieces,
-                                    new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount },
-                                    async (piece, t) =>
+                                await Parallel.ForEachAsync(pieces, new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = cancellation_token, TaskScheduler = TaskScheduler.Current}, async (piece, token) =>
                                     {
-                                        var message = await client.SendMessage(url, piece, cancellation_token, pause_token.Token);
-                                        await client.ReadResponse(message, piece, cancellation_token, pause_token.Token);
+                                        var message = await client.SendMessage(url, piece, token, pause_token.Token);
+                                        await client.ReadResponse(message, piece, token, pause_token.Token);
 
                                         Interlocked.Increment(ref tasksDone);
                                         if (config?.ProgressCallback != null)
@@ -280,14 +282,18 @@ namespace OctaneEngine
                                             config?.ProgressCallback((tasksDone + 0.0) / (pieces.Count + 0.0));
                                         }
 
-                                        logger.LogTrace($"Finished {tasksDone - 1}/{config?.Parts} pieces!");
+                                        logger.LogTrace($"Finished {tasksDone}/{config?.Parts} pieces!");
                                     });
+                            }
+                            catch(Exception ex)
+                            {
+                                logger.LogError($"ERROR USING CORE CLIENT: {ex.Message}");
                             }
                             finally
                             {
-#if NET6_0_OR_GREATER
-                            GC.EndNoGCRegion();
-#endif
+                                #if NET6_0_OR_GREATER
+                                    GC.EndNoGCRegion();
+                                #endif
                             }
                         }
                         else
@@ -297,13 +303,22 @@ namespace OctaneEngine
                             await client.ReadResponse(message, (0, 0), cancellation_token, pause_token.Token);
                         }
                     }
-
+                    
                     success = true;
+                    logger.LogInformation("File downloaded successfully.");
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex.Message);
-                    success = false;
+                    if (ex.GetType().FullName == "System.InvalidOperationException")
+                    {
+                        logger.LogInformation("Allocated size too small but file downloaded successfully.");
+                        success = true;
+                    }
+                    else
+                    {
+                        logger.LogError($"{ex.GetType().FullName}: {ex.Message}");
+                        success = false;
+                    }
                 }
                 finally
                 {

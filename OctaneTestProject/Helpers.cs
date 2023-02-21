@@ -11,17 +11,6 @@ namespace OctaneTestProject
 {
     public static class Helpers
     {
-        public static ILogger seriLog = new LoggerConfiguration()
-            .Enrich.FromLogContext()
-            .MinimumLevel.Verbose()
-            .WriteTo.File("./OctaneLog.txt")
-            .WriteTo.Console()
-            .CreateLogger();
-
-        public static ILoggerFactory _factory = LoggerFactory.Create(logging =>
-        {
-            logging.AddSerilog(seriLog);
-        });
         public static bool AreFilesEqual(string file1, string file2)
         {
             int attempts = 0;
