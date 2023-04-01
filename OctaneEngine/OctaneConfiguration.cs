@@ -22,12 +22,17 @@
  */
 
 using System;
+using System.IO;
 using System.Net;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace OctaneEngine;
 
 public class OctaneConfiguration
 {
+    private readonly ILogger<OctaneConfiguration> _logger;
+
     public OctaneConfiguration()
     {
         Parts = 4;
@@ -41,6 +46,29 @@ public class OctaneConfiguration
         Proxy = null;
     }
 
+    public OctaneConfiguration(IConfiguration config, ILoggerFactory factory)
+    {
+        _logger = factory.CreateLogger<OctaneConfiguration>();
+        var octaneSection = config.GetSection("octane");
+        
+        if (octaneSection.Exists())
+        {
+            Parts = Convert.ToInt32(octaneSection?["Parts"]);
+            BufferSize = Convert.ToInt32(octaneSection?["BufferSize"]);
+            ShowProgress = Convert.ToBoolean(octaneSection?["ShowProgress"]);
+            NumRetries = Convert.ToInt32(octaneSection?["NumRetries"]);
+            BytesPerSecond = Convert.ToInt32(octaneSection?["BytesPerSecond"]);
+            UseProxy = Convert.ToBoolean(octaneSection?["UseProxy"]);
+            DoneCallback = null!;
+            ProgressCallback = null!;
+            Proxy = null;
+        }
+
+        if (UseProxy && Proxy == null)
+        {
+            _logger.LogError("Proxy must be set on use proxy!");
+        }
+    }
     /// <summary>
     ///     The number of parts to download in parallel.
     /// </summary>
@@ -85,7 +113,6 @@ public class OctaneConfiguration
     ///     The Proxy settings to use.
     /// </summary>
     public IWebProxy Proxy { get; set; }
-
     public override string ToString()
     {
         var s =

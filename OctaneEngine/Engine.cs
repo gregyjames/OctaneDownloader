@@ -174,7 +174,7 @@ namespace OctaneEngine
             stopwatch.Stop();
             logger.LogInformation($"File downloaded in {stopwatch.ElapsedMilliseconds} ms.");
             logger.LogTrace("Calling callback function...");
-            config.DoneCallback.Invoke(success);
+            config.DoneCallback?.Invoke(success);
 
             if (!success)
             {
