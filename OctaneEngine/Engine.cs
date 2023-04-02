@@ -23,6 +23,7 @@
 
 using System;
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -32,6 +33,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Runtime;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -57,7 +59,7 @@ namespace OctaneEngine
         }
         
         #region Helpers
-        private static ILoggerFactory createLoggerFactory(ILoggerFactory loggerFactory)
+        private ILoggerFactory createLoggerFactory(ILoggerFactory loggerFactory)
         {
             var factory = loggerFactory ?? new LoggerFactory();
             if (loggerFactory == null)
@@ -67,7 +69,7 @@ namespace OctaneEngine
 
             return factory;
         }
-        private static OctaneConfiguration createConfiguration(OctaneConfiguration config, ILogger logger)
+        private OctaneConfiguration createConfiguration(OctaneConfiguration config, ILogger logger)
         {
             if (config == null)
             {
@@ -79,7 +81,7 @@ namespace OctaneEngine
 
             return config;
         }
-        private static CancellationToken createCancellationToken(CancellationTokenSource cancelTokenSource, OctaneConfiguration config, string outFile)
+        private CancellationToken createCancellationToken(CancellationTokenSource cancelTokenSource, OctaneConfiguration config, string outFile)
         {
             var cancellation_token = cancelTokenSource?.Token ?? new CancellationToken();
             cancellation_token.Register(new Action(() =>
@@ -93,7 +95,7 @@ namespace OctaneEngine
 
             return cancellation_token;
         }
-        private static async Task<(long, bool)> getFileSizeAndRangeSupport(string url)
+        private async Task<(long, bool)> getFileSizeAndRangeSupport(string url)
         {
             using (var client = new HttpClient())
             {
@@ -105,7 +107,7 @@ namespace OctaneEngine
             }
             
         }
-        private static HttpClient createHTTPClient(OctaneConfiguration config, ILoggerFactory factory)
+        private HttpClient createHTTPClient(OctaneConfiguration config, ILoggerFactory factory)
         {
             var clientHandler = new HttpClientHandler()
             {
@@ -127,9 +129,9 @@ namespace OctaneEngine
 
             return _client;
         }
-        private static List<ValueTuple<long, long>> createPartsList(bool rangeSupported, long responseLength, long partSize, ILogger logger)
+        private ConcurrentBag<ValueTuple<long, long>> createPartsList(bool rangeSupported, long responseLength, long partSize, ILogger logger)
         {
-            var pieces = new List<ValueTuple<long, long>>();
+            var pieces = new ConcurrentBag<ValueTuple<long, long>>();
             //Loop to add all the events to the queue
             if (rangeSupported)
             {
@@ -141,14 +143,14 @@ namespace OctaneEngine
                         i += 1;
                     }
                     var j = Math.Min(i + partSize, responseLength);
-                    pieces.Insert(0, new ValueTuple<long, long>(i, j));
+                    pieces.Add(new ValueTuple<long, long>(i, j));
                     logger.LogTrace($"Piece with range ({pieces.First().Item1},{pieces.First().Item2}) added to tasks queue.");
                 }
             }
 
             return pieces;
         }
-        private static ProgressBar createProgressBar(OctaneConfiguration config, ILogger logger)
+        private ProgressBar createProgressBar(OctaneConfiguration config, ILogger logger)
         {
             //Options for progress base
             var options = new ProgressBarOptions
@@ -169,7 +171,7 @@ namespace OctaneEngine
 
             return pbar;
         }
-        private static void checkURL(string url, ILogger logger)
+        private void checkURL(string url, ILogger logger)
         {
             if (url == null)
             {
@@ -177,7 +179,7 @@ namespace OctaneEngine
                 throw new ArgumentNullException(nameof(url));
             }
         }
-        private static void Cleanup(GCLatencyMode old_mode, ILogger logger, Stopwatch stopwatch, HttpClient _client, OctaneConfiguration config, bool success)
+        private void Cleanup(GCLatencyMode old_mode, ILogger logger, Stopwatch stopwatch, HttpClient _client, OctaneConfiguration config, bool success)
         {
             GCSettings.LatencyMode = old_mode;
             logger.LogTrace("Restored GC mode.");
