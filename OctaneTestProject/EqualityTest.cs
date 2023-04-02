@@ -98,8 +98,8 @@ namespace OctaneTestProject
 
             if (File.Exists("original.png"))
             {
-                var download = Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource, _cancelTokenSource);
-                download.Wait();
+                var engine = new Engine(_factory, config);
+                engine.DownloadFile(url, outFile, _pauseTokenSource, _cancelTokenSource).Wait();
             }
 
             if (File.Exists(outFile) && done)

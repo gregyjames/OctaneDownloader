@@ -24,6 +24,7 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
@@ -43,8 +44,18 @@ using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngine
 {
-    public static class Engine
+    public class Engine
     {
+        private readonly ILoggerFactory _factory;
+        private OctaneConfiguration _config;
+
+        public Engine() { }
+        public Engine(ILoggerFactory factory, OctaneConfiguration config)
+        {
+            _factory = factory;
+            _config = config;
+        }
+        
         #region Helpers
         private static ILoggerFactory createLoggerFactory(ILoggerFactory loggerFactory)
         {
@@ -182,14 +193,18 @@ namespace OctaneEngine
             }
         }
         #endregion
-        
+
         /// <summary>
         /// Gets the optimal number of parts to use to download a file by downloading a small test file (1MB) and testing network latency.
         /// </summary>
         /// <param name="url">The url of the file you are planning to download.</param>
+        /// <param name="sizeToUse">The size of the test file to use.</param>
         /// <returns>A Task that returns the optimal number of parts to use to download a file.</returns>
         public async static Task<int> GetOptimalNumberOfParts(string url, NetworkAnalyzer.TestFileSize sizeToUse = NetworkAnalyzer.TestFileSize.Small)
         {
+            if (!Enum.IsDefined(typeof(NetworkAnalyzer.TestFileSize), sizeToUse))
+                throw new InvalidEnumArgumentException(nameof(sizeToUse), (int)sizeToUse,
+                    typeof(NetworkAnalyzer.TestFileSize));
             using var client = new HttpClient();
             var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
             var size_of_file = response.Content.Headers.ContentLength ?? 0;
@@ -206,32 +221,30 @@ namespace OctaneEngine
         /// </summary>
         /// <param name="url">The string url of the file to be downloaded.</param>
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
-        /// <param name="loggerFactory">The ILoggerFactory instance to use for logging.</param>
-        /// <param name="config">The OctaneConfiguration object used for configuring the downloader.</param>
         /// <param name="pauseTokenSource">The pause token source to use for pausing and resuming.</param>
         /// <param name="cancelTokenSource">The cancellation token for canceling the task.</param>
-        public async static Task DownloadFile(string url, ILoggerFactory loggerFactory = null, string outFile = null, OctaneConfiguration config = null, PauseTokenSource pauseTokenSource = null, CancellationTokenSource cancelTokenSource = null)
+        public async Task DownloadFile(string url, string outFile = null, PauseTokenSource pauseTokenSource = null, CancellationTokenSource cancelTokenSource = null)
         {
             #region Varible Initilization
-            var factory = createLoggerFactory(loggerFactory);
+            var factory = createLoggerFactory(_factory);
             var logger = factory.CreateLogger("OctaneEngine");
             var old_mode = GCSettings.LatencyMode;
             logger.LogTrace("Setting GC to sustained low latency mode.");
             GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
             var success = false;
-            var cancellation_token = createCancellationToken(cancelTokenSource, config, outFile);
+            var cancellation_token = createCancellationToken(cancelTokenSource, _config, outFile);
             checkURL(url, logger);
-            config = createConfiguration(config, logger);
+            _config = createConfiguration(_config, logger);
             var pause_token = pauseTokenSource ?? new PauseTokenSource(factory);
             var filename = outFile ?? Path.GetFileName(new Uri(url).LocalPath);
             var stopwatch = new Stopwatch();
-            var memPool = ArrayPool<byte>.Create(config.BufferSize, config.Parts);
+            var memPool = ArrayPool<byte>.Create(_config.BufferSize, _config.Parts);
             var (responseLength, rangeSupported) = await getFileSizeAndRangeSupport(url);
             logger.LogInformation($"Range supported: {rangeSupported}");
-            var partSize = Convert.ToInt64(responseLength / config.Parts);
+            var partSize = Convert.ToInt64(responseLength / _config.Parts);
             var pieces = createPartsList(rangeSupported, responseLength, partSize, logger);
-            var _client = createHTTPClient(config, factory);
+            var _client = createHTTPClient(_config, factory);
             int tasksDone = 0;
             #endregion
             
@@ -240,7 +253,7 @@ namespace OctaneEngine
             ServicePointManager.Expect100Continue = false;
             ServicePointManager.DefaultConnectionLimit = 10000;
             ServicePointManager.SetTcpKeepAlive(true, Int32.MaxValue,1);
-            ServicePointManager.MaxServicePoints = config.Parts;
+            ServicePointManager.MaxServicePoints = _config.Parts;
             #if NET6_0_OR_GREATER
                 ServicePointManager.ReusePort = true;
             #endif
@@ -256,10 +269,10 @@ namespace OctaneEngine
             {
                 try
                 {
-                    var pbar = createProgressBar(config, logger);
+                    var pbar = createProgressBar(_config, logger);
 
                     //Create a client based on if range is supported or not..
-                    using (IClient client = rangeSupported ? new OctaneClient(config, _client, factory, mmf, pbar, memPool) : new DefaultClient(_client, mmf, memPool, config, pbar, partSize))
+                    using (IClient client = rangeSupported ? new OctaneClient(_config, _client, factory, mmf, pbar, memPool) : new DefaultClient(_client, mmf, memPool, _config, pbar, partSize))
                     {
                         //Check if range is supported
                         if (rangeSupported)
@@ -267,7 +280,7 @@ namespace OctaneEngine
                             logger.LogInformation("Using Octane Client to download file.");
                             //No GC Mode if supported
                             #if NET6_0_OR_GREATER
-                                GC.TryStartNoGCRegion(Environment.ProcessorCount*config.BufferSize, true);
+                                GC.TryStartNoGCRegion(Environment.ProcessorCount*_config.BufferSize, true);
                             #endif
                             try
                             {
@@ -277,12 +290,12 @@ namespace OctaneEngine
                                         await client.ReadResponse(message, piece, token, pause_token.Token);
 
                                         Interlocked.Increment(ref tasksDone);
-                                        if (config?.ProgressCallback != null)
+                                        if (_config?.ProgressCallback != null)
                                         {
-                                            config?.ProgressCallback((tasksDone + 0.0) / (pieces.Count + 0.0));
+                                            _config?.ProgressCallback((tasksDone + 0.0) / (pieces.Count + 0.0));
                                         }
 
-                                        logger.LogTrace($"Finished {tasksDone}/{config?.Parts} pieces!");
+                                        logger.LogTrace($"Finished {tasksDone}/{_config?.Parts} pieces!");
                                     });
                             }
                             catch(Exception ex)
@@ -322,7 +335,7 @@ namespace OctaneEngine
                 }
                 finally
                 {
-                    Cleanup(old_mode, logger, stopwatch, _client, config, success);
+                    Cleanup(old_mode, logger, stopwatch, _client, _config, success);
                 }
             }
         }

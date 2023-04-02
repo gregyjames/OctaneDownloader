@@ -77,7 +77,8 @@ namespace OctaneTestProject
                     Proxy = null
                 };
 
-                Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource, _cancelTokenSource).Wait();
+                var engine = new Engine(_factory, config);
+                engine.DownloadFile(url, outFile, _pauseTokenSource, _cancelTokenSource).Wait();
             }
             catch
             {

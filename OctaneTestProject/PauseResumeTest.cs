@@ -68,10 +68,11 @@ namespace OctaneTestProject
             
             _pauseTokenSource.Pause();
             
-            
+            var engine = new Engine(_factory, config);
+
             Parallel.Invoke(
                 () => Action(_pauseTokenSource),
-                () => Engine.DownloadFile(url, _factory, outFile, config, _pauseTokenSource, _cancelTokenSource).Wait()
+                () => engine.DownloadFile(url, outFile, _pauseTokenSource, _cancelTokenSource).Wait()
             );
         }
 

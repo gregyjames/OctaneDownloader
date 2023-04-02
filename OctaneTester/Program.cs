@@ -17,7 +17,7 @@ namespace OctaneTester
             #region Logging Configuration
             var seriLog = new LoggerConfiguration()
                 .Enrich.FromLogContext()
-                .MinimumLevel.Fatal()
+                .MinimumLevel.Verbose()
                 .WriteTo.File("./OctaneLog.txt")
                 .WriteTo.Console(theme: AnsiConsoleTheme.Sixteen)
                 .CreateLogger();
@@ -44,7 +44,9 @@ namespace OctaneTester
             seriLog.Information("Latency: {Result}", NetworkAnalyzer.GetCurrentNetworkLatency().Result);
             var pauseTokenSource = new PauseTokenSource();
             var cancelTokenSource = new CancellationTokenSource();
-            Engine.DownloadFile(Url, factory, null, config, pauseTokenSource, cancelTokenSource).Wait(cancelTokenSource.Token);
+            
+            var octaneEngine = new Engine(factory, config);
+            octaneEngine.DownloadFile(Url, null, pauseTokenSource, cancelTokenSource).Wait(cancelTokenSource.Token);
         }
     }
 }
