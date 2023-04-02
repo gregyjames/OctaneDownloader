@@ -24,46 +24,42 @@ dotnet add package OctaneEngineCore
 * Logging
 * Proxy Support
 * Pause/Resume Support
+* JSON/Microsoft.Extensions.Configuration Support
 
 # Usage
 ```csharp
 private const string Url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
-private static void Main(){
-     var config = new OctaneConfiguration {
-          Parts = Environment.ProcessorCount / 2,
-          BufferSize = 2097152,
-          ShowProgress = true,
-          BytesPerSecond = 1,
-          UseProxy = false,
-          Proxy = null,
-          DoneCallback = _ => {  },
-          ProgressCallback = _ => {  },
-          NumRetries = 10
-     };
-            
-     //SERILOG EXAMPLE 
+private static void Main()
+{
+     //Logging Setup
      var seriLog = new LoggerConfiguration()
           .Enrich.FromLogContext()
-          .MinimumLevel.Fatal()
+          .MinimumLevel.Verbose()
           .WriteTo.File("./OctaneLog.txt")
           .WriteTo.Console(theme: AnsiConsoleTheme.Sixteen)
           .CreateLogger();
-
-            
      var factory = LoggerFactory.Create(logging => {
           logging.AddSerilog(seriLog);
      });
+
+     //JSON Config Loading
+     var builder = new ConfigurationBuilder();
+     builder.SetBasePath(Directory.GetCurrentDirectory())
+          .AddJsonFile("appsettings.json", true, true);
+     var configRoot = builder.Build();
+     var config = new OctaneConfiguration(configRoot, factory);
             
-     var optimalNumberOfParts = Engine.getOptimalNumberOfParts(Url).Result;
-     config.Parts = optimalNumberOfParts;
-     seriLog.Information($"Speed: {NetworkAnalyzer.GetCurrentNetworkSpeed().Result}");
-     seriLog.Information($"Latency: {NetworkAnalyzer.GetCurrentNetworkLatency().Result}");
-     seriLog.Information($"Optimal number of parts to download file: {optimalNumberOfParts}");
-     Thread.Sleep(5000);
+     //Find Optimal number of parts
+     var optimalNumberOfParts = Engine.GetOptimalNumberOfParts(Url).Result;
+     seriLog.Information("Optimal number of parts to download file: {OptimalNumberOfParts}", optimalNumberOfParts);
+            
+     seriLog.Information("Speed: {Result}", NetworkAnalyzer.GetCurrentNetworkSpeed().Result);
+     seriLog.Information("Latency: {Result}", NetworkAnalyzer.GetCurrentNetworkLatency().Result);
      var pauseTokenSource = new PauseTokenSource();
      var cancelTokenSource = new CancellationTokenSource();
-     Engine.DownloadFile(Url, factory, null, config, pauseTokenSource, cancelTokenSource).Wait(cancelTokenSource.Token);
-}
+            
+     var octaneEngine = new Engine(factory, config);
+     octaneEngine.DownloadFile(Url, null, pauseTokenSource, cancelTokenSource).Wait(cancelTokenSource.Token);
         
 ```
 
