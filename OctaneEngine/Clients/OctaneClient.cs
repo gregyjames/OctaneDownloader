@@ -34,6 +34,7 @@ using OctaneEngineCore;
 using OctaneEngineCore.Clients;
 using OctaneEngineCore.ShellProgressBar;
 using OctaneEngineCore.Streams;
+using PooledAwait;
 
 namespace OctaneEngine;
 internal class OctaneClient : IClient
@@ -58,7 +59,7 @@ internal class OctaneClient : IClient
         _log = loggerFactory.CreateLogger<IClient>();
     }
 
-    public async Task<HttpResponseMessage> SendMessage(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
+    public async PooledTask<HttpResponseMessage> SendMessage(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         if (pauseToken.IsPaused)
         {
@@ -70,7 +71,7 @@ internal class OctaneClient : IClient
         return await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
     }
-    public async Task ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
+    public async PooledTask ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         #region Variable Declaration
         var buffer = _memPool.Rent(_config.BufferSize);
@@ -131,7 +132,7 @@ internal class OctaneClient : IClient
 
             _log.LogInformation("Buffer returned to memory pool");
         }
-        _memPool.Return(buffer, true);
+        _memPool.Return(buffer, false);
         _progressBar?.Tick();
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) done", piece.Item1, piece.Item2);
         stopwatch.Stop();

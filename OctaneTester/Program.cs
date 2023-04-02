@@ -17,7 +17,7 @@ namespace OctaneTester
             #region Logging Configuration
             var seriLog = new LoggerConfiguration()
                 .Enrich.FromLogContext()
-                .MinimumLevel.Verbose()
+                .MinimumLevel.Information()
                 .WriteTo.Async(a => a.File("./OctaneLog.txt"))
                 .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen))
                 .CreateLogger();

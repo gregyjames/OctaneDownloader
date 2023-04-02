@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Cysharp.Text;
+using PooledAwait;
 
 namespace OctaneEngineCore;
 
@@ -43,7 +44,7 @@ public static class NetworkAnalyzer
 
         return url;
     }
-    internal static async Task<int> GetNetworkLatency()
+    internal static async PooledTask<int> GetNetworkLatency()
     {
         // Measure the network latency by pinging a fast server
         const string pingUrl = "www.google.com";
@@ -59,7 +60,7 @@ public static class NetworkAnalyzer
             throw new("Unable to ping server: " + reply?.Status);
         }
     }
-    internal static async Task<int> GetNetworkSpeed((string,int) testFile)
+    internal static async PooledTask<int> GetNetworkSpeed((string,int) testFile)
     {
         // Measure the network speed by downloading a test file from a fast server
         using var client = new HttpClient();

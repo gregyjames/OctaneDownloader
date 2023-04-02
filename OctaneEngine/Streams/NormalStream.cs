@@ -76,8 +76,8 @@ internal class NormalStream: Stream, IStream
 
     public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
     {
-        int bytesRead = 0;
-        int totalBytesRead = 0;
+        var bytesRead = 0;
+        var totalBytesRead = 0;
         while (totalBytesRead < count)
         {
             bytesRead = await _stream.ReadAsync(buffer, offset + totalBytesRead, count - totalBytesRead, cancellationToken);

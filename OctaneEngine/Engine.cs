@@ -36,6 +36,7 @@ using System.Runtime;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Collections.Pooled;
 using Microsoft.Extensions.Logging;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
@@ -107,7 +108,7 @@ namespace OctaneEngine
             }
             
         }
-        private HttpClient createHTTPClient(OctaneConfiguration config, ILoggerFactory factory)
+        private HttpClient createHTTPClient(OctaneConfiguration config, ILoggerFactory factory, string url)
         {
             var clientHandler = new HttpClientHandler()
             {
@@ -121,17 +122,18 @@ namespace OctaneEngine
             };
 
             var retryHandler = new RetryHandler(clientHandler, factory, config.NumRetries);
-
+            var basePart = new Uri(new Uri(url).GetLeftPart(UriPartial.Authority));
             var _client = new HttpClient(retryHandler)
             {
-                MaxResponseContentBufferSize = config.BufferSize
+                MaxResponseContentBufferSize = config.BufferSize,
+                BaseAddress = basePart
             };
 
             return _client;
         }
-        private ConcurrentBag<ValueTuple<long, long>> createPartsList(bool rangeSupported, long responseLength, long partSize, ILogger logger)
+        private PooledList<ValueTuple<long, long>> createPartsList(bool rangeSupported, long responseLength, long partSize, ILogger logger)
         {
-            var pieces = new ConcurrentBag<ValueTuple<long, long>>();
+            var pieces = new PooledList<ValueTuple<long, long>>();
             //Loop to add all the events to the queue
             if (rangeSupported)
             {
@@ -246,7 +248,7 @@ namespace OctaneEngine
             logger.LogInformation($"Range supported: {rangeSupported}");
             var partSize = Convert.ToInt64(responseLength / _config.Parts);
             var pieces = createPartsList(rangeSupported, responseLength, partSize, logger);
-            var _client = createHTTPClient(_config, factory);
+            var _client = createHTTPClient(_config, factory, url);
             int tasksDone = 0;
             #endregion
             
@@ -294,7 +296,7 @@ namespace OctaneEngine
                                         Interlocked.Increment(ref tasksDone);
                                         if (_config?.ProgressCallback != null)
                                         {
-                                            _config?.ProgressCallback((tasksDone + 0.0) / (pieces.Count + 0.0));
+                                            await Task.Run(() => _config?.ProgressCallback((tasksDone + 0.0) / (pieces.Count + 0.0)), token);
                                         }
 
                                         logger.LogTrace($"Finished {tasksDone}/{_config?.Parts} pieces!");
