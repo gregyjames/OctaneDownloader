@@ -46,7 +46,7 @@
 
     <ItemGroup>
         <PackageReference Include="AsyncEnumerator" Version="4.0.2" Condition="'$(TargetFramework)' == 'net461' OR '$(TargetFramework)' == 'net472'" />
-        <PackageReference Include="Microsoft.Extensions.Configuration" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="7.0.0" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" />
         <PackageReference Include="PooledAwait" Version="1.0.49" />
