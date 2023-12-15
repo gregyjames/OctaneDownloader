@@ -10,26 +10,20 @@ namespace Collections.Pooled
     {
         #region PooledList
 
-        public static PooledList<T> ToPooledList<T>(this IEnumerable<T> items)
-            => new PooledList<T>(items);
+        public static PooledList<T> ToPooledList<T>(this IEnumerable<T> items) => new(items);
 
-        public static PooledList<T> ToPooledList<T>(this IEnumerable<T> items, int suggestCapacity)
-            => new PooledList<T>(items, suggestCapacity);
+        public static PooledList<T> ToPooledList<T>(this IEnumerable<T> items, int suggestCapacity) =>
+            new(items, suggestCapacity);
 
-        public static PooledList<T> ToPooledList<T>(this T[] array)
-            => new PooledList<T>(array.AsSpan());
+        public static PooledList<T> ToPooledList<T>(this T[] array) => new(array.AsSpan());
 
-        public static PooledList<T> ToPooledList<T>(this ReadOnlySpan<T> span)
-            => new PooledList<T>(span);
+        public static PooledList<T> ToPooledList<T>(this ReadOnlySpan<T> span) => new(span);
 
-        public static PooledList<T> ToPooledList<T>(this Span<T> span)
-            => new PooledList<T>(span);
+        public static PooledList<T> ToPooledList<T>(this Span<T> span) => new(span);
 
-        public static PooledList<T> ToPooledList<T>(this ReadOnlyMemory<T> memory)
-            => new PooledList<T>(memory.Span);
+        public static PooledList<T> ToPooledList<T>(this ReadOnlyMemory<T> memory) => new(memory.Span);
 
-        public static PooledList<T> ToPooledList<T>(this Memory<T> memory)
-            => new PooledList<T>(memory.Span);
+        public static PooledList<T> ToPooledList<T>(this Memory<T> memory) => new(memory.Span);
 
         #endregion
 
@@ -235,20 +229,20 @@ namespace Collections.Pooled
 
         #region PooledSet
 
-        public static PooledSet<T> ToPooledSet<T>(this IEnumerable<T> source, IEqualityComparer<T> comparer = null)
-            => new PooledSet<T>(source, comparer);
+        public static PooledSet<T> ToPooledSet<T>(this IEnumerable<T> source, IEqualityComparer<T> comparer = null) =>
+            new(source, comparer);
 
-        public static PooledSet<T> ToPooledSet<T>(this Span<T> source, IEqualityComparer<T> comparer = null)
-            => new PooledSet<T>(source, comparer);
+        public static PooledSet<T> ToPooledSet<T>(this Span<T> source, IEqualityComparer<T> comparer = null) =>
+            new(source, comparer);
 
-        public static PooledSet<T> ToPooledSet<T>(this ReadOnlySpan<T> source, IEqualityComparer<T> comparer = null)
-            => new PooledSet<T>(source, comparer);
+        public static PooledSet<T> ToPooledSet<T>(this ReadOnlySpan<T> source, IEqualityComparer<T> comparer = null) =>
+            new(source, comparer);
 
-        public static PooledSet<T> ToPooledSet<T>(this Memory<T> source, IEqualityComparer<T> comparer = null)
-            => new PooledSet<T>(source.Span, comparer);
+        public static PooledSet<T> ToPooledSet<T>(this Memory<T> source, IEqualityComparer<T> comparer = null) =>
+            new(source.Span, comparer);
 
-        public static PooledSet<T> ToPooledSet<T>(this ReadOnlyMemory<T> source, IEqualityComparer<T> comparer = null)
-            => new PooledSet<T>(source.Span, comparer);
+        public static PooledSet<T> ToPooledSet<T>(this ReadOnlyMemory<T> source,
+            IEqualityComparer<T> comparer = null) => new(source.Span, comparer);
 
         #endregion
 
@@ -258,37 +252,37 @@ namespace Collections.Pooled
         /// Creates an instance of PooledStack from the given items.
         /// </summary>
         public static PooledStack<T> ToPooledStack<T>(this IEnumerable<T> items)
-            => new PooledStack<T>(items);
+            => new(items);
 
         /// <summary>
         /// Creates an instance of PooledStack from the given items.
         /// </summary>
         public static PooledStack<T> ToPooledStack<T>(this T[] array)
-            => new PooledStack<T>(array.AsSpan());
+            => new(array.AsSpan());
 
         /// <summary>
         /// Creates an instance of PooledStack from the given items.
         /// </summary>
         public static PooledStack<T> ToPooledStack<T>(this ReadOnlySpan<T> span)
-            => new PooledStack<T>(span);
+            => new(span);
 
         /// <summary>
         /// Creates an instance of PooledStack from the given items.
         /// </summary>
         public static PooledStack<T> ToPooledStack<T>(this Span<T> span)
-            => new PooledStack<T>(span);
+            => new(span);
 
         /// <summary>
         /// Creates an instance of PooledStack from the given items.
         /// </summary>
         public static PooledStack<T> ToPooledStack<T>(this ReadOnlyMemory<T> memory)
-            => new PooledStack<T>(memory.Span);
+            => new(memory.Span);
 
         /// <summary>
         /// Creates an instance of PooledStack from the given items.
         /// </summary>
         public static PooledStack<T> ToPooledStack<T>(this Memory<T> memory)
-            => new PooledStack<T>(memory.Span);
+            => new(memory.Span);
 
         #endregion
 
@@ -298,37 +292,37 @@ namespace Collections.Pooled
         /// Creates an instance of PooledQueue from the given items.
         /// </summary>
         public static PooledQueue<T> ToPooledQueue<T>(this IEnumerable<T> items)
-            => new PooledQueue<T>(items);
+            => new(items);
 
         /// <summary>
         /// Creates an instance of PooledQueue from the given items.
         /// </summary>
         public static PooledQueue<T> ToPooledQueue<T>(this ReadOnlySpan<T> span)
-            => new PooledQueue<T>(span);
+            => new(span);
 
         /// <summary>
         /// Creates an instance of PooledQueue from the given items.
         /// </summary>
         public static PooledQueue<T> ToPooledQueue<T>(this Span<T> span)
-            => new PooledQueue<T>(span);
+            => new(span);
 
         /// <summary>
         /// Creates an instance of PooledQueue from the given items.
         /// </summary>
         public static PooledQueue<T> ToPooledQueue<T>(this ReadOnlyMemory<T> memory)
-            => new PooledQueue<T>(memory.Span);
+            => new(memory.Span);
 
         /// <summary>
         /// Creates an instance of PooledQueue from the given items.
         /// </summary>
         public static PooledQueue<T> ToPooledQueue<T>(this Memory<T> memory)
-            => new PooledQueue<T>(memory.Span);
+            => new(memory.Span);
 
         /// <summary>
         /// Creates an instance of PooledQueue from the given items.
         /// </summary>
         public static PooledQueue<T> ToPooledQueue<T>(this T[] array)
-            => new PooledQueue<T>(array.AsSpan());
+            => new(array.AsSpan());
 
         #endregion
     }

@@ -268,7 +268,7 @@ namespace OctaneEngineCore.ShellProgressBar
 
 		protected override void DisplayProgress() => _displayProgressEvent.Set();
 
-		private readonly ConcurrentQueue<ConsoleOutLine> _stickyMessages = new ConcurrentQueue<ConsoleOutLine>();
+		private readonly ConcurrentQueue<ConsoleOutLine> _stickyMessages = new();
 
 		public override void WriteLine(string message)
 		{

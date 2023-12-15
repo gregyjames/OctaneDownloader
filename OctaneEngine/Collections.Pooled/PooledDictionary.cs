@@ -7,7 +7,6 @@ using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Threading;
 
@@ -176,9 +175,9 @@ namespace Collections.Pooled
             // back-compat with subclasses that may have overridden the enumerator behavior.
             if (dictionary is PooledDictionary<TKey, TValue> pooled)
             {
-                int count = pooled._count;
+                var count = pooled._count;
                 var entries = pooled._entries;
-                for (int i = 0; i < count; i++)
+                for (var i = 0; i < count; i++)
                 {
                     if (entries[i].hashCode >= 0)
                     {
@@ -428,14 +427,14 @@ namespace Collections.Pooled
         {
             get
             {
-                int i = FindEntry(key);
+                var i = FindEntry(key);
                 if (i >= 0) return _entries[i].value;
                 ThrowHelper.ThrowKeyNotFoundException(key);
                 return default;
             }
             set
             {
-                bool modified = TryInsert(key, value, InsertionBehavior.OverwriteExisting);
+                var modified = TryInsert(key, value, InsertionBehavior.OverwriteExisting);
                 Debug.Assert(modified);
             }
         }
@@ -445,7 +444,7 @@ namespace Collections.Pooled
         /// </summary>
         public void Add(TKey key, TValue value)
         {
-            bool modified = TryInsert(key, value, InsertionBehavior.ThrowOnExisting);
+            var modified = TryInsert(key, value, InsertionBehavior.ThrowOnExisting);
             Debug.Assert(modified); // If there was an existing key and the Add failed, an exception will already have been thrown.
         }
 
@@ -492,7 +491,7 @@ namespace Collections.Pooled
 
         public void AddOrUpdate(TKey key, TValue addValue, Func<TKey, TValue, TValue> updater)
         {
-            if (TryGetValue(key, out TValue value))
+            if (TryGetValue(key, out var value))
             {
                 var updatedValue = updater(key, value);
                 TryInsert(key, updatedValue, InsertionBehavior.OverwriteExisting);
@@ -505,7 +504,7 @@ namespace Collections.Pooled
 
         public void AddOrUpdate(TKey key, Func<TKey, TValue> addValueFactory, Func<TKey, TValue, TValue> updater)
         {
-            if (TryGetValue(key, out TValue value))
+            if (TryGetValue(key, out var value))
             {
                 var updatedValue = updater(key, value);
                 TryInsert(key, updatedValue, InsertionBehavior.OverwriteExisting);
@@ -522,7 +521,7 @@ namespace Collections.Pooled
 
         bool ICollection<KeyValuePair<TKey, TValue>>.Contains(KeyValuePair<TKey, TValue> keyValuePair)
         {
-            int i = FindEntry(keyValuePair.Key);
+            var i = FindEntry(keyValuePair.Key);
             if (i >= 0 && EqualityComparer<TValue>.Default.Equals(_entries[i].value, keyValuePair.Value))
             {
                 return true;
@@ -532,7 +531,7 @@ namespace Collections.Pooled
 
         bool ICollection<KeyValuePair<TKey, TValue>>.Remove(KeyValuePair<TKey, TValue> keyValuePair)
         {
-            int i = FindEntry(keyValuePair.Key);
+            var i = FindEntry(keyValuePair.Key);
             if (i >= 0 && EqualityComparer<TValue>.Default.Equals(_entries[i].value, keyValuePair.Value))
             {
                 Remove(keyValuePair.Key);
@@ -543,7 +542,7 @@ namespace Collections.Pooled
 
         public void Clear()
         {
-            int count = _count;
+            var count = _count;
             if (count > 0)
             {
                 Array.Clear(_buckets, 0, _size);
@@ -565,7 +564,7 @@ namespace Collections.Pooled
             var entries = _entries;
             if (value == null)
             {
-                for (int i = 0; i < _count; i++)
+                for (var i = 0; i < _count; i++)
                 {
                     if (entries[i].hashCode >= 0 && entries[i].value == null) return true;
                 }
@@ -575,7 +574,7 @@ namespace Collections.Pooled
                 if (default(TValue) != null)
                 {
                     // ValueType: Devirtualize with EqualityComparer<TValue>.Default intrinsic
-                    for (int i = 0; i < _count; i++)
+                    for (var i = 0; i < _count; i++)
                     {
                         if (entries[i].hashCode >= 0 && EqualityComparer<TValue>.Default.Equals(entries[i].value, value)) return true;
                     }
@@ -586,7 +585,7 @@ namespace Collections.Pooled
                     // https://github.com/dotnet/coreclr/issues/17273
                     // So cache in a local rather than get EqualityComparer per loop iteration
                     var defaultComparer = EqualityComparer<TValue>.Default;
-                    for (int i = 0; i < _count; i++)
+                    for (var i = 0; i < _count; i++)
                     {
                         if (entries[i].hashCode >= 0 && defaultComparer.Equals(entries[i].value, value)) return true;
                     }
@@ -612,9 +611,9 @@ namespace Collections.Pooled
                 ThrowHelper.ThrowArgumentException(ExceptionResource.Arg_ArrayPlusOffTooSmall);
             }
 
-            int count = _count;
+            var count = _count;
             var entries = _entries;
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 if (entries[i].hashCode >= 0)
                 {
@@ -623,8 +622,7 @@ namespace Collections.Pooled
             }
         }
 
-        public Enumerator GetEnumerator()
-            => new Enumerator(this, Enumerator.KeyValuePair);
+        public Enumerator GetEnumerator() => new(this, Enumerator.KeyValuePair);
 
         IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<KeyValuePair<TKey, TValue>>.GetEnumerator()
             => new Enumerator(this, Enumerator.KeyValuePair);
@@ -665,19 +663,19 @@ namespace Collections.Pooled
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.key);
             }
 
-            int i = -1;
-            int length = _size;
+            var i = -1;
+            var length = _size;
             if (length <= 0)
                 return i;
 
             var buckets = _buckets;
             var entries = _entries;
-            int collisionCount = 0;
-            IEqualityComparer<TKey> comparer = _comparer;
+            var collisionCount = 0;
+            var comparer = _comparer;
 
             if (comparer == null)
             {
-                int hashCode = key.GetHashCode() & Lower31BitMask;
+                var hashCode = key.GetHashCode() & Lower31BitMask;
                 // Value in _buckets is 1-based
                 i = buckets[hashCode % length] - 1;
                 if (default(TKey) != null)
@@ -730,7 +728,7 @@ namespace Collections.Pooled
             }
             else
             {
-                int hashCode = comparer.GetHashCode(key) & Lower31BitMask;
+                var hashCode = comparer.GetHashCode(key) & Lower31BitMask;
                 // Value in _buckets is 1-based
                 i = buckets[hashCode % length] - 1;
                 do
@@ -784,12 +782,12 @@ namespace Collections.Pooled
             var comparer = _comparer;
             var size = _size;
 
-            int hashCode = ((comparer == null) ? key.GetHashCode() : comparer.GetHashCode(key)) & Lower31BitMask;
+            var hashCode = ((comparer == null) ? key.GetHashCode() : comparer.GetHashCode(key)) & Lower31BitMask;
 
-            int collisionCount = 0;
-            ref int bucket = ref _buckets[hashCode % size];
+            var collisionCount = 0;
+            ref var bucket = ref _buckets[hashCode % size];
             // Value in _buckets is 1-based
-            int i = bucket - 1;
+            var i = bucket - 1;
 
             if (comparer == null)
             {
@@ -915,7 +913,7 @@ namespace Collections.Pooled
 
             }
 
-            bool updateFreeList = false;
+            var updateFreeList = false;
             int index;
             if (_freeCount > 0)
             {
@@ -925,7 +923,7 @@ namespace Collections.Pooled
             }
             else
             {
-                int count = _count;
+                var count = _count;
                 if (count == size)
                 {
                     Resize();
@@ -937,7 +935,7 @@ namespace Collections.Pooled
                 entries = _entries;
             }
 
-            ref Entry entry = ref entries[index];
+            ref var entry = ref entries[index];
 
             if (updateFreeList)
             {
@@ -968,7 +966,7 @@ namespace Collections.Pooled
 
         public virtual void OnDeserialization(object sender)
         {
-            HashHelpers.SerializationInfoTable.TryGetValue(this, out SerializationInfo siInfo);
+            HashHelpers.SerializationInfoTable.TryGetValue(this, out var siInfo);
 
             if (siInfo == null)
             {
@@ -977,8 +975,8 @@ namespace Collections.Pooled
                 return;
             }
 
-            int realVersion = siInfo.GetInt32(VersionName);
-            int hashsize = siInfo.GetInt32(HashSizeName);
+            var realVersion = siInfo.GetInt32(VersionName);
+            var hashsize = siInfo.GetInt32(HashSizeName);
             _comparer = (IEqualityComparer<TKey>)siInfo.GetValue(ComparerName, typeof(IEqualityComparer<TKey>));
 
             if (hashsize != 0)
@@ -993,7 +991,7 @@ namespace Collections.Pooled
                     throw new SerializationException("Serialized PooledDictionary missing data.");
                 }
 
-                for (int i = 0; i < array.Length; i++)
+                for (var i = 0; i < array.Length; i++)
                 {
                     if (array[i].Key == null)
                     {
@@ -1023,7 +1021,7 @@ namespace Collections.Pooled
             int[] buckets;
             Entry[] entries;
             bool replaceArrays;
-            int count = _count;
+            var count = _count;
 
             // Because ArrayPool might give us larger arrays than we asked for, see if we can 
             // use the existing capacity without actually resizing.
@@ -1047,7 +1045,7 @@ namespace Collections.Pooled
 
             if (default(TKey) == null && forceNewHashCodes)
             {
-                for (int i = 0; i < count; i++)
+                for (var i = 0; i < count; i++)
                 {
                     if (entries[i].hashCode >= 0)
                     {
@@ -1057,11 +1055,11 @@ namespace Collections.Pooled
                 }
             }
 
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
             {
                 if (entries[i].hashCode >= 0)
                 {
-                    int bucket = entries[i].hashCode % newSize;
+                    var bucket = entries[i].hashCode % newSize;
                     // Value in _buckets is 1-based
                     entries[i].next = buckets[bucket] - 1;
                     // Value in _buckets is 1-based
@@ -1090,17 +1088,17 @@ namespace Collections.Pooled
 
             var buckets = _buckets;
             var entries = _entries;
-            int collisionCount = 0;
+            var collisionCount = 0;
             if (_size > 0)
             {
-                int hashCode = (_comparer?.GetHashCode(key) ?? key.GetHashCode()) & Lower31BitMask;
-                int bucket = hashCode % _size;
-                int last = -1;
+                var hashCode = (_comparer?.GetHashCode(key) ?? key.GetHashCode()) & Lower31BitMask;
+                var bucket = hashCode % _size;
+                var last = -1;
                 // Value in buckets is 1-based
-                int i = buckets[bucket] - 1;
+                var i = buckets[bucket] - 1;
                 while (i >= 0)
                 {
-                    ref Entry entry = ref entries[i];
+                    ref var entry = ref entries[i];
 
                     if (entry.hashCode == hashCode && (_comparer?.Equals(entry.key, key) ?? EqualityComparer<TKey>.Default.Equals(entry.key, key)))
                     {
@@ -1153,15 +1151,15 @@ namespace Collections.Pooled
 
             var buckets = _buckets;
             var entries = _entries;
-            int collisionCount = 0;
-            int hashCode = (_comparer?.GetHashCode(key) ?? key.GetHashCode()) & Lower31BitMask;
-            int bucket = hashCode % _size;
-            int last = -1;
+            var collisionCount = 0;
+            var hashCode = (_comparer?.GetHashCode(key) ?? key.GetHashCode()) & Lower31BitMask;
+            var bucket = hashCode % _size;
+            var last = -1;
             // Value in buckets is 1-based
-            int i = buckets[bucket] - 1;
+            var i = buckets[bucket] - 1;
             while (i >= 0)
             {
-                ref Entry entry = ref entries[i];
+                ref var entry = ref entries[i];
 
                 if (entry.hashCode == hashCode && (_comparer?.Equals(entry.key, key) ?? EqualityComparer<TKey>.Default.Equals(entry.key, key)))
                 {
@@ -1206,7 +1204,7 @@ namespace Collections.Pooled
 
         public bool TryGetValue(TKey key, out TValue value)
         {
-            int i = FindEntry(key);
+            var i = FindEntry(key);
             if (i >= 0)
             {
                 value = _entries[i].value;
@@ -1221,7 +1219,7 @@ namespace Collections.Pooled
 
         public TValue GetOrAdd(TKey key, TValue addValue)
         {
-            if (TryGetValue(key, out TValue value))
+            if (TryGetValue(key, out var value))
                 return value;
 
             Add(key, addValue);
@@ -1230,7 +1228,7 @@ namespace Collections.Pooled
 
         public TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory)
         {
-            if (TryGetValue(key, out TValue value))
+            if (TryGetValue(key, out var value))
                 return value;
 
             var addValue = valueFactory(key);
@@ -1262,8 +1260,8 @@ namespace Collections.Pooled
             }
             else if (array is DictionaryEntry[] dictEntryArray)
             {
-                Entry[] entries = _entries;
-                for (int i = 0; i < _count; i++)
+                var entries = _entries;
+                for (var i = 0; i < _count; i++)
                 {
                     if (entries[i].hashCode >= 0)
                     {
@@ -1275,9 +1273,9 @@ namespace Collections.Pooled
             {
                 try
                 {
-                    int count = _count;
+                    var count = _count;
                     var entries = _entries;
-                    for (int i = 0; i < count; i++)
+                    for (var i = 0; i < count; i++)
                     {
                         if (entries[i].hashCode >= 0)
                         {
@@ -1306,13 +1304,13 @@ namespace Collections.Pooled
         {
             if (capacity < 0)
                 ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.capacity);
-            int currentCapacity = _size;
+            var currentCapacity = _size;
             if (currentCapacity >= capacity)
                 return currentCapacity;
             _version++;
             if (_buckets == null || _size == 0)
                 return Initialize(capacity);
-            int newSize = HashHelpers.GetPrime(capacity);
+            var newSize = HashHelpers.GetPrime(capacity);
             Resize(newSize, forceNewHashCodes: false);
             return newSize;
         }
@@ -1341,30 +1339,30 @@ namespace Collections.Pooled
         {
             if (capacity < Count)
                 throw new ArgumentOutOfRangeException(nameof(capacity));
-            int newSize = HashHelpers.GetPrime(capacity);
+            var newSize = HashHelpers.GetPrime(capacity);
 
-            Entry[] oldEntries = _entries;
-            int[] oldBuckets = _buckets;
-            int currentCapacity = oldEntries == null ? 0 : oldEntries.Length;
+            var oldEntries = _entries;
+            var oldBuckets = _buckets;
+            var currentCapacity = oldEntries == null ? 0 : oldEntries.Length;
             if (newSize >= currentCapacity)
                 return;
 
-            int oldCount = _count;
+            var oldCount = _count;
             _version++;
             Initialize(newSize);
             var entries = _entries;
             var buckets = _buckets;
-            int count = 0;
-            for (int i = 0; i < oldCount; i++)
+            var count = 0;
+            for (var i = 0; i < oldCount; i++)
             {
-                int hashCode = oldEntries[i].hashCode;
+                var hashCode = oldEntries[i].hashCode;
                 if (hashCode >= 0)
                 {
 #pragma warning disable IDE0059 // Value assigned to symbol is never used
-                    ref Entry entry = ref entries[count];
+                    ref var entry = ref entries[count];
 #pragma warning restore IDE0059
                     entry = oldEntries[i];
-                    int bucket = hashCode % newSize;
+                    var bucket = hashCode % newSize;
                     // Value in _buckets is 1-based
                     entry.next = buckets[bucket] - 1;
                     // Value in _buckets is 1-based
@@ -1407,7 +1405,7 @@ namespace Collections.Pooled
             {
                 if (IsCompatibleKey(key))
                 {
-                    int i = FindEntry((TKey)key);
+                    var i = FindEntry((TKey)key);
                     if (i >= 0)
                     {
                         return _entries[i].value;
@@ -1425,7 +1423,7 @@ namespace Collections.Pooled
 
                 try
                 {
-                    TKey tempKey = (TKey)key;
+                    var tempKey = (TKey)key;
                     try
                     {
                         this[tempKey] = (TValue)value;
@@ -1511,7 +1509,7 @@ namespace Collections.Pooled
 
             try
             {
-                TKey tempKey = (TKey)key;
+                var tempKey = (TKey)key;
 
                 try
                 {
@@ -1589,7 +1587,7 @@ namespace Collections.Pooled
                 // dictionary.count+1 could be negative if dictionary.count is int.MaxValue
                 while ((uint)_index < (uint)_dictionary._count)
                 {
-                    ref Entry entry = ref _dictionary._entries[_index++];
+                    ref var entry = ref _dictionary._entries[_index++];
 
                     if (entry.hashCode >= 0)
                     {
@@ -1691,8 +1689,7 @@ namespace Collections.Pooled
                 _dictionary = dictionary ?? throw new ArgumentNullException(nameof(dictionary));
             }
 
-            public Enumerator GetEnumerator()
-                => new Enumerator(_dictionary);
+            public Enumerator GetEnumerator() => new(_dictionary);
 
             public void CopyTo(TKey[] array, int index)
             {
@@ -1705,9 +1702,9 @@ namespace Collections.Pooled
                 if (array.Length - index < _dictionary.Count)
                     ThrowHelper.ThrowArgumentException(ExceptionResource.Arg_ArrayPlusOffTooSmall);
 
-                int count = _dictionary._count;
+                var count = _dictionary._count;
                 var entries = _dictionary._entries;
-                for (int i = 0; i < count; i++)
+                for (var i = 0; i < count; i++)
                 {
                     if (entries[i].hashCode >= 0) array[index++] = entries[i].key;
                 }
@@ -1757,17 +1754,17 @@ namespace Collections.Pooled
                 }
                 else
                 {
-                    object[] objects = array as object[];
+                    var objects = array as object[];
                     if (objects == null)
                     {
                         ThrowHelper.ThrowArgumentException_Argument_InvalidArrayType();
                     }
 
-                    int count = _dictionary._count;
+                    var count = _dictionary._count;
                     var entries = _dictionary._entries;
                     try
                     {
-                        for (int i = 0; i < count; i++)
+                        for (var i = 0; i < count; i++)
                         {
                             if (entries[i].hashCode >= 0) objects[index++] = entries[i].key;
                         }
@@ -1811,7 +1808,7 @@ namespace Collections.Pooled
 
                     while ((uint)_index < (uint)_dictionary._count)
                     {
-                        ref Entry entry = ref _dictionary._entries[_index++];
+                        ref var entry = ref _dictionary._entries[_index++];
 
                         if (entry.hashCode >= 0)
                         {
@@ -1868,8 +1865,7 @@ namespace Collections.Pooled
                 _dictionary = dictionary;
             }
 
-            public Enumerator GetEnumerator()
-                => new Enumerator(_dictionary);
+            public Enumerator GetEnumerator() => new(_dictionary);
 
             public void CopyTo(TValue[] array, int index)
             {
@@ -1882,9 +1878,9 @@ namespace Collections.Pooled
                 if (array.Length - index < _dictionary.Count)
                     ThrowHelper.ThrowArgumentException(ExceptionResource.Arg_ArrayPlusOffTooSmall);
 
-                int count = _dictionary._count;
+                var count = _dictionary._count;
                 var entries = _dictionary._entries;
-                for (int i = 0; i < count; i++)
+                for (var i = 0; i < count; i++)
                 {
                     if (entries[i].hashCode >= 0) array[index++] = entries[i].value;
                 }
@@ -1934,11 +1930,11 @@ namespace Collections.Pooled
                 }
                 else if (array is object[] objects)
                 {
-                    int count = _dictionary._count;
+                    var count = _dictionary._count;
                     var entries = _dictionary._entries;
                     try
                     {
-                        for (int i = 0; i < count; i++)
+                        for (var i = 0; i < count; i++)
                         {
                             if (entries[i].hashCode >= 0) objects[index++] = entries[i].value;
                         }
@@ -1986,7 +1982,7 @@ namespace Collections.Pooled
 
                     while ((uint)_index < (uint)_dictionary._count)
                     {
-                        ref Entry entry = ref _dictionary._entries[_index++];
+                        ref var entry = ref _dictionary._entries[_index++];
 
                         if (entry.hashCode >= 0)
                         {

@@ -39,16 +39,14 @@ internal class RetryHandler : DelegatingHandler
     // network cable got pulled out."
     private readonly int _maxRetries;
 
-    public RetryHandler(HttpMessageHandler innerHandler, ILoggerFactory loggerFactory, int maxRetries = 3) :
-        base(innerHandler)
+    public RetryHandler(HttpMessageHandler innerHandler, ILoggerFactory loggerFactory, int maxRetries = 3) : base(innerHandler)
     {
         _maxRetries = maxRetries;
         _log = loggerFactory.CreateLogger<RetryHandler>();
         _log.LogInformation("Retry handler created with {MaxRetries} retries", _maxRetries);
     }
 
-    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
-        CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         HttpResponseMessage? response = null;
         for (var i = 0; i < _maxRetries; i++)

@@ -34,7 +34,7 @@ namespace OctaneEngineCore.ShellProgressBar
 		protected override void Grow(ProgressBarHeight direction) => _growth?.Invoke(direction);
 
 		private bool _calledDone;
-		private readonly object _callOnce = new object();
+		private readonly object _callOnce = new();
 		protected override void OnDone()
 		{
 			if (_calledDone) return;

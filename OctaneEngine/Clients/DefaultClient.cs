@@ -27,7 +27,6 @@ using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Net.Http;
 using System.Threading;
-using System.Threading.Tasks;
 using OctaneEngine;
 using OctaneEngineCore.ShellProgressBar;
 using PooledAwait;
@@ -37,17 +36,15 @@ namespace OctaneEngineCore.Clients;
 internal class DefaultClient : IClient
 {
     private readonly HttpClient _httpClient;
-    private readonly MemoryMappedFile _mmf;
-    private readonly ArrayPool<byte> _memPool;
+    private MemoryMappedFile _mmf;
+    private ArrayPool<byte> _memPool;
     private readonly OctaneConfiguration _config;
-    private readonly ProgressBar _pbar;
+    private readonly IProgressBar _pbar;
     private readonly long _partsize;
 
-    public DefaultClient(HttpClient httpClient, MemoryMappedFile mmf, ArrayPool<byte> memPool, OctaneConfiguration config, ProgressBar pbar, long partsize)
+    public DefaultClient(HttpClient httpClient, OctaneConfiguration config, IProgressBar pbar, long partsize)
     {
         _httpClient = httpClient;
-        _mmf = mmf;
-        _memPool = memPool;
         _config = config;
         _pbar = pbar;
         _partsize = partsize;
@@ -55,10 +52,10 @@ internal class DefaultClient : IClient
 
     public async PooledTask CopyMessageContentToStreamWithProgressAsync(HttpResponseMessage message, Stream stream, IProgress<long> progress)
     {
-        byte[] buffer = _memPool.Rent(_config.BufferSize);
+        var buffer = _memPool.Rent(_config.BufferSize);
         long totalBytesWritten = 0;
 
-        using (MemoryStream memoryStream = new MemoryStream())
+        using (var memoryStream = new MemoryStream())
         {
             await message.Content.CopyToAsync(memoryStream);
 
@@ -79,6 +76,21 @@ internal class DefaultClient : IClient
         }
     }
 
+
+    public bool isRangeSupported()
+    {
+        return false;
+    }
+
+    public void SetMMF(MemoryMappedFile file)
+    {
+        _mmf = file;
+    }
+
+    public void SetArrayPool(ArrayPool<byte> pool)
+    {
+        _memPool = pool;
+    }
 
     public async PooledTask<HttpResponseMessage> SendMessage(string url, (long, long) piece,
         CancellationToken cancellationToken, PauseToken pauseToken)

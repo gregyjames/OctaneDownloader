@@ -8,7 +8,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 
 namespace Collections.Pooled
@@ -203,7 +202,7 @@ namespace Collections.Pooled
                 // to avoid excess resizes, first set size based on collection's count. Collection
                 // may contain duplicates, so call TrimExcess if resulting hashset is larger than
                 // threshold
-                int suggestedCapacity = (collection is ICollection<T> coll) ? coll.Count : 0;
+                var suggestedCapacity = (collection is ICollection<T> coll) ? coll.Count : 0;
                 Initialize(suggestedCapacity);
 
                 UnionWith(collection);
@@ -286,7 +285,7 @@ namespace Collections.Pooled
         // equality comparer.
         private void CopyFrom(PooledSet<T> source)
         {
-            int count = source._count;
+            var count = source._count;
             if (count == 0)
             {
                 // As well as short-circuiting on the rest of the work done,
@@ -295,8 +294,8 @@ namespace Collections.Pooled
                 return;
             }
 
-            int capacity = _size = source._size;
-            int threshold = HashHelpers.ExpandPrime(count + 1);
+            var capacity = _size = source._size;
+            var threshold = HashHelpers.ExpandPrime(count + 1);
 
             if (threshold >= capacity)
             {
@@ -311,13 +310,13 @@ namespace Collections.Pooled
             }
             else
             {
-                int lastIndex = source._lastIndex;
-                Slot[] slots = source._slots;
+                var lastIndex = source._lastIndex;
+                var slots = source._slots;
                 Initialize(count);
-                int index = 0;
-                for (int i = 0; i < lastIndex; ++i)
+                var index = 0;
+                for (var i = 0; i < lastIndex; ++i)
                 {
-                    int hashCode = slots[i].hashCode;
+                    var hashCode = slots[i].hashCode;
                     if (hashCode >= 0)
                     {
                         AddValue(index, hashCode, slots[i].value);
@@ -372,11 +371,11 @@ namespace Collections.Pooled
         {
             if (_buckets != null)
             {
-                int collisionCount = 0;
-                int hashCode = InternalGetHashCode(item);
-                Slot[] slots = _slots;
+                var collisionCount = 0;
+                var hashCode = InternalGetHashCode(item);
+                var slots = _slots;
                 // see note at "HashSet" level describing why "- 1" appears in for loop
-                for (int i = _buckets[hashCode % _size] - 1; i >= 0; i = slots[i].next)
+                for (var i = _buckets[hashCode % _size] - 1; i >= 0; i = slots[i].next)
                 {
                     if (slots[i].hashCode == hashCode && _comparer.Equals(slots[i].value, item))
                     {
@@ -412,12 +411,12 @@ namespace Collections.Pooled
         {
             if (_buckets != null)
             {
-                int hashCode = InternalGetHashCode(item);
-                int bucket = hashCode % _size;
-                int last = -1;
-                int collisionCount = 0;
-                Slot[] slots = _slots;
-                for (int i = _buckets[bucket] - 1; i >= 0; last = i, i = slots[i].next)
+                var hashCode = InternalGetHashCode(item);
+                var bucket = hashCode % _size;
+                var last = -1;
+                var collisionCount = 0;
+                var slots = _slots;
+                for (var i = _buckets[bucket] - 1; i >= 0; last = i, i = slots[i].next)
                 {
                     if (slots[i].hashCode == hashCode && _comparer.Equals(slots[i].value, item))
                     {
@@ -488,7 +487,7 @@ namespace Collections.Pooled
         /// Gets an enumerator with which to enumerate the set.
         /// </summary>
         public Enumerator GetEnumerator()
-            => new Enumerator(this);
+            => new(this);
 
         IEnumerator<T> IEnumerable<T>.GetEnumerator()
             => new Enumerator(this);
@@ -516,7 +515,7 @@ namespace Collections.Pooled
 
             if (_buckets != null)
             {
-                T[] array = new T[_count];
+                var array = new T[_count];
                 CopyTo(array);
                 info.AddValue(ElementsName, array, typeof(T[]));
             }
@@ -539,7 +538,7 @@ namespace Collections.Pooled
                 return;
             }
 
-            int capacity = _siInfo.GetInt32(CapacityName);
+            var capacity = _siInfo.GetInt32(CapacityName);
             _comparer = (IEqualityComparer<T>)_siInfo.GetValue(ComparerName, typeof(IEqualityComparer<T>));
             _freeList = -1;
 
@@ -547,7 +546,7 @@ namespace Collections.Pooled
             {
                 Initialize(capacity);
 
-                T[] array = (T[])_siInfo.GetValue(ElementsName, typeof(T[]));
+                var array = (T[])_siInfo.GetValue(ElementsName, typeof(T[]));
 
                 if (array == null)
                 {
@@ -555,7 +554,7 @@ namespace Collections.Pooled
                 }
 
                 // there are no resizes here because we already set capacity above
-                for (int i = 0; i < array.Length; i++)
+                for (var i = 0; i < array.Length; i++)
                 {
                     AddIfNotPresent(array[i]);
                 }
@@ -598,7 +597,7 @@ namespace Collections.Pooled
         {
             if (_buckets != null)
             {
-                int i = InternalIndexOf(equalValue);
+                var i = InternalIndexOf(equalValue);
                 if (i >= 0)
                 {
                     actualValue = _slots[i].value;
@@ -625,7 +624,7 @@ namespace Collections.Pooled
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.other);
             }
 
-            foreach (T item in other)
+            foreach (var item in other)
             {
                 AddIfNotPresent(item);
             }
@@ -781,7 +780,7 @@ namespace Collections.Pooled
             }
 
             // remove every element in other from this
-            foreach (T element in other)
+            foreach (var element in other)
             {
                 Remove(element);
             }
@@ -945,7 +944,7 @@ namespace Collections.Pooled
                 return IsSubsetOfHashSetWithSameEC(otherAsHs);
             }
 
-            ElementCount result = CheckUniqueAndUnfoundElements(other, false);
+            var result = CheckUniqueAndUnfoundElements(other, false);
             return (result.uniqueCount == _count && result.unfoundCount >= 0);
         }
 
@@ -969,7 +968,7 @@ namespace Collections.Pooled
                 return true;
             }
 
-            ElementCount result = CheckUniqueAndUnfoundElements(other, false);
+            var result = CheckUniqueAndUnfoundElements(other, false);
             return (result.uniqueCount == _count && result.unfoundCount >= 0);
         }
 
@@ -1040,7 +1039,7 @@ namespace Collections.Pooled
                 }
             }
 
-            ElementCount result = CheckUniqueAndUnfoundElements(other, false);
+            var result = CheckUniqueAndUnfoundElements(other, false);
             return (result.uniqueCount == _count && result.unfoundCount > 0);
         }
 
@@ -1082,7 +1081,7 @@ namespace Collections.Pooled
                 return other.Length > 0;
             }
 
-            ElementCount result = CheckUniqueAndUnfoundElements(other, false);
+            var result = CheckUniqueAndUnfoundElements(other, false);
             return (result.uniqueCount == _count && result.unfoundCount > 0);
         }
 
@@ -1247,7 +1246,7 @@ namespace Collections.Pooled
                 }
             }
             // couldn't fall out in the above cases; do it the long way
-            ElementCount result = CheckUniqueAndUnfoundElements(other, true);
+            var result = CheckUniqueAndUnfoundElements(other, true);
             return (result.uniqueCount < _count && result.unfoundCount == 0);
         }
 
@@ -1300,7 +1299,7 @@ namespace Collections.Pooled
             }
 
             // couldn't fall out in the above cases; do it the long way
-            ElementCount result = CheckUniqueAndUnfoundElements(other, true);
+            var result = CheckUniqueAndUnfoundElements(other, true);
             return (result.uniqueCount < _count && result.unfoundCount == 0);
         }
 
@@ -1327,7 +1326,7 @@ namespace Collections.Pooled
                 return true;
             }
 
-            foreach (T element in other)
+            foreach (var element in other)
             {
                 if (Contains(element))
                 {
@@ -1422,7 +1421,7 @@ namespace Collections.Pooled
                         return false;
                     }
                 }
-                ElementCount result = CheckUniqueAndUnfoundElements(other, true);
+                var result = CheckUniqueAndUnfoundElements(other, true);
                 return (result.uniqueCount == _count && result.unfoundCount == 0);
             }
         }
@@ -1449,7 +1448,7 @@ namespace Collections.Pooled
                 return false;
             }
 
-            ElementCount result = CheckUniqueAndUnfoundElements(other, true);
+            var result = CheckUniqueAndUnfoundElements(other, true);
             return (result.uniqueCount == _count && result.unfoundCount == 0);
         }
 
@@ -1489,8 +1488,8 @@ namespace Collections.Pooled
                 ThrowHelper.ThrowArgumentException(ExceptionResource.Arg_ArrayPlusOffTooSmall);
             }
 
-            int numCopied = 0;
-            for (int i = 0; i < _lastIndex && numCopied < count; i++)
+            var numCopied = 0;
+            for (var i = 0; i < _lastIndex && numCopied < count; i++)
             {
                 if (_slots[i].hashCode >= 0)
                 {
@@ -1515,8 +1514,8 @@ namespace Collections.Pooled
                 ThrowHelper.ThrowArgumentException_DestinationTooShort();
             }
 
-            int numCopied = 0;
-            for (int i = 0; i < _lastIndex && numCopied < count; i++)
+            var numCopied = 0;
+            for (var i = 0; i < _lastIndex && numCopied < count; i++)
             {
                 if (_slots[i].hashCode >= 0)
                 {
@@ -1538,13 +1537,13 @@ namespace Collections.Pooled
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.match);
             }
 
-            int numRemoved = 0;
-            for (int i = 0; i < _lastIndex; i++)
+            var numRemoved = 0;
+            for (var i = 0; i < _lastIndex; i++)
             {
                 if (_slots[i].hashCode >= 0)
                 {
                     // cache value in case delegate removes it
-                    T value = _slots[i].value;
+                    var value = _slots[i].value;
                     if (match(value))
                     {
                         // check again that remove actually removed it
@@ -1571,13 +1570,13 @@ namespace Collections.Pooled
         {
             if (capacity < 0)
                 ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.capacity, ExceptionResource.ArgumentOutOfRange_NeedNonNegNum);
-            int currentCapacity = _slots == null ? 0 : _size;
+            var currentCapacity = _slots == null ? 0 : _size;
             if (currentCapacity >= capacity)
                 return currentCapacity;
             if (_buckets == null)
                 return Initialize(capacity);
 
-            int newSize = HashHelpers.GetPrime(capacity);
+            var newSize = HashHelpers.GetPrime(capacity);
             SetCapacity(newSize);
             return newSize;
         }
@@ -1609,9 +1608,9 @@ namespace Collections.Pooled
 
                 // similar to IncreaseCapacity but moves down elements in case add/remove/etc
                 // caused fragmentation
-                int newSize = HashHelpers.GetPrime(_count);
-                Slot[] newSlots = s_slotPool.Rent(newSize);
-                int[] newBuckets = s_bucketPool.Rent(newSize);
+                var newSize = HashHelpers.GetPrime(_count);
+                var newSlots = s_slotPool.Rent(newSize);
+                var newBuckets = s_bucketPool.Rent(newSize);
 
                 if (newSlots.Length >= _slots.Length || newBuckets.Length >= _buckets.Length)
                 {
@@ -1628,15 +1627,15 @@ namespace Collections.Pooled
 
                 // move down slots and rehash at the same time. newIndex keeps track of current 
                 // position in newSlots array
-                int newIndex = 0;
-                for (int i = 0; i < _lastIndex; i++)
+                var newIndex = 0;
+                for (var i = 0; i < _lastIndex; i++)
                 {
                     if (_slots[i].hashCode >= 0)
                     {
                         newSlots[newIndex] = _slots[i];
 
                         // rehash
-                        int bucket = newSlots[newIndex].hashCode % newSize;
+                        var bucket = newSlots[newIndex].hashCode % newSize;
                         newSlots[newIndex].next = newBuckets[bucket] - 1;
                         newBuckets[bucket] = newIndex + 1;
 
@@ -1693,7 +1692,7 @@ namespace Collections.Pooled
         {
             Debug.Assert(_buckets != null, "IncreaseCapacity called on a set with no elements");
 
-            int newSize = HashHelpers.ExpandPrime(_count);
+            var newSize = HashHelpers.ExpandPrime(_count);
             if (newSize <= _count)
             {
                 ThrowHelper.ThrowInvalidOperationException(ExceptionResource.InvalidOperation_HSCapacityOverflow);
@@ -1740,9 +1739,9 @@ namespace Collections.Pooled
                 replaceArrays = true;
             }
 
-            for (int i = 0; i < _lastIndex; i++)
+            for (var i = 0; i < _lastIndex; i++)
             {
-                int bucket = newSlots[i].hashCode % newSize;
+                var bucket = newSlots[i].hashCode % newSize;
                 newSlots[i].next = newBuckets[bucket] - 1;
                 newBuckets[bucket] = i + 1;
             }
@@ -1810,11 +1809,11 @@ namespace Collections.Pooled
                 Initialize(0);
             }
 
-            int hashCode = InternalGetHashCode(value);
-            int bucket = hashCode % _size;
-            int collisionCount = 0;
-            Slot[] slots = _slots;
-            for (int i = _buckets[bucket] - 1; i >= 0; i = slots[i].next)
+            var hashCode = InternalGetHashCode(value);
+            var bucket = hashCode % _size;
+            var collisionCount = 0;
+            var slots = _slots;
+            for (var i = _buckets[bucket] - 1; i >= 0; i = slots[i].next)
             {
                 if (slots[i].hashCode == hashCode && _comparer.Equals(slots[i].value, value))
                 {
@@ -1861,11 +1860,11 @@ namespace Collections.Pooled
         // when constructing from another HashSet.
         private void AddValue(int index, int hashCode, T value)
         {
-            int bucket = hashCode % _size;
+            var bucket = hashCode % _size;
 
 #if DEBUG
             Debug.Assert(InternalGetHashCode(value) == hashCode);
-            for (int i = _buckets[bucket] - 1; i >= 0; i = _slots[i].next)
+            for (var i = _buckets[bucket] - 1; i >= 0; i = _slots[i].next)
             {
                 Debug.Assert(!_comparer.Equals(_slots[i].value, value));
             }
@@ -1887,7 +1886,7 @@ namespace Collections.Pooled
         /// <returns></returns>
         private bool ContainsAllElements(IEnumerable<T> other)
         {
-            foreach (T element in other)
+            foreach (var element in other)
             {
                 if (!Contains(element))
                 {
@@ -1906,7 +1905,7 @@ namespace Collections.Pooled
         /// <returns></returns>
         private bool ContainsAllElements(ReadOnlySpan<T> other)
         {
-            foreach (T element in other)
+            foreach (var element in other)
             {
                 if (!Contains(element))
                 {
@@ -1931,7 +1930,7 @@ namespace Collections.Pooled
         /// <returns></returns>
         private bool IsSubsetOfHashSetWithSameEC(PooledSet<T> other)
         {
-            foreach (T item in this)
+            foreach (var item in this)
             {
                 if (!other.Contains(item))
                 {
@@ -1956,7 +1955,7 @@ namespace Collections.Pooled
         /// <returns></returns>
         private bool IsSubsetOfHashSetWithSameEC(HashSet<T> other)
         {
-            foreach (T item in this)
+            foreach (var item in this)
             {
                 if (!other.Contains(item))
                 {
@@ -1973,11 +1972,11 @@ namespace Collections.Pooled
         /// <param name="other"></param>
         private void IntersectWithHashSetWithSameEC(PooledSet<T> other)
         {
-            for (int i = 0; i < _lastIndex; i++)
+            for (var i = 0; i < _lastIndex; i++)
             {
                 if (_slots[i].hashCode >= 0)
                 {
-                    T item = _slots[i].value;
+                    var item = _slots[i].value;
                     if (!other.Contains(item))
                     {
                         Remove(item);
@@ -1993,11 +1992,11 @@ namespace Collections.Pooled
         /// <param name="other"></param>
         private void IntersectWithHashSetWithSameEC(HashSet<T> other)
         {
-            for (int i = 0; i < _lastIndex; i++)
+            for (var i = 0; i < _lastIndex; i++)
             {
                 if (_slots[i].hashCode >= 0)
                 {
-                    T item = _slots[i].value;
+                    var item = _slots[i].value;
                     if (!other.Contains(item))
                     {
                         Remove(item);
@@ -2019,18 +2018,18 @@ namespace Collections.Pooled
 
             // keep track of current last index; don't want to move past the end of our bit array
             // (could happen if another thread is modifying the collection)
-            int originalLastIndex = _lastIndex;
-            int intArrayLength = BitHelper.ToIntArrayLength(originalLastIndex);
+            var originalLastIndex = _lastIndex;
+            var intArrayLength = BitHelper.ToIntArrayLength(originalLastIndex);
 
             Span<int> span = stackalloc int[StackAllocThreshold];
-            BitHelper bitHelper = intArrayLength <= StackAllocThreshold
+            var bitHelper = intArrayLength <= StackAllocThreshold
                 ? new BitHelper(span.Slice(0, intArrayLength), clear: true)
                 : new BitHelper(new int[intArrayLength], clear: false);
 
             // mark if contains: find index of in slots array and mark corresponding element in bit array
-            foreach (T item in other)
+            foreach (var item in other)
             {
-                int index = InternalIndexOf(item);
+                var index = InternalIndexOf(item);
                 if (index >= 0)
                 {
                     bitHelper.MarkBit(index);
@@ -2038,7 +2037,7 @@ namespace Collections.Pooled
             }
 
             // if anything unmarked, remove it. 
-            for (int i = bitHelper.FindFirstUnmarked(); (uint)i < (uint)originalLastIndex; i = bitHelper.FindFirstUnmarked(i + 1))
+            for (var i = bitHelper.FindFirstUnmarked(); (uint)i < (uint)originalLastIndex; i = bitHelper.FindFirstUnmarked(i + 1))
             {
                 if (_slots[i].hashCode >= 0)
                 {
@@ -2060,18 +2059,18 @@ namespace Collections.Pooled
 
             // keep track of current last index; don't want to move past the end of our bit array
             // (could happen if another thread is modifying the collection)
-            int originalLastIndex = _lastIndex;
-            int intArrayLength = BitHelper.ToIntArrayLength(originalLastIndex);
+            var originalLastIndex = _lastIndex;
+            var intArrayLength = BitHelper.ToIntArrayLength(originalLastIndex);
 
             Span<int> span = stackalloc int[StackAllocThreshold];
-            BitHelper bitHelper = intArrayLength <= StackAllocThreshold
+            var bitHelper = intArrayLength <= StackAllocThreshold
                 ? new BitHelper(span.Slice(0, intArrayLength), clear: true)
                 : new BitHelper(new int[intArrayLength], clear: false);
 
             // mark if contains: find index of in slots array and mark corresponding element in bit array
             for (int i = 0, len = other.Length; i < len; i++)
             {
-                int index = InternalIndexOf(other[i]);
+                var index = InternalIndexOf(other[i]);
                 if (index >= 0)
                 {
                     bitHelper.MarkBit(index);
@@ -2079,7 +2078,7 @@ namespace Collections.Pooled
             }
 
             // if anything unmarked, remove it. 
-            for (int i = bitHelper.FindFirstUnmarked(); (uint)i < (uint)originalLastIndex; i = bitHelper.FindFirstUnmarked(i + 1))
+            for (var i = bitHelper.FindFirstUnmarked(); (uint)i < (uint)originalLastIndex; i = bitHelper.FindFirstUnmarked(i + 1))
             {
                 if (_slots[i].hashCode >= 0)
                 {
@@ -2098,10 +2097,10 @@ namespace Collections.Pooled
         {
             Debug.Assert(_buckets != null, "_buckets was null; callers should check first");
 
-            int collisionCount = 0;
-            int hashCode = InternalGetHashCode(item);
-            Slot[] slots = _slots;
-            for (int i = _buckets[hashCode % _size] - 1; i >= 0; i = slots[i].next)
+            var collisionCount = 0;
+            var hashCode = InternalGetHashCode(item);
+            var slots = _slots;
+            for (var i = _buckets[hashCode % _size] - 1; i >= 0; i = slots[i].next)
             {
                 if ((slots[i].hashCode) == hashCode && _comparer.Equals(slots[i].value, item))
                 {
@@ -2129,7 +2128,7 @@ namespace Collections.Pooled
         /// <param name="other"></param>
         private void SymmetricExceptWithUniqueHashSet(PooledSet<T> other)
         {
-            foreach (T item in other)
+            foreach (var item in other)
             {
                 if (!Remove(item))
                 {
@@ -2148,7 +2147,7 @@ namespace Collections.Pooled
         /// <param name="other"></param>
         private void SymmetricExceptWithUniqueHashSet(HashSet<T> other)
         {
-            foreach (T item in other)
+            foreach (var item in other)
             {
                 if (!Remove(item))
                 {
@@ -2176,22 +2175,22 @@ namespace Collections.Pooled
         /// <param name="other"></param>
         private void SymmetricExceptWithEnumerable(IEnumerable<T> other)
         {
-            int originalLastIndex = _lastIndex;
-            int intArrayLength = BitHelper.ToIntArrayLength(originalLastIndex);
+            var originalLastIndex = _lastIndex;
+            var intArrayLength = BitHelper.ToIntArrayLength(originalLastIndex);
 
             Span<int> itemsToRemoveSpan = stackalloc int[StackAllocThreshold / 2];
-            BitHelper itemsToRemove = intArrayLength <= StackAllocThreshold / 2
+            var itemsToRemove = intArrayLength <= StackAllocThreshold / 2
                 ? new BitHelper(itemsToRemoveSpan.Slice(0, intArrayLength), clear: true)
                 : new BitHelper(new int[intArrayLength], clear: false);
 
             Span<int> itemsAddedFromOtherSpan = stackalloc int[StackAllocThreshold / 2];
-            BitHelper itemsAddedFromOther = intArrayLength <= StackAllocThreshold / 2
+            var itemsAddedFromOther = intArrayLength <= StackAllocThreshold / 2
                 ? new BitHelper(itemsAddedFromOtherSpan.Slice(0, intArrayLength), clear: true)
                 : new BitHelper(new int[intArrayLength], clear: false);
 
-            foreach (T item in other)
+            foreach (var item in other)
             {
-                bool added = AddOrGetLocation(item, out int location);
+                var added = AddOrGetLocation(item, out var location);
                 if (added)
                 {
                     // wasn't already present in collection; flag it as something not to remove
@@ -2215,7 +2214,7 @@ namespace Collections.Pooled
             }
 
             // if anything marked, remove it
-            for (int i = itemsToRemove.FindFirstMarked(); (uint)i < (uint)originalLastIndex; i = itemsToRemove.FindFirstMarked(i + 1))
+            for (var i = itemsToRemove.FindFirstMarked(); (uint)i < (uint)originalLastIndex; i = itemsToRemove.FindFirstMarked(i + 1))
             {
                 if (_slots[i].hashCode >= 0)
                 {
@@ -2243,22 +2242,22 @@ namespace Collections.Pooled
         /// <param name="other"></param>
         private void SymmetricExceptWithSpan(ReadOnlySpan<T> other)
         {
-            int originalLastIndex = _lastIndex;
-            int intArrayLength = BitHelper.ToIntArrayLength(originalLastIndex);
+            var originalLastIndex = _lastIndex;
+            var intArrayLength = BitHelper.ToIntArrayLength(originalLastIndex);
 
             Span<int> itemsToRemoveSpan = stackalloc int[StackAllocThreshold / 2];
-            BitHelper itemsToRemove = intArrayLength <= StackAllocThreshold / 2
+            var itemsToRemove = intArrayLength <= StackAllocThreshold / 2
                 ? new BitHelper(itemsToRemoveSpan.Slice(0, intArrayLength), clear: true)
                 : new BitHelper(new int[intArrayLength], clear: false);
 
             Span<int> itemsAddedFromOtherSpan = stackalloc int[StackAllocThreshold / 2];
-            BitHelper itemsAddedFromOther = intArrayLength <= StackAllocThreshold / 2
+            var itemsAddedFromOther = intArrayLength <= StackAllocThreshold / 2
                 ? new BitHelper(itemsAddedFromOtherSpan.Slice(0, intArrayLength), clear: true)
                 : new BitHelper(new int[intArrayLength], clear: false);
 
             for (int i = 0, len = other.Length; i < len; i++)
             {
-                bool added = AddOrGetLocation(other[i], out int location);
+                var added = AddOrGetLocation(other[i], out var location);
                 if (added)
                 {
                     // wasn't already present in collection; flag it as something not to remove
@@ -2282,7 +2281,7 @@ namespace Collections.Pooled
             }
 
             // if anything marked, remove it
-            for (int i = itemsToRemove.FindFirstMarked(); (uint)i < (uint)originalLastIndex; i = itemsToRemove.FindFirstMarked(i + 1))
+            for (var i = itemsToRemove.FindFirstMarked(); (uint)i < (uint)originalLastIndex; i = itemsToRemove.FindFirstMarked(i + 1))
             {
                 if (_slots[i].hashCode >= 0)
                 {
@@ -2305,11 +2304,11 @@ namespace Collections.Pooled
         {
             Debug.Assert(_buckets != null, "_buckets is null, callers should have checked");
 
-            int hashCode = InternalGetHashCode(value);
-            int bucket = hashCode % _size;
-            int collisionCount = 0;
-            Slot[] slots = _slots;
-            for (int i = _buckets[bucket] - 1; i >= 0; i = slots[i].next)
+            var hashCode = InternalGetHashCode(value);
+            var bucket = hashCode % _size;
+            var collisionCount = 0;
+            var slots = _slots;
+            for (var i = _buckets[bucket] - 1; i >= 0; i = slots[i].next)
             {
                 if (slots[i].hashCode == hashCode && _comparer.Equals(slots[i].value, value))
                 {
@@ -2383,8 +2382,8 @@ namespace Collections.Pooled
             // need special case in case this has no elements. 
             if (_count == 0)
             {
-                int numElementsInOther = 0;
-                foreach (T item in other)
+                var numElementsInOther = 0;
+                foreach (var item in other)
                 {
                     numElementsInOther++;
                     // break right away, all we want to know is whether other has 0 or 1 elements
@@ -2397,22 +2396,22 @@ namespace Collections.Pooled
 
             Debug.Assert((_buckets != null) && (_count > 0), "_buckets was null but count greater than 0");
 
-            int originalLastIndex = _lastIndex;
-            int intArrayLength = BitHelper.ToIntArrayLength(originalLastIndex);
+            var originalLastIndex = _lastIndex;
+            var intArrayLength = BitHelper.ToIntArrayLength(originalLastIndex);
 
             Span<int> span = stackalloc int[StackAllocThreshold];
-            BitHelper bitHelper = intArrayLength <= StackAllocThreshold
+            var bitHelper = intArrayLength <= StackAllocThreshold
                 ? new BitHelper(span.Slice(0, intArrayLength), clear: true)
                 : new BitHelper(new int[intArrayLength], clear: false);
 
             // count of items in other not found in this
-            int unfoundCount = 0;
+            var unfoundCount = 0;
             // count of unique items in other found in this
-            int uniqueFoundCount = 0;
+            var uniqueFoundCount = 0;
 
-            foreach (T item in other)
+            foreach (var item in other)
             {
-                int index = InternalIndexOf(item);
+                var index = InternalIndexOf(item);
                 if (index >= 0)
                 {
                     if (!bitHelper.IsMarked(index))
@@ -2475,22 +2474,22 @@ namespace Collections.Pooled
 
             Debug.Assert((_buckets != null) && (_count > 0), "_buckets was null but count greater than 0");
 
-            int originalLastIndex = _lastIndex;
-            int intArrayLength = BitHelper.ToIntArrayLength(originalLastIndex);
+            var originalLastIndex = _lastIndex;
+            var intArrayLength = BitHelper.ToIntArrayLength(originalLastIndex);
 
             Span<int> span = stackalloc int[StackAllocThreshold];
-            BitHelper bitHelper = intArrayLength <= StackAllocThreshold
+            var bitHelper = intArrayLength <= StackAllocThreshold
                 ? new BitHelper(span.Slice(0, intArrayLength), clear: true)
                 : new BitHelper(new int[intArrayLength], clear: false);
 
             // count of items in other not found in this
-            int unfoundCount = 0;
+            var unfoundCount = 0;
             // count of unique items in other found in this
-            int uniqueFoundCount = 0;
+            var uniqueFoundCount = 0;
 
             for (int i = 0, len = other.Length; i < len; i++)
             {
-                int index = InternalIndexOf(other[i]);
+                var index = InternalIndexOf(other[i]);
                 if (index >= 0)
                 {
                     if (!bitHelper.IsMarked(index))
@@ -2547,7 +2546,7 @@ namespace Collections.Pooled
                     return false;
                 }
                 // suffices to check subset
-                foreach (T item in set2)
+                foreach (var item in set2)
                 {
                     if (!set1.Contains(item))
                     {
@@ -2558,10 +2557,10 @@ namespace Collections.Pooled
             }
             else
             {  // n^2 search because items are hashed according to their respective ECs
-                foreach (T set2Item in set2)
+                foreach (var set2Item in set2)
                 {
-                    bool found = false;
-                    foreach (T set1Item in set1)
+                    var found = false;
+                    foreach (var set1Item in set1)
                     {
                         if (comparer.Equals(set2Item, set1Item))
                         {

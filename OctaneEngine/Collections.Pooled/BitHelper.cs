@@ -3,7 +3,6 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
-using System.Runtime.CompilerServices;
 
 namespace Collections.Pooled
 {
@@ -23,7 +22,7 @@ namespace Collections.Pooled
 
         internal void MarkBit(int bitPosition)
         {
-            int bitArrayIndex = bitPosition / IntSize;
+            var bitArrayIndex = bitPosition / IntSize;
             if ((uint)bitArrayIndex < (uint)_span.Length)
             {
                 _span[bitArrayIndex] |= (1 << (bitPosition % IntSize));
@@ -32,7 +31,7 @@ namespace Collections.Pooled
 
         internal bool IsMarked(int bitPosition)
         {
-            int bitArrayIndex = bitPosition / IntSize;
+            var bitArrayIndex = bitPosition / IntSize;
             return
                 (uint)bitArrayIndex < (uint)_span.Length &&
                 (_span[bitArrayIndex] & (1 << (bitPosition % IntSize))) != 0;
@@ -40,8 +39,8 @@ namespace Collections.Pooled
 
         internal int FindFirstUnmarked(int startPosition = 0)
         {
-            int i = startPosition;
-            for (int bi = i / IntSize; (uint)bi < (uint)_span.Length; bi = ++i / IntSize)
+            var i = startPosition;
+            for (var bi = i / IntSize; (uint)bi < (uint)_span.Length; bi = ++i / IntSize)
             {
                 if ((_span[bi] & (1 << (i % IntSize))) == 0)
                     return i;
@@ -51,8 +50,8 @@ namespace Collections.Pooled
 
         internal int FindFirstMarked(int startPosition = 0)
         {
-            int i = startPosition;
-            for (int bi = i / IntSize; (uint)bi < (uint)_span.Length; bi = ++i / IntSize)
+            var i = startPosition;
+            for (var bi = i / IntSize; (uint)bi < (uint)_span.Length; bi = ++i / IntSize)
             {
                 if ((_span[bi] & (1 << (i % IntSize))) != 0)
                     return i;

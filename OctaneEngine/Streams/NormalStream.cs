@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,7 +16,13 @@ internal class NormalStream: Stream, IStream
         base.Dispose(disposing);
     }
 
-    private readonly Stream _stream;
+    public Stream _stream { get; set; }
+
+    public NormalStream()
+    {
+        _stream = null;
+    }
+    
     public NormalStream(Stream stream)
     {
         _stream = stream;
@@ -35,8 +40,8 @@ internal class NormalStream: Stream, IStream
 
     public override int Read(byte[] buffer, int offset, int count)
     {
-        int bytesRead = 0;
-        int totalBytesRead = 0;
+        var bytesRead = 0;
+        var totalBytesRead = 0;
 
         while (totalBytesRead < count)
         {
@@ -88,5 +93,15 @@ internal class NormalStream: Stream, IStream
             totalBytesRead += bytesRead;
         }
         return totalBytesRead;
+    }
+
+    public void SetStreamParent(Stream stream)
+    {
+        _stream = stream;
+    }
+
+    public void SetBPS(int maxBytesPerSecond)
+    {
+        // Method intentionally left empty.
     }
 }

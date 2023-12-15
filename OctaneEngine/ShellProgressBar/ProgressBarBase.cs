@@ -26,7 +26,7 @@ namespace OctaneEngineCore.ShellProgressBar
 		}
 
 		internal ProgressBarOptions Options { get; }
-		internal ConcurrentBag<ChildProgressBar> Children { get; } = new ConcurrentBag<ChildProgressBar>();
+		internal ConcurrentBag<ChildProgressBar> Children { get; } = new();
 
 		protected abstract void DisplayProgress();
 

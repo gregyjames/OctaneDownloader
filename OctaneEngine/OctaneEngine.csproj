@@ -46,6 +46,8 @@
 
     <ItemGroup>
         <PackageReference Include="AsyncEnumerator" Version="4.0.2" Condition="'$(TargetFramework)' == 'net461' OR '$(TargetFramework)' == 'net472'" />
+        <PackageReference Include="Autofac" Version="7.1.0" />
+        <PackageReference Include="AutofacSerilogIntegration" Version="5.0.0" />
         <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />

@@ -263,7 +263,7 @@ namespace Collections.Pooled
             _pool = customPool ?? ArrayPool<T>.Shared;
             _clearOnFree = ShouldClear(clearMode);
 
-            int count = span.Length;
+            var count = span.Length;
             if (count == 0)
             {
                 _items = s_emptyArray;
@@ -334,7 +334,7 @@ namespace Collections.Pooled
 
                 case ICollection<T> c:
                 {
-                    int count = c.Count;
+                    var count = c.Count;
                     if (count == 0)
                     {
                         _items = s_emptyArray;
@@ -351,7 +351,7 @@ namespace Collections.Pooled
 
                 case ICollection c:
                 {
-                    int count = c.Count;
+                    var count = c.Count;
                     if (count == 0)
                     {
                         _items = s_emptyArray;
@@ -368,7 +368,7 @@ namespace Collections.Pooled
 
                 case IReadOnlyCollection<T> c:
                 {
-                    int count = c.Count;
+                    var count = c.Count;
                     if (count == 0)
                     {
                         _items = s_emptyArray;
@@ -558,7 +558,7 @@ namespace Collections.Pooled
         public void Add(T item)
         {
             _version++;
-            int size = _size;
+            var size = _size;
             if ((uint)size < (uint)_items.Length)
             {
                 _size = size + 1;
@@ -574,7 +574,7 @@ namespace Collections.Pooled
         [MethodImpl(MethodImplOptions.NoInlining)]
         private void AddWithResize(T item)
         {
-            int size = _size;
+            var size = _size;
             EnsureCapacity(size + 1);
             _size = size + 1;
             _items[size] = item;
@@ -633,8 +633,7 @@ namespace Collections.Pooled
         public Span<T> AddSpan(int count)
             => InsertSpan(_size, count);
 
-        public ReadOnlyCollection<T> AsReadOnly()
-            => new ReadOnlyCollection<T>(this);
+        public ReadOnlyCollection<T> AsReadOnly() => new(this);
 
         /// <summary>
         /// Searches a section of the list for a given element using a binary search
@@ -693,7 +692,7 @@ namespace Collections.Pooled
         public void Clear()
         {
             _version++;
-            int size = _size;
+            var size = _size;
             _size = 0;
 
             if (size > 0 && _clearOnFree)
@@ -739,7 +738,7 @@ namespace Collections.Pooled
             }
 
             var list = new PooledList<TOutput>(_size);
-            for (int i = 0; i < _size; i++)
+            for (var i = 0; i < _size; i++)
             {
                 list._items[i] = converter(_items[i]);
             }
@@ -794,7 +793,7 @@ namespace Collections.Pooled
         {
             if (_items.Length < min)
             {
-                int newCapacity = _items.Length == 0 ? DefaultCapacity : _items.Length * 2;
+                var newCapacity = _items.Length == 0 ? DefaultCapacity : _items.Length * 2;
                 // Allow the list to grow to maximum possible capacity (~2G elements) before encountering overflow.
                 // Note that this check works even when _items.Length overflowed thanks to the (uint) cast
                 if ((uint)newCapacity > MaxArrayLength) newCapacity = MaxArrayLength;
@@ -811,7 +810,7 @@ namespace Collections.Pooled
             if (match == null)
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.match);
 
-            for (int i = 0; i < _size; i++)
+            for (var i = 0; i < _size; i++)
             {
                 if (match(_items[i]))
                 {
@@ -830,7 +829,7 @@ namespace Collections.Pooled
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.match);
 
             var list = new PooledList<T>();
-            for (int i = 0; i < _size; i++)
+            for (var i = 0; i < _size; i++)
             {
                 if (match(_items[i]))
                 {
@@ -858,8 +857,8 @@ namespace Collections.Pooled
             if (match is null)
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.match);
 
-            int endIndex = startIndex + count;
-            for (int i = startIndex; i < endIndex; i++)
+            var endIndex = startIndex + count;
+            for (var i = startIndex; i < endIndex; i++)
             {
                 if (match(_items[i])) return i;
             }
@@ -874,7 +873,7 @@ namespace Collections.Pooled
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.match);
             }
 
-            for (int i = _size - 1; i >= 0; i--)
+            for (var i = _size - 1; i >= 0; i--)
             {
                 if (match(_items[i]))
                 {
@@ -923,8 +922,8 @@ namespace Collections.Pooled
                 ThrowHelper.ThrowCountArgumentOutOfRange_ArgumentOutOfRange_Count();
             }
 
-            int endIndex = startIndex - count;
-            for (int i = startIndex; i > endIndex; i--)
+            var endIndex = startIndex - count;
+            for (var i = startIndex; i > endIndex; i--)
             {
                 if (match(_items[i]))
                 {
@@ -942,8 +941,8 @@ namespace Collections.Pooled
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.action);
             }
 
-            int version = _version;
-            for (int i = 0; i < _size; i++)
+            var version = _version;
+            for (var i = 0; i < _size; i++)
             {
                 if (version != _version)
                 {
@@ -964,7 +963,7 @@ namespace Collections.Pooled
         /// GetObject methods of the enumerator will throw an exception.
         /// </summary>
         public Enumerator GetEnumerator()
-            => new Enumerator(this);
+            => new(this);
 
         IEnumerator<T> IEnumerable<T>.GetEnumerator()
             => new Enumerator(this);
@@ -1100,7 +1099,7 @@ namespace Collections.Pooled
                     break;
 
                 case ICollection<T> c:
-                    int count = c.Count;
+                    var count = c.Count;
                     if (count > 0)
                     {
                         EnsureCapacity(_size + count);
@@ -1271,7 +1270,7 @@ namespace Collections.Pooled
         // decreased by one.
         public bool Remove(T item)
         {
-            int index = IndexOf(item);
+            var index = IndexOf(item);
             if (index >= 0)
             {
                 RemoveAt(index);
@@ -1298,13 +1297,13 @@ namespace Collections.Pooled
             if (match == null)
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.match);
 
-            int freeIndex = 0; // the first free slot in items array
+            var freeIndex = 0; // the first free slot in items array
 
             // Find the first item which needs to be removed.
             while (freeIndex < _size && !match(_items[freeIndex])) freeIndex++;
             if (freeIndex >= _size) return 0;
 
-            int current = freeIndex + 1;
+            var current = freeIndex + 1;
             while (current < _size)
             {
                 // Find the first item which needs to be kept.
@@ -1323,7 +1322,7 @@ namespace Collections.Pooled
                 Array.Clear(_items, freeIndex, _size - freeIndex);
             }
 
-            int result = _size - freeIndex;
+            var result = _size - freeIndex;
             _size = freeIndex;
             _version++;
             return result;
@@ -1507,7 +1506,7 @@ namespace Collections.Pooled
         /// </summary>
         public void TrimExcess()
         {
-            int threshold = (int)(_items.Length * 0.9);
+            var threshold = (int)(_items.Length * 0.9);
             if (_size < threshold)
             {
                 Capacity = _size;
@@ -1521,7 +1520,7 @@ namespace Collections.Pooled
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.match);
             }
 
-            for (int i = 0; i < _size; i++)
+            for (var i = 0; i < _size; i++)
             {
                 if (!match(_items[i]))
                 {

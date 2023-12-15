@@ -39,26 +39,41 @@ using PooledAwait;
 namespace OctaneEngine;
 internal class OctaneClient : IClient
 {
-    private readonly HttpClient _client;
-    private readonly OctaneConfiguration _config;
-    private readonly ILogger<IClient> _log;
-    private readonly ILoggerFactory _loggerFactory;
-    private readonly ArrayPool<byte> _memPool;
-    private readonly MemoryMappedFile _mmf;
-    private readonly ProgressBar _progressBar;
+    private HttpClient _client;
+    private OctaneConfiguration _config;
+    private ILogger<IClient> _log;
+    private ILoggerFactory _loggerFactory;
+    private ArrayPool<byte> _memPool;
+    private IStream _stream;
+    private MemoryMappedFile _mmf;
+    private IProgressBar _progressBar;
 
-    public OctaneClient(OctaneConfiguration config, HttpClient httpClient, ILoggerFactory loggerFactory,
-        MemoryMappedFile mmf, ProgressBar progressBar, ArrayPool<byte> memPool)
+    public OctaneClient(OctaneConfiguration config, HttpClient httpClient, ILoggerFactory loggerFactory, IStream stream, IProgressBar progressBar = null)
     {
         _config = config;
         _client = httpClient;
         _loggerFactory = loggerFactory;
-        _mmf = mmf;
         _progressBar = progressBar;
-        _memPool = memPool;
         _log = loggerFactory.CreateLogger<IClient>();
+        _stream = stream;
     }
 
+    public bool isRangeSupported()
+    {
+        return true;
+    }
+
+    public void SetMMF(MemoryMappedFile file)
+    {
+        _mmf = file;
+    }
+
+    public void SetArrayPool(ArrayPool<byte> pool)
+    {
+        _memPool = pool;
+    }
+
+    private readonly SemaphoreSlim _readSemaphore = new(1, 1);
     public async PooledTask<HttpResponseMessage> SendMessage(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         if (pauseToken.IsPaused)
@@ -68,75 +83,86 @@ internal class OctaneClient : IClient
         _log.LogTrace("Sending request for range ({PieceItem1},{PieceItem2})...", piece.Item1, piece.Item2);
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
         request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
-        return await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
-            .ConfigureAwait(false);
+        return await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
     }
     public async PooledTask ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
-        #region Variable Declaration
-        var buffer = _memPool.Rent(_config.BufferSize);
-        _log.LogInformation("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
-        var stopwatch = new Stopwatch();
-        var programBps = _config.BytesPerSecond / _config.Parts;
-        long bytesReadOverall = 0;
-        var childOptions = new ProgressBarOptions()
+        try
         {
-            CollapseWhenFinished = true,
-            DisplayTimeInRealTime = false,
-            BackgroundColor = ConsoleColor.Magenta,
-            DenseProgressBar = true,
-            DisableBottomPercentage = true,
-            ShowEstimatedDuration = true
-        };
-        #endregion
-        
-        if (pauseToken.IsPaused)
-        {
-            await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
-        }
-        
-        stopwatch.Start();
-        if (message.IsSuccessStatusCode)
-        {
-            _log.LogInformation("HTTP request returned success status code for piece ({PieceItem1},{PieceItem2})", piece.Item1, piece.Item2);
-            using (var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
+            #region Variable Declaration
+                var buffer = _memPool.Rent(_config.BufferSize);
+                _log.LogInformation("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
+                var stopwatch = new Stopwatch();
+                var programBps = _config.BytesPerSecond / _config.Parts;
+                long bytesReadOverall = 0;
+                var childOptions = new ProgressBarOptions() {
+                    CollapseWhenFinished = true,
+                    DisplayTimeInRealTime = false,
+                    BackgroundColor = ConsoleColor.Magenta,
+                    DenseProgressBar = true,
+                    DisableBottomPercentage = true,
+                    ShowEstimatedDuration = true
+                };
+            #endregion
+
+            if (pauseToken.IsPaused)
             {
-                IStream streamToRead = new NormalStream(networkStream);
-                // If throttling is enabled, wrap the stream in a ThrottleStream
-                if (_config.BytesPerSecond != 1)
-                {
-                    streamToRead = new ThrottleStream(networkStream, programBps, _loggerFactory);
-                    _log.LogTrace("Throttling stream for piece ({PieceItem1},{PieceItem2}) to {ProgramBps} bytes per second", piece.Item1, piece.Item2, programBps);
-                }
-
-                using var child = _progressBar?.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", childOptions);
-                
-                while (true)
-                {
-                    var bytesRead = await streamToRead.ReadAsync(buffer, 0, _config.BufferSize, cancellationToken);
-                    if (bytesRead == 0)
-                    {
-                        break;
-                    }
-
-                    await Task.Run(() =>
-                    {
-                        using var accessor = _mmf.CreateViewAccessor(piece.Item1 + bytesReadOverall, bytesRead, MemoryMappedFileAccess.Write);
-                        accessor.WriteArray(0, buffer, 0, bytesRead);
-                        accessor.Flush();
-                    }, cancellationToken);
-                    bytesReadOverall += bytesRead;
-                    child?.Tick((int)bytesReadOverall);
-                }
+                await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
             }
 
-            _log.LogInformation("Buffer returned to memory pool");
+            stopwatch.Start();
+            if (message.IsSuccessStatusCode)
+            {
+                _log.LogInformation("HTTP request returned success status code for piece ({PieceItem1},{PieceItem2})",piece.Item1, piece.Item2);
+                using (var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    _stream.SetStreamParent(networkStream);
+                    _stream.SetBPS(programBps);
+
+                    using var child = _progressBar?.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", childOptions);
+
+                    while (true)
+                    {
+                        await _readSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                        try
+                        {
+                            var bytesRead = await _stream.ReadAsync(buffer, 0, _config.BufferSize, cancellationToken).ConfigureAwait(false);
+                            if (bytesRead == 0)
+                            {
+                                break;
+                            }
+                            
+                            await Task.Run(() =>
+                            {
+                                using var accessor = _mmf.CreateViewAccessor(piece.Item1 + bytesReadOverall, bytesRead,
+                                    MemoryMappedFileAccess.Write);
+                                accessor.WriteArray(0, buffer, 0, bytesRead);
+                                accessor.Flush();
+                            }, cancellationToken).ConfigureAwait(false);
+                            bytesReadOverall += bytesRead;
+                            child?.Tick((int)bytesReadOverall);
+                        }
+                        finally
+                        {
+                            _readSemaphore.Release();
+                        }
+                    }
+                }
+
+                _log.LogInformation("Buffer returned to memory pool");
+            }
+
+            _memPool.Return(buffer, false);
+            _progressBar?.Tick();
+            _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) done", piece.Item1, piece.Item2);
+            stopwatch.Stop();
+            _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds} ms",
+                piece.Item1, piece.Item2, stopwatch.ElapsedMilliseconds);
         }
-        _memPool.Return(buffer, false);
-        _progressBar?.Tick();
-        _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) done", piece.Item1, piece.Item2);
-        stopwatch.Stop();
-        _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds} ms", piece.Item1, piece.Item2, stopwatch.ElapsedMilliseconds);
+        catch(Exception ex)
+        {
+            _log.LogError(ex.Message);
+        }
     }
 
     public void Dispose()

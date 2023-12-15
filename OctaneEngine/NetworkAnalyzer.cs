@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Cysharp.Text;
@@ -14,14 +13,14 @@ public static class NetworkAnalyzer
     private static readonly string[] sizes = { "B", "KB", "MB", "GB", "TB" };
     internal static string prettySize(long len)
     {
-        int order = 0;
+        var order = 0;
         while (len >= 1024 && order < sizes.Length - 1)
         {
             order++;
             len = len >> 10;
         }
             
-        string result = ZString.Format("{0:0.##} {1}", len, sizes[order]); 
+        var result = ZString.Format("{0:0.##} {1}", len, sizes[order]); 
             
         return result;
     }

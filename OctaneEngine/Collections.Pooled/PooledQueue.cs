@@ -16,7 +16,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Threading;
 
@@ -290,16 +289,16 @@ namespace Collections.Pooled
                     ExceptionResource.ArgumentOutOfRange_Index);
             }
 
-            int arrayLen = array.Length;
+            var arrayLen = array.Length;
             if (arrayLen - arrayIndex < _size)
             {
                 ThrowHelper.ThrowArgumentException(ExceptionResource.Argument_InvalidOffLen);
             }
 
-            int numToCopy = _size;
+            var numToCopy = _size;
             if (numToCopy == 0) return;
 
-            int firstPart = Math.Min(_array.Length - _head, numToCopy);
+            var firstPart = Math.Min(_array.Length - _head, numToCopy);
             Array.Copy(_array, _head, array, arrayIndex, firstPart);
             numToCopy -= firstPart;
             if (numToCopy > 0)
@@ -327,7 +326,7 @@ namespace Collections.Pooled
                     ExceptionArgument.array);
             }
 
-            int arrayLen = array.Length;
+            var arrayLen = array.Length;
             if ((uint)index > (uint)arrayLen)
             {
                 ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.index,
@@ -339,12 +338,12 @@ namespace Collections.Pooled
                 ThrowHelper.ThrowArgumentException(ExceptionResource.Argument_InvalidOffLen);
             }
 
-            int numToCopy = _size;
+            var numToCopy = _size;
             if (numToCopy == 0) return;
 
             try
             {
-                int firstPart = (_array.Length - _head < numToCopy) ? _array.Length - _head : numToCopy;
+                var firstPart = (_array.Length - _head < numToCopy) ? _array.Length - _head : numToCopy;
                 Array.Copy(_array, _head, array, index, firstPart);
                 numToCopy -= firstPart;
 
@@ -366,7 +365,7 @@ namespace Collections.Pooled
         {
             if (_size == _array.Length)
             {
-                int newcapacity = (int)(_array.Length * (long)GrowFactor / 100);
+                var newcapacity = (int)(_array.Length * (long)GrowFactor / 100);
                 if (newcapacity < _array.Length + MinimumGrow)
                 {
                     newcapacity = _array.Length + MinimumGrow;
@@ -385,7 +384,7 @@ namespace Collections.Pooled
         /// Enumerator will support removing.
         /// </summary>
         public Enumerator GetEnumerator()
-            => new Enumerator(this);
+            => new(this);
 
         /// <internalonly/>
         IEnumerator<T> IEnumerable<T>.GetEnumerator()
@@ -401,15 +400,15 @@ namespace Collections.Pooled
         /// </summary>
         public T Dequeue()
         {
-            int head = _head;
-            T[] array = _array;
+            var head = _head;
+            var array = _array;
 
             if (_size == 0)
             {
                 ThrowForEmptyQueue();
             }
 
-            T removed = array[head];
+            var removed = array[head];
             if (_clearOnFree)
             {
                 array[head] = default;
@@ -422,8 +421,8 @@ namespace Collections.Pooled
 
         public bool TryDequeue(out T result)
         {
-            int head = _head;
-            T[] array = _array;
+            var head = _head;
+            var array = _array;
 
             if (_size == 0)
             {
@@ -504,13 +503,13 @@ namespace Collections.Pooled
             if (_size == 0)
                 return 0;
 
-            T[] newArray = _pool.Rent(_size);
-            int removeCount = 0;
+            var newArray = _pool.Rent(_size);
+            var removeCount = 0;
 
             if (_head < _tail)
             {
-                int copyIdx = 0;
-                for (int i = _head; i < _size; i++)
+                var copyIdx = 0;
+                for (var i = _head; i < _size; i++)
                 {
                     if (match(_array[i]))
                         removeCount++;
@@ -520,8 +519,8 @@ namespace Collections.Pooled
             }
             else
             {
-                int copyIdx = 0;
-                for (int i = _head; i < _array.Length - _head; i++)
+                var copyIdx = 0;
+                for (var i = _head; i < _array.Length - _head; i++)
                 {
                     if (match(_array[i]))
                         removeCount++;
@@ -529,7 +528,7 @@ namespace Collections.Pooled
                         newArray[copyIdx++] = _array[i];
                 }
 
-                for (int i = 0; i < _tail; i++)
+                for (var i = 0; i < _tail; i++)
                 {
                     if (match(_array[i]))
                         removeCount++;
@@ -560,7 +559,7 @@ namespace Collections.Pooled
                 return Array.Empty<T>();
             }
 
-            T[] arr = new T[_size];
+            var arr = new T[_size];
 
             if (_head < _tail)
             {
@@ -579,7 +578,7 @@ namespace Collections.Pooled
         // must be >= _size.
         private void SetCapacity(int capacity)
         {
-            T[] newarray = _pool.Rent(capacity);
+            var newarray = _pool.Rent(capacity);
             if (_size > 0)
             {
                 if (_head < _tail)
@@ -605,7 +604,7 @@ namespace Collections.Pooled
             // It is tempting to use the remainder operator here but it is actually much slower
             // than a simple comparison and a rarely taken branch.
             // JIT produces better code than with ternary operator ?:
-            int tmp = index + 1;
+            var tmp = index + 1;
             if (tmp == _array.Length)
             {
                 tmp = 0;
@@ -621,7 +620,7 @@ namespace Collections.Pooled
 
         public void TrimExcess()
         {
-            int threshold = (int)(_array.Length * 0.9);
+            var threshold = (int)(_array.Length * 0.9);
             if (_size < threshold)
             {
                 SetCapacity(_size);
@@ -713,13 +712,13 @@ namespace Collections.Pooled
                 }
 
                 // Cache some fields in locals to decrease code size
-                T[] array = _q._array;
-                int capacity = array.Length;
+                var array = _q._array;
+                var capacity = array.Length;
 
                 // _index represents the 0-based index into the queue, however the queue
                 // doesn't have to start from 0 and it may not even be stored contiguously in memory.
 
-                int arrayIndex = _q._head + _index; // this is the actual index into the queue's backing array
+                var arrayIndex = _q._head + _index; // this is the actual index into the queue's backing array
                 if (arrayIndex >= capacity)
                 {
                     // NOTE: Originally we were using the modulo operator here, however

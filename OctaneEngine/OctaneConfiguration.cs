@@ -22,7 +22,6 @@
  */
 
 using System;
-using System.IO;
 using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -115,8 +114,7 @@ public class OctaneConfiguration
     public IWebProxy Proxy { get; set; }
     public override string ToString()
     {
-        var s =
-            $"Parts: {Parts}, BufferSize: {BufferSize}, ShowProgress: {ShowProgress}, ProgressCallback: {ProgressCallback != null}, NumRetries: {NumRetries}, BytesPerSecond: {BytesPerSecond}, DoneCallback: {DoneCallback != null}, Proxy: {Proxy?.ToString() ?? "NULL"}, UseProxy: {UseProxy}";
+        var s = $"Parts: {Parts}, BufferSize: {BufferSize}, ShowProgress: {ShowProgress}, ProgressCallback: {ProgressCallback != null}, NumRetries: {NumRetries}, BytesPerSecond: {BytesPerSecond}, DoneCallback: {DoneCallback != null}, Proxy: {Proxy?.ToString() ?? "NULL"}, UseProxy: {UseProxy}";
         return "{" + s + "}";
     }
 }

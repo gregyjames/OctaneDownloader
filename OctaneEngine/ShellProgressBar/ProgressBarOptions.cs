@@ -9,7 +9,7 @@ namespace OctaneEngineCore.ShellProgressBar
 	public class ProgressBarOptions
 	{
 		private bool _enableTaskBarProgress;
-		public static readonly ProgressBarOptions Default = new ProgressBarOptions();
+		public static readonly ProgressBarOptions Default = new();
 
 		public static string ProgressMessageEncodingName { get; set; }
 

@@ -47,13 +47,20 @@ internal class ThrottleStream : Stream, IStream
     }
 
     private readonly ILogger<ThrottleStream> _log;
-    private readonly int _maxBps;
-    private readonly Stream _parentStream;
+    public int _maxBps { get; set; }
+    public Stream _parentStream { get; set; }
     private readonly IScheduler _scheduler;
     private readonly IStopwatch _stopwatch;
 
     private long _processed;
 
+    public ThrottleStream(ILoggerFactory factory)
+    {
+        _scheduler = Scheduler.Immediate;
+        _log = factory.CreateLogger<ThrottleStream>();
+        _stopwatch = _scheduler.StartStopwatch();
+        _processed = 0;
+    }
     public ThrottleStream(Stream parent, int maxBytesPerSecond, ILoggerFactory factory)
     {
         _maxBps = maxBytesPerSecond;
@@ -112,6 +119,16 @@ internal class ThrottleStream : Stream, IStream
         var read = _parentStream.Read(buffer, offset, count);
         Throttle(read);
         return read;
+    }
+
+    public void SetStreamParent(Stream stream)
+    {
+        _parentStream = stream;
+    }
+
+    public void SetBPS(int maxBytesPerSecond)
+    {
+        _maxBps = maxBytesPerSecond;
     }
 
     public override void Write(byte[] buffer, int offset, int count)

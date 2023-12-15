@@ -7,7 +7,7 @@ namespace OctaneEngineCore.ShellProgressBar
 	{
 		public bool IsCompleted { get; private set; }
 
-		private readonly ManualResetEvent _completedHandle = new ManualResetEvent(false);
+		private readonly ManualResetEvent _completedHandle = new(false);
 		public WaitHandle CompletedHandle => _completedHandle;
 
 		public FixedDurationBar(TimeSpan duration, string message, ConsoleColor color) : this(duration, message, new ProgressBarOptions {ForegroundColor = color}) { }

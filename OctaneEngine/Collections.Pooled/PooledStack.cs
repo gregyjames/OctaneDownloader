@@ -281,13 +281,13 @@ namespace Collections.Pooled
             if (match == null)
                 ThrowHelper.ThrowArgumentNullException(ExceptionArgument.match);
 
-            int freeIndex = 0;   // the first free slot in items array
+            var freeIndex = 0;   // the first free slot in items array
 
             // Find the first item which needs to be removed.
             while (freeIndex < _size && !match(_array[freeIndex])) freeIndex++;
             if (freeIndex >= _size) return 0;
 
-            int current = freeIndex + 1;
+            var current = freeIndex + 1;
             while (current < _size)
             {
                 // Find the first item which needs to be kept.
@@ -306,7 +306,7 @@ namespace Collections.Pooled
                 Array.Clear(_array, freeIndex, _size - freeIndex);
             }
 
-            int result = _size - freeIndex;
+            var result = _size - freeIndex;
             _size = freeIndex;
             _version++;
             return result;
@@ -331,8 +331,8 @@ namespace Collections.Pooled
             }
 
             Debug.Assert(array != _array);
-            int srcIndex = 0;
-            int dstIndex = arrayIndex + _size;
+            var srcIndex = 0;
+            var dstIndex = arrayIndex + _size;
             while (srcIndex < _size)
             {
                 array[--dstIndex] = _array[srcIndex++];
@@ -346,8 +346,8 @@ namespace Collections.Pooled
                 ThrowHelper.ThrowArgumentException_DestinationTooShort();
             }
 
-            int srcIndex = 0;
-            int dstIndex = _size;
+            var srcIndex = 0;
+            var dstIndex = _size;
             while (srcIndex < _size)
             {
                 span[--dstIndex] = _array[srcIndex++];
@@ -397,7 +397,7 @@ namespace Collections.Pooled
         /// </summary>
         /// <returns></returns>
         public Enumerator GetEnumerator()
-            => new Enumerator(this);
+            => new(this);
 
         /// <internalonly/>
         IEnumerator<T> IEnumerable<T>.GetEnumerator()
@@ -415,7 +415,7 @@ namespace Collections.Pooled
                 return;
             }
 
-            int threshold = (int)(_array.Length * 0.9);
+            var threshold = (int)(_array.Length * 0.9);
             if (_size < threshold)
             {
                 var newArray = _pool.Rent(_size);
@@ -442,8 +442,8 @@ namespace Collections.Pooled
         /// </summary>
         public T Peek()
         {
-            int size = _size - 1;
-            T[] array = _array;
+            var size = _size - 1;
+            var array = _array;
 
             if ((uint)size >= (uint)array.Length)
             {
@@ -455,8 +455,8 @@ namespace Collections.Pooled
 
         public bool TryPeek(out T result)
         {
-            int size = _size - 1;
-            T[] array = _array;
+            var size = _size - 1;
+            var array = _array;
 
             if ((uint)size >= (uint)array.Length)
             {
@@ -473,8 +473,8 @@ namespace Collections.Pooled
         /// </summary>
         public T Pop()
         {
-            int size = _size - 1;
-            T[] array = _array;
+            var size = _size - 1;
+            var array = _array;
 
             // if (_size == 0) is equivalent to if (size == -1), and this case
             // is covered with (uint)size, thus allowing bounds check elimination 
@@ -486,7 +486,7 @@ namespace Collections.Pooled
 
             _version++;
             _size = size;
-            T item = array[size];
+            var item = array[size];
             if (_clearOnFree)
             {
                 array[size] = default;     // Free memory quicker.
@@ -496,8 +496,8 @@ namespace Collections.Pooled
 
         public bool TryPop(out T result)
         {
-            int size = _size - 1;
-            T[] array = _array;
+            var size = _size - 1;
+            var array = _array;
 
             if ((uint)size >= (uint)array.Length)
             {
@@ -520,8 +520,8 @@ namespace Collections.Pooled
         /// </summary>
         public void Push(T item)
         {
-            int size = _size;
-            T[] array = _array;
+            var size = _size;
+            var array = _array;
 
             if ((uint)size < (uint)array.Length)
             {
@@ -555,8 +555,8 @@ namespace Collections.Pooled
             if (_size == 0)
                 return Array.Empty<T>();
 
-            T[] objArray = new T[_size];
-            int i = 0;
+            var objArray = new T[_size];
+            var i = 0;
             while (i < _size)
             {
                 objArray[i] = _array[_size - i - 1];

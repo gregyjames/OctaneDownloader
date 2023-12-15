@@ -5,7 +5,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 
 namespace Collections.Pooled
@@ -43,17 +42,17 @@ namespace Collections.Pooled
         // This code was ported from an internal method on String, which relied on private members to get the char* pointer.
         private static unsafe int GetNonRandomizedHashCode(string str)
         {
-            ReadOnlySpan<char> chars = str.AsSpan();
+            var chars = str.AsSpan();
             fixed (char* src = chars)
             {
                 Debug.Assert(src[chars.Length] == '\0', "src[this.Length] == '\\0'");
                 Debug.Assert(((int)src) % 4 == 0, "Managed string should start at 4 bytes boundary");
 
                 uint hash1 = (5381 << 16) + 5381;
-                uint hash2 = hash1;
+                var hash2 = hash1;
 
-                uint* ptr = (uint*)src;
-                int length = chars.Length;
+                var ptr = (uint*)src;
+                var length = chars.Length;
 
                 while (length > 2)
                 {
