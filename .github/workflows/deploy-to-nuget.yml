@@ -1,8 +1,9 @@
-name: Deploy to NuGet
-on: [workflow_dispatch]
-env:
-  PACKAGE_OUT_DIR: ${{ github.workspace }}\output
-  NUGET_SOURCE_URL: "https://api.nuget.org/v3/index.json"
+name: NuGet Publish
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # Specify the tag pattern, e.g., 'v1.0.0'
 jobs:
   deploy:
     name: Deploy
@@ -30,14 +31,12 @@ jobs:
       run: nuget restore Octane.sln
     - name: Build
       run: dotnet build --no-restore --configuration Release
-    - name: Publish NuGet
-      uses: brandedoutcast/publish-nuget@v2.5.5
-      with:
-        # Filepath of the project to be packaged, relative to root of repository
-        PROJECT_FILE_PATH: D:\a\OctaneDownloader\OctaneDownloader\OctaneEngine\OctaneEngine.csproj
-        # API key to authenticate with NuGet server
-        NUGET_KEY: ${{secrets.NUGET_AUTH_TOKEN}}
-        # Flag to toggle pushing symbols along with nuget package to the server, disabled by default
-        INCLUDE_SYMBOLS: false
-        VERSION_REGEX: " (. *) <\ / Version>"
-        TAG_FORMAT: ‘*’
+    - name: Extract version from tag
+      id: extract_version
+      run: echo "VERSION=$(echo ${{ github.ref }} | sed -n 's/^refs\/tags\/v//p')"
+      shell: bash
+
+    - name: Publish NuGet package
+      run: dotnet nuget push **/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --version ${{ steps.extract_version.outputs.VERSION }}
+      env:
+        NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
