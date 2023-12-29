@@ -31,12 +31,6 @@ jobs:
       run: nuget restore Octane.sln
     - name: Build
       run: dotnet build --no-restore --configuration Release
-    - name: Extract version from tag
-      id: extract_version
-      run: echo "VERSION=$(echo ${{ github.ref }} | sed -n 's/^refs\/tags\/v//p')"
-      shell: bash
-
     - name: Publish NuGet package
-      run: dotnet nuget push **/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --version ${{ steps.extract_version.outputs.VERSION }}
-      env:
+      run: dotnet nuget push **/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
         NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
