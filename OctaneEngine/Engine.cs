@@ -23,8 +23,6 @@
 
 using System;
 using System.Buffers;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -32,8 +30,6 @@ using System.IO.MemoryMappedFiles;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Runtime;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Collections.Pooled;
@@ -181,9 +177,8 @@ namespace OctaneEngine
                 throw new ArgumentNullException(nameof(url));
             }
         }
-        private void Cleanup(GCLatencyMode old_mode, ILogger logger, Stopwatch stopwatch, HttpClient _client, OctaneConfiguration config, bool success)
+        private void Cleanup(ILogger logger, Stopwatch stopwatch, HttpClient _client, OctaneConfiguration config, bool success)
         {
-            GCSettings.LatencyMode = old_mode;
             logger.LogTrace("Restored GC mode.");
             _client.Dispose();
             stopwatch.Stop();
@@ -232,10 +227,7 @@ namespace OctaneEngine
             #region Varible Initilization
             var factory = createLoggerFactory(_factory);
             var logger = factory.CreateLogger("OctaneEngine");
-            var old_mode = GCSettings.LatencyMode;
             logger.LogTrace("Setting GC to sustained low latency mode.");
-            GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
             var success = false;
             var cancellation_token = createCancellationToken(cancelTokenSource, _config, outFile);
             checkURL(url, logger);
@@ -282,10 +274,6 @@ namespace OctaneEngine
                         if (rangeSupported)
                         {
                             logger.LogInformation("Using Octane Client to download file.");
-                            //No GC Mode if supported
-                            #if NET6_0_OR_GREATER
-                                GC.TryStartNoGCRegion(Environment.ProcessorCount*_config.BufferSize, true);
-                            #endif
                             try
                             {
                                 await Parallel.ForEachAsync(pieces, new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = cancellation_token, TaskScheduler = TaskScheduler.Current}, async (piece, token) =>
@@ -305,12 +293,6 @@ namespace OctaneEngine
                             catch(Exception ex)
                             {
                                 logger.LogError($"ERROR USING CORE CLIENT: {ex.Message}");
-                            }
-                            finally
-                            {
-                                #if NET6_0_OR_GREATER
-                                    GC.EndNoGCRegion();
-                                #endif
                             }
                         }
                         else
@@ -339,7 +321,7 @@ namespace OctaneEngine
                 }
                 finally
                 {
-                    Cleanup(old_mode, logger, stopwatch, _client, _config, success);
+                    Cleanup(logger, stopwatch, _client, _config, success);
                 }
             }
         }
