@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net461;net472;net6.0;</TargetFrameworks>
         <LangVersion>preview</LangVersion>
         <NeutralLanguage>en-US</NeutralLanguage>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
@@ -23,6 +22,7 @@
         <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
         <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <TargetFramework>net6.0</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>

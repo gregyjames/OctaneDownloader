@@ -30,21 +30,20 @@ using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using OctaneEngineCore;
-using OctaneEngineCore.Clients;
+using OctaneEngine;
 using OctaneEngineCore.ShellProgressBar;
 using OctaneEngineCore.Streams;
 using PooledAwait;
 
-namespace OctaneEngine;
+namespace OctaneEngineCore.Clients;
 internal class OctaneClient : IClient
 {
-    private HttpClient _client;
-    private OctaneConfiguration _config;
-    private ILogger<IClient> _log;
-    private ILoggerFactory _loggerFactory;
+    private readonly HttpClient _client;
+    private readonly OctaneConfiguration _config;
+    private readonly ILogger<IClient> _log;
+    private readonly ILoggerFactory _loggerFactory;
     private ArrayPool<byte> _memPool;
-    private IStream _stream;
+    private readonly IStream _stream;
     private MemoryMappedFile _mmf;
     private IProgressBar _progressBar;
 
@@ -68,24 +67,24 @@ internal class OctaneClient : IClient
         _mmf = file;
     }
 
+    public void SetProgressbar(ProgressBar bar)
+    {
+        _progressBar = bar;
+    }
     public void SetArrayPool(ArrayPool<byte> pool)
     {
         _memPool = pool;
     }
+    
+    private readonly SemaphoreSlim _writeSemaphore = new(1, 1);
 
-    private readonly SemaphoreSlim _readSemaphore = new(1, 1);
-    public async PooledTask<HttpResponseMessage> SendMessage(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
+    private async Task WriteBytesToAccessor(MemoryMappedViewAccessor accessor, byte[] buffer, int bytesRead)
     {
-        if (pauseToken.IsPaused)
-        {
-            await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
-        }
-        _log.LogTrace("Sending request for range ({PieceItem1},{PieceItem2})...", piece.Item1, piece.Item2);
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
-        request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
-        return await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        accessor.WriteArray(0, buffer, 0, bytesRead);
+        accessor.Flush();
     }
-    public async PooledTask ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
+    
+    public async Task DownloadPart(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         try
         {
@@ -109,43 +108,43 @@ internal class OctaneClient : IClient
             {
                 await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
             }
+            _log.LogTrace("Sending request for range ({PieceItem1},{PieceItem2})...", piece.Item1, piece.Item2);
+            using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
+            request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
+            var message = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
 
             stopwatch.Start();
             if (message.IsSuccessStatusCode)
             {
                 _log.LogInformation("HTTP request returned success status code for piece ({PieceItem1},{PieceItem2})",piece.Item1, piece.Item2);
-                using (var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
+                await using (var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
                 {
                     _stream.SetStreamParent(networkStream);
                     _stream.SetBPS(programBps);
 
                     using var child = _progressBar?.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", childOptions);
-
-                    while (true)
+                    
+                    await _writeSemaphore.WaitAsync(cancellationToken);
+                    
+                    try
                     {
-                        await _readSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                        try
+                        while (true)
                         {
                             var bytesRead = await _stream.ReadAsync(buffer, 0, _config.BufferSize, cancellationToken).ConfigureAwait(false);
-                            if (bytesRead == 0)
-                            {
+                            if (bytesRead == 0) { 
                                 break;
                             }
-                            
-                            await Task.Run(() =>
-                            {
-                                using var accessor = _mmf.CreateViewAccessor(piece.Item1 + bytesReadOverall, bytesRead,
-                                    MemoryMappedFileAccess.Write);
-                                accessor.WriteArray(0, buffer, 0, bytesRead);
-                                accessor.Flush();
-                            }, cancellationToken).ConfigureAwait(false);
+
+                            var accessor = _mmf.CreateViewAccessor(piece.Item1 + bytesReadOverall, bytesRead, MemoryMappedFileAccess.Write);
+                            await WriteBytesToAccessor(accessor, buffer, bytesRead);
+                                
                             bytesReadOverall += bytesRead;
                             child?.Tick((int)bytesReadOverall);
                         }
-                        finally
-                        {
-                            _readSemaphore.Release();
-                        }
+                    }
+                    finally
+                    {
+                        _writeSemaphore.Release();
                     }
                 }
 
@@ -162,6 +161,7 @@ internal class OctaneClient : IClient
         catch(Exception ex)
         {
             _log.LogError(ex.Message);
+            throw;
         }
     }
 

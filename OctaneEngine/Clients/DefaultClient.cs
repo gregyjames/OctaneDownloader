@@ -27,6 +27,7 @@ using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Net.Http;
 using System.Threading;
+using System.Threading.Tasks;
 using OctaneEngine;
 using OctaneEngineCore.ShellProgressBar;
 using PooledAwait;
@@ -87,9 +88,19 @@ internal class DefaultClient : IClient
         _mmf = file;
     }
 
+    public void SetProgressbar(ProgressBar bar)
+    {
+        throw new NotImplementedException();
+    }
+
     public void SetArrayPool(ArrayPool<byte> pool)
     {
         _memPool = pool;
+    }
+
+    public async Task DownloadPart(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
+    {
+        throw new NotImplementedException();
     }
 
     public async PooledTask<HttpResponseMessage> SendMessage(string url, (long, long) piece,

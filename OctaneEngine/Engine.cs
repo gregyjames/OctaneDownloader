@@ -27,6 +27,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
@@ -35,6 +36,7 @@ using Collections.Pooled;
 using Microsoft.Extensions.Logging;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
+using OctaneEngineCore.ShellProgressBar;
 
 // ReSharper disable All
 
@@ -47,6 +49,7 @@ namespace OctaneEngine
         private readonly IClient _client;
         private readonly long _length;
         private readonly bool _range;
+
         public Engine(ILoggerFactory factory, OctaneConfiguration config, IClient client, long length, bool rangeSupported)
         {
             _factory = factory;
@@ -143,7 +146,7 @@ namespace OctaneEngine
                 var stopwatch = new Stopwatch();
                 var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, _length, MemoryMappedFileAccess.ReadWrite);
                 var memPool = ArrayPool<byte>.Create(_config.BufferSize, _config.Parts);
-            
+                //var memPool = ArrayPool<byte>.Shared;
                 logger.LogInformation($"Range supported: {_range}");
                 var partSize = Convert.ToInt64(_length / _config.Parts);
                 int tasksDone = 0;
@@ -178,20 +181,41 @@ namespace OctaneEngine
                     {
                         MaxDegreeOfParallelism = Environment.ProcessorCount,
                         CancellationToken = cancellation_token,
-                        TaskScheduler = TaskScheduler.Current
+                        //TaskScheduler = TaskScheduler.Current
                     };
+                    
+                    ProgressBar pbar = null;
+                    if (_config.ShowProgress)
+                    {
+                        pbar = new ProgressBar(pieces.Count*2, "progress bar is on the bottom now");
+                        _client.SetProgressbar(pbar);
+                    }
+                    
                     try
                     {
-                        await Parallel.ForEachAsync(pieces,options, async (piece, token) => {
-                            var message = await _client.SendMessage(url, piece, token, pause_token.Token).ConfigureAwait(false);
-                            await _client.ReadResponse(message, piece, token, pause_token.Token).ConfigureAwait(false);
-                                
+                        //todo: fix this so we don't block the main thread
+                        /*
+                        await Parallel.ForEachAsync(pieces, cancellation_token, async (piece, token) =>
+                        {
+                            await _client.DownloadPart(url, piece, token, pause_token.Token);
+
                             Interlocked.Increment(ref tasksDone);
-                            if (_config?.ProgressCallback != null) {
-                                await Task.Run(() => _config?.ProgressCallback((tasksDone + 0.0) / (pieces.Count + 0.0)), token).ConfigureAwait(false);
-                            }
+                            
                             logger.LogTrace($"Finished {tasksDone}/{_config?.Parts} pieces!");
+                            
+                            pbar?.Tick();
                         }).ConfigureAwait(false);
+                        */
+                        foreach (var piece in pieces)
+                        {
+                            await _client.DownloadPart(url, piece, cancellation_token, pause_token.Token);
+
+                            Interlocked.Increment(ref tasksDone);
+                            
+                            logger.LogTrace($"Finished {tasksDone}/{_config?.Parts} pieces!");
+                            
+                            pbar?.Tick();
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -201,16 +225,7 @@ namespace OctaneEngine
                 else
                 {
                     logger.LogInformation("Using Default Client to download file.");
-                    var message = await _client.SendMessage(
-                        url, 
-                        (0, 0), 
-                        cancellation_token, 
-                        pause_token.Token);
-                    await _client.ReadResponse(
-                        message, 
-                        (0, 0), 
-                        cancellation_token, 
-                        pause_token.Token);
+                    await _client.DownloadPart(url, (0,0), cancellation_token, pause_token.Token);
                 }
 
                 success = true;

@@ -26,6 +26,8 @@ using System.Buffers;
 using System.IO.MemoryMappedFiles;
 using System.Net.Http;
 using System.Threading;
+using System.Threading.Tasks;
+using OctaneEngineCore.ShellProgressBar;
 using PooledAwait;
 
 namespace OctaneEngineCore.Clients;
@@ -34,8 +36,8 @@ public interface IClient : IDisposable
 {
     public bool isRangeSupported();
     public void SetMMF(MemoryMappedFile file);
+    public void SetProgressbar(ProgressBar bar);
     public void SetArrayPool(ArrayPool<Byte> pool);
-    public PooledTask<HttpResponseMessage> SendMessage(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken);
 
-    public PooledTask ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken);
+    public Task DownloadPart(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken);
 }

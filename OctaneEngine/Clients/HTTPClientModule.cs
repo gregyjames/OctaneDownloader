@@ -34,6 +34,6 @@ public class HTTPClientModule: Module
             };
 
             return _client;
-        }).As<HttpClient>().InstancePerDependency();
+        }).As<HttpClient>().SingleInstance();
     }
 }
