@@ -6,7 +6,6 @@
         <NeutralLanguage>en-US</NeutralLanguage>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <PackageId>OctaneEngineCore</PackageId>
-        <PackageVersion>6.0.1</PackageVersion>
         <Authors>Greg James</Authors>
         <Description>A high Performance C# file downloader that asyncrounously downloads files as pieces. Made as a faster, more efficent replacement to Microsoft's WebClient.</Description>
         <Copyright>2015, Greg James</Copyright>

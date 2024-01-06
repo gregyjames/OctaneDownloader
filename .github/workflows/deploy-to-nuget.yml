@@ -22,6 +22,10 @@ jobs:
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
         restore-keys: |
           ${{ runner.os }}-nuget-
+    - name: Set VERSION variable from tag
+      run: |
+        $VERSION=$Env:GITHUB_REF_NAME.TrimStart("v")
+        echo "VERSION=$VERSION" >> $Env:GITHUB_ENV
     - name: Restore dependencies
       run: dotnet restore
     - name: Setup NuGet.exe for use with actions
@@ -30,8 +34,8 @@ jobs:
       if: steps.cacheStep.outputs.cache-hit != 'true'
       run: nuget restore Octane.sln
     - name: Build
-      run: dotnet build --no-restore --configuration Release
+      run: dotnet build OctaneEngine/OctaneEngine.csproj --no-restore --configuration Release /p:Version=$Env:VERSION /p:AssemblyVersion=$Env:VERSION
     - name: Publish NuGet package
-      run: dotnet nuget push **/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
+      run: dotnet nuget push **/*.nupkg --source https://api.nuget.org/v3/index.json --api-key $Env:NUGET_API_KEY
       env:
         NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
