@@ -28,7 +28,6 @@ using System.IO.MemoryMappedFiles;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
@@ -71,10 +70,11 @@ internal class OctaneClient : IClient
         return await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
     }
+    
     public async PooledTask ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         #region Variable Declaration
-        var buffer = _memPool.Rent(_config.BufferSize);
+        var readbuffer = _memPool.Rent(_config.BufferSize);
         _log.LogInformation("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
         var stopwatch = new Stopwatch();
         var programBps = _config.BytesPerSecond / _config.Parts;
@@ -99,7 +99,7 @@ internal class OctaneClient : IClient
         if (message.IsSuccessStatusCode)
         {
             _log.LogInformation("HTTP request returned success status code for piece ({PieceItem1},{PieceItem2})", piece.Item1, piece.Item2);
-            using (var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
+            await using (var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
             {
                 IStream streamToRead = new NormalStream(networkStream);
                 // If throttling is enabled, wrap the stream in a ThrottleStream
@@ -110,29 +110,63 @@ internal class OctaneClient : IClient
                 }
 
                 using var child = _progressBar?.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", childOptions);
-                
-                while (true)
-                {
-                    var bytesRead = await streamToRead.ReadAsync(buffer, 0, _config.BufferSize, cancellationToken);
-                    if (bytesRead == 0)
-                    {
-                        break;
-                    }
 
-                    await Task.Run(() =>
+                if (_config.LowMemoryMode)
+                {
+                    try
                     {
-                        using var accessor = _mmf.CreateViewAccessor(piece.Item1 + bytesReadOverall, bytesRead, MemoryMappedFileAccess.Write);
-                        accessor.WriteArray(0, buffer, 0, bytesRead);
-                        accessor.Flush();
-                    }, cancellationToken);
-                    bytesReadOverall += bytesRead;
-                    child?.Tick((int)bytesReadOverall);
+                        while (true)
+                        {
+                            var bytesRead = await streamToRead.ReadAsync(readbuffer.AsMemory(), cancellationToken);
+
+                            if (bytesRead == 0)
+                            {
+                                break;
+                            }
+                            
+                            using (var accessor = _mmf.CreateViewAccessor(piece.Item1 + bytesReadOverall, bytesRead,
+                                       MemoryMappedFileAccess.Write))
+                            {
+                                accessor.WriteArray(0, readbuffer, 0, bytesRead);
+                                bytesReadOverall += bytesRead;
+                                child?.Tick((int)bytesReadOverall);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogError(ex.Message);
+                    }
                 }
+                else
+                {
+                    var stream = _mmf.CreateViewStream(piece.Item1, 0);
+                    try
+                    {
+                        while (true)
+                        {
+                            var bytesRead = await streamToRead.ReadAsync(readbuffer.AsMemory(), cancellationToken);
+                            if (bytesRead == 0)
+                            {
+                                break;
+                            }
+
+                            await stream.WriteAsync(readbuffer.AsMemory()[..bytesRead], cancellationToken);
+                        }
+                    }
+                    finally
+                    {
+                        // Flush and dispose of the MemoryMappedViewStream
+                        await stream.FlushAsync(cancellationToken);
+                        await stream.DisposeAsync();
+                    }
+                }
+
             }
 
             _log.LogInformation("Buffer returned to memory pool");
         }
-        _memPool.Return(buffer, false);
+        _memPool.Return(readbuffer);
         _progressBar?.Tick();
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) done", piece.Item1, piece.Item2);
         stopwatch.Stop();
