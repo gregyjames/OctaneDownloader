@@ -126,4 +126,9 @@ internal class ThrottleStream : Stream, IStream
         Throttle(count);
         _parentStream.Write(buffer, offset, count);
     }
+
+    public override async ValueTask DisposeAsync()
+    {
+        await _parentStream.DisposeAsync();
+    }
 }

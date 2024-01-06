@@ -34,6 +34,7 @@ using OctaneEngineCore.Clients;
 using OctaneEngineCore.ShellProgressBar;
 using OctaneEngineCore.Streams;
 using PooledAwait;
+// ReSharper disable TemplateIsNotCompileTimeConstantProblem
 
 namespace OctaneEngine;
 internal class OctaneClient : IClient
@@ -136,6 +137,7 @@ internal class OctaneClient : IClient
                     catch (Exception ex)
                     {
                         _log.LogError(ex.Message);
+                        throw;
                     }
                 }
                 else
@@ -150,8 +152,9 @@ internal class OctaneClient : IClient
                             {
                                 break;
                             }
-
-                            await stream.WriteAsync(readbuffer.AsMemory()[..bytesRead], cancellationToken);
+                            await stream.WriteAsync(readbuffer.AsMemory().Slice(0, bytesRead), cancellationToken);
+                            bytesReadOverall += bytesRead;
+                            child?.Tick((int)bytesReadOverall);
                         }
                     }
                     finally
@@ -159,6 +162,7 @@ internal class OctaneClient : IClient
                         // Flush and dispose of the MemoryMappedViewStream
                         await stream.FlushAsync(cancellationToken);
                         await stream.DisposeAsync();
+                        await streamToRead.DisposeAsync();
                     }
                 }
 

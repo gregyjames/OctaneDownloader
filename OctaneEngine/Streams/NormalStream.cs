@@ -95,4 +95,9 @@ internal class NormalStream: Stream, IStream
         var bytesRead = await _stream.ReadAsync(buffer, token);
         return bytesRead;
     }
+
+    public override async ValueTask DisposeAsync()
+    {
+        await _stream.DisposeAsync();
+    }
 }
