@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Cysharp.Text;
@@ -11,17 +10,17 @@ using System.Diagnostics;
 using System.Net.NetworkInformation;
 public static class NetworkAnalyzer
 {
-    private static readonly string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-    internal static string prettySize(long len)
+    private static readonly string[] Sizes = { "B", "KB", "MB", "GB", "TB" };
+    internal static string PrettySize(long len)
     {
         int order = 0;
-        while (len >= 1024 && order < sizes.Length - 1)
+        while (len >= 1024 && order < Sizes.Length - 1)
         {
             order++;
             len = len >> 10;
         }
             
-        string result = ZString.Format("{0:0.##} {1}", len, sizes[order]); 
+        string result = ZString.Format("{0:0.##} {1}", len, Sizes[order]); 
             
         return result;
     }
@@ -57,7 +56,7 @@ public static class NetworkAnalyzer
         }
         else
         {
-            throw new("Unable to ping server: " + reply?.Status);
+            throw new Exception("Unable to ping server: " + reply?.Status);
         }
     }
     internal static async PooledTask<int> GetNetworkSpeed((string,int) testFile)

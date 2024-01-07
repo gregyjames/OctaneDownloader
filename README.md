@@ -63,6 +63,21 @@ private static void Main()
         
 ```
 
+# Benchmark
+
+```
+BenchmarkDotNet v0.13.12, macOS Sonoma 14.0 (23A344) [Darwin 23.0.0]
+Apple M1, 1 CPU, 8 logical and 8 physical cores
+.NET SDK 8.0.100
+[Host] : .NET 6.0.25 (6.0.2523.51912), Arm64 RyuJIT AdvSIMD
+DefaultJob : .NET 6.0.25 (6.0.2523.51912), Arm64 RyuJIT AdvSIMD
+```
+
+| Method | Mean | Error | StdDev |
+|-------------------- |--------:|---------:|---------:|
+| BenchmarkOctane | 5.369 s | 0.1836 s | 0.5326 s |
+| BenchmarkHttpClient | 6.803 s | 0.1021 s | 0.2367 s |
+
 # License
 The MIT License (MIT)
 

@@ -29,14 +29,14 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using Microsoft.Extensions.Logging;
-using OctaneEngineCore;
-using OctaneEngineCore.Clients;
+using OctaneEngine;
 using OctaneEngineCore.ShellProgressBar;
 using OctaneEngineCore.Streams;
 using PooledAwait;
+
 // ReSharper disable TemplateIsNotCompileTimeConstantProblem
 
-namespace OctaneEngine;
+namespace OctaneEngineCore.Clients;
 internal class OctaneClient : IClient
 {
     private readonly HttpClient _client;
