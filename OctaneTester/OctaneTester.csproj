@@ -5,7 +5,7 @@
 	    <IsPackable>false</IsPackable>
         <NeutralLanguage>en-US</NeutralLanguage>
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
-        <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+        <TargetFramework>net6.0</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>
