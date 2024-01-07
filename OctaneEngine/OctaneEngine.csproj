@@ -19,6 +19,7 @@
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+        <PackageIcon>Itzikgur-My-Seven-Downloads-1.256.png</PackageIcon>
         <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <TargetFramework>net6.0</TargetFramework>
@@ -27,6 +28,7 @@
     <ItemGroup>
         <None Include="docs\README.md" Pack="true" PackagePath="\" />
         <None Include="docs\LICENSE.md" Pack="true" PackagePath="\" />
+        <None Include="docs\Itzikgur-My-Seven-Downloads-1.256.png" Pack="true" PackagePath="\" />
     </ItemGroup>
     
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
