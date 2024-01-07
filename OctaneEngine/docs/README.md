@@ -24,43 +24,67 @@ dotnet add package OctaneEngineCore
 * Logging
 * Proxy Support
 * Pause/Resume Support
+* JSON/Microsoft.Extensions.Configuration Support
 
 # Usage
 ```csharp
-var config = new OctaneConfiguration
+private const string Url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
+private static void Main()
 {
-     Parts = 2,
-     BufferSize = 8192,
-     ShowProgress = false,
-     BytesPerSecond = 1,
-     UseProxy = false,
-     Proxy = null,
-     DoneCallback = x => {
-          Console.WriteLine("Done!"); 
-     },
-     ProgressCallback = x => { 
-          Console.WriteLine(x.ToString(CultureInfo.InvariantCulture)); 
-     },
-     NumRetries = 10
-};
+     //Logging Setup
+     var seriLog = new LoggerConfiguration()
+          .Enrich.FromLogContext()
+          .MinimumLevel.Verbose()
+          .WriteTo.File("./OctaneLog.txt")
+          .WriteTo.Console(theme: AnsiConsoleTheme.Sixteen)
+          .CreateLogger();
+     var factory = LoggerFactory.Create(logging => {
+          logging.AddSerilog(seriLog);
+     });
 
-//Pick any logging implementation you want, here we are using Serilog
-var seriLog = new LoggerConfiguration()
-     .Enrich.FromLogContext()
-     .MinimumLevel.Verbose()
-     .WriteTo.File("./OctaneLog.txt")
-     .WriteTo.Console(theme: AnsiConsoleTheme.Sixteen)
-     .CreateLogger();
-
-var factory = LoggerFactory.Create(logging => {
-     logging.AddSerilog(seriLog);
-});
-
-var pauseTokenSource = new PauseTokenSource(factory);
-
-Engine.DownloadFile("https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png", factory, null, config, pauseTokenSource).Wait();
+     //JSON Config Loading
+     var builder = new ConfigurationBuilder();
+     builder.SetBasePath(Directory.GetCurrentDirectory())
+          .AddJsonFile("appsettings.json", true, true);
+     var configRoot = builder.Build();
+     var config = new OctaneConfiguration(configRoot, factory);
+            
+     //Find Optimal number of parts
+     var optimalNumberOfParts = Engine.GetOptimalNumberOfParts(Url).Result;
+     seriLog.Information("Optimal number of parts to download file: {OptimalNumberOfParts}", optimalNumberOfParts);
+            
+     seriLog.Information("Speed: {Result}", NetworkAnalyzer.GetCurrentNetworkSpeed().Result);
+     seriLog.Information("Latency: {Result}", NetworkAnalyzer.GetCurrentNetworkLatency().Result);
+     var pauseTokenSource = new PauseTokenSource();
+     var cancelTokenSource = new CancellationTokenSource();
+            
+     var octaneEngine = new Engine(factory, config);
+     octaneEngine.DownloadFile(Url, null, pauseTokenSource, cancelTokenSource).Wait(cancelTokenSource.Token);
         
 ```
+
+# Benchmark
+
+```
+BenchmarkDotNet v0.13.12, Windows 10 (10.0.19045.3803/22H2/2022Update)
+12th Gen Intel Core i7-12700K, 1 CPU, 20 logical and 12 physical cores
+.NET SDK 8.0.100
+[Host] : .NET 6.0.25 (6.0.2523.51912), X64 RyuJIT AVX2 [AttachedDebugger]
+Job-GUGLRW : .NET 6.0.25 (6.0.2523.51912), X64 RyuJIT AVX2
+Platform=X64 IterationCount=5 WarmupCount=0
+```
+
+| Method | Url | Mean | Error | StdDev |
+|------------------------- |--------------------- |---------:|--------:|---------:|
+| **BenchmarkOctane** | **http:(...)150MB [30]** | **8.773 s** | **1.321 s** | **0.3430 s** |
+| BenchmarkOctaneLowMemory | http:(...)150MB [30] | 8.999 s | 0.5978 s | 0.0925 s |
+| BenchmarkHttpClient | http:(...)150MB [30] | 8.648 s | 0.7375 s | 0.1915 s |
+| **BenchmarkOctane** | **https(...)250MB [31]** | **14.335 s** | **2.095 s** | **0.5440 s** |
+| BenchmarkOctaneLowMemory | https(...)250MB [31] | 14.159 s | 1.7879 s | 0.4643 s |
+| BenchmarkHttpClient | https(...)250MB [31] | 15.775 s | 2.2267 s | 0.3446 s |
+| **BenchmarkOctane** | **https(...)500MB [31]** | **28.262 s** | **1.876 s** | **0.2904 s** |
+| BenchmarkOctaneLowMemory | https(...)500MB [31] | 27.303 s | 1.0371 s | 0.2693 s |
+| BenchmarkHttpClient | https(...)500MB [31] | 31.325 s | 1.7619 s | 0.2727 s |
 
 # License
 The MIT License (MIT)
