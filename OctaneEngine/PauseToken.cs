@@ -43,6 +43,6 @@ public readonly struct PauseToken
         _log.LogInformation("Waiting for task to resume...");
         return IsPaused
             ? _tokenSource.WaitWhilePausedAsync()
-            : PauseTokenSource._completedTask;
+            : PauseTokenSource.CompletedTask;
     }
 }

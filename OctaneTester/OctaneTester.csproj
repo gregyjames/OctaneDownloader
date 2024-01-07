@@ -2,10 +2,10 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-	    <TargetFrameworks>net461;net472;net6.0;</TargetFrameworks>
 	    <IsPackable>false</IsPackable>
         <NeutralLanguage>en-US</NeutralLanguage>
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+        <TargetFramework>net6.0</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>

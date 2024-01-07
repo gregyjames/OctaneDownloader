@@ -255,8 +255,8 @@ namespace OctaneEngine
             #endif
             #endregion
             
-            logger.LogInformation($"TOTAL SIZE: {NetworkAnalyzer.prettySize(responseLength)}");
-            logger.LogInformation($"PART SIZE: {NetworkAnalyzer.prettySize(partSize)}");
+            logger.LogInformation($"TOTAL SIZE: {NetworkAnalyzer.PrettySize(responseLength)}");
+            logger.LogInformation($"PART SIZE: {NetworkAnalyzer.PrettySize(partSize)}");
             
             stopwatch.Start();
             

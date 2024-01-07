@@ -44,6 +44,7 @@ public class OctaneConfiguration
         BytesPerSecond = 1;
         UseProxy = false;
         Proxy = null;
+        LowMemoryMode = false;
     }
 
     public OctaneConfiguration(IConfiguration config, ILoggerFactory factory)
@@ -59,6 +60,7 @@ public class OctaneConfiguration
             NumRetries = Convert.ToInt32(octaneSection?["NumRetries"]);
             BytesPerSecond = Convert.ToInt32(octaneSection?["BytesPerSecond"]);
             UseProxy = Convert.ToBoolean(octaneSection?["UseProxy"]);
+            LowMemoryMode = Convert.ToBoolean(octaneSection?["LowMemoryMode"]);
             DoneCallback = null!;
             ProgressCallback = null!;
             Proxy = null;
@@ -74,6 +76,11 @@ public class OctaneConfiguration
     /// </summary>
     public int Parts { get; set; }
 
+    /// <summary>
+    /// Determines whether to use a Stream (max performance/high memory) or accessor (lower memory use)
+    /// </summary>
+    public bool LowMemoryMode { get; set; }
+    
     /// <summary>
     ///     The memory buffer size to use, default 8192.
     /// </summary>

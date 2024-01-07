@@ -31,9 +31,9 @@ namespace OctaneEngineCore;
 public class PauseTokenSource
 {
     private volatile TaskCompletionSource<bool> _paused;
-    private ILoggerFactory _factory;
-    private ILogger _log;
-    internal static readonly Task _completedTask = Task.FromResult(true);
+    private readonly ILoggerFactory _factory;
+    private readonly ILogger _log;
+    internal static readonly Task CompletedTask = Task.FromResult(true);
     public PauseTokenSource(ILoggerFactory factory = null)
     {
         if (factory == null)
@@ -76,6 +76,6 @@ public class PauseTokenSource
     public Task WaitWhilePausedAsync()
     {
         _log.LogInformation("Waiting for download task to resume...");
-        return _paused?.Task ?? _completedTask;
+        return _paused?.Task ?? CompletedTask;
     }
 }

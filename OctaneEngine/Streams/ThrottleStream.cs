@@ -25,6 +25,7 @@ using System;
 using System.IO;
 using System.Reactive.Concurrency;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace OctaneEngineCore.Streams;
@@ -114,10 +115,20 @@ internal class ThrottleStream : Stream, IStream
         return read;
     }
 
+    public async Task<int> ReadAsync(Memory<byte> buffer, CancellationToken token)
+    {
+        throw new NotImplementedException();
+    }
+
     public override void Write(byte[] buffer, int offset, int count)
     {
         _log.LogTrace("Throttle stream write");
         Throttle(count);
         _parentStream.Write(buffer, offset, count);
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        await _parentStream.DisposeAsync();
     }
 }

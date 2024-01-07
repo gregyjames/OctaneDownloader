@@ -14,10 +14,11 @@ namespace OctaneTester
         private const string Url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
         private static void Main()
         {
+            Thread.Sleep(10000);
             #region Logging Configuration
             var seriLog = new LoggerConfiguration()
                 .Enrich.FromLogContext()
-                .MinimumLevel.Information()
+                .MinimumLevel.Error()
                 .WriteTo.Async(a => a.File("./OctaneLog.txt"))
                 .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen))
                 .CreateLogger();
