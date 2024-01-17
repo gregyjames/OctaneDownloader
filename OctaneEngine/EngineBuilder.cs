@@ -7,22 +7,37 @@ namespace OctaneEngineCore;
 
 public static class EngineBuilder
 {
-    public static IEngine Build(ILoggerFactory factory, IConfiguration config)
+    public static IEngine Build(ILoggerFactory factory = null, IConfiguration config = null)
     {
         var containerBuilder = new ContainerBuilder();
-        containerBuilder.RegisterInstance(factory).As<ILoggerFactory>();
-        containerBuilder.RegisterInstance(config).As<IConfiguration>();
+        if (factory != null)
+        {
+            containerBuilder.RegisterInstance(factory).As<ILoggerFactory>();
+        }
+
+        if (config != null)
+        {
+            containerBuilder.RegisterInstance(config).As<IConfiguration>();
+        }
+
         containerBuilder.AddOctane();
         var engineContainer = containerBuilder.Build();
         var engine = engineContainer.Resolve<IEngine>();
         return engine;
     }
 
-    public static IEngine Build(ILoggerFactory factory, OctaneConfiguration config)
+    public static IEngine Build(ILoggerFactory factory = null, OctaneConfiguration config = null)
     {
         var containerBuilder = new ContainerBuilder();
-        containerBuilder.RegisterInstance(factory).As<ILoggerFactory>();
-        containerBuilder.RegisterInstance(config).As<OctaneConfiguration>();
+        if (factory != null)
+        {
+            containerBuilder.RegisterInstance(factory).As<ILoggerFactory>();
+        }
+
+        if (config != null)
+        {
+            containerBuilder.RegisterInstance(config).As<IConfiguration>();
+        }
         containerBuilder.AddOctane();
         var engineContainer = containerBuilder.Build();
         var engine = engineContainer.Resolve<IEngine>();
