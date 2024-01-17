@@ -186,31 +186,34 @@ namespace OctaneEngine
                         CancellationToken = cancellation_token,
                         //TaskScheduler = TaskScheduler.Current
                     };
-                    
                     ProgressBar pbar = null;
                     if (_config.ShowProgress)
                     {
                         pbar = new ProgressBar(pieces.Count*2, "Downloading file...");
                         _client.SetProgressbar(pbar);
                     }
-                    
+
                     try
                     {
-                        await Parallel.ForEachAsync(pieces,options, async (piece, token) =>
+                        await Parallel.ForEachAsync(pieces, options, async (piece, token) =>
                         {
                             await _client.Download(url, piece, cancellation_token, pause_token.Token);
 
                             Interlocked.Increment(ref tasksDone);
-                            
+
                             logger.LogTrace($"Finished {tasksDone}/{_config?.Parts} pieces!");
-                            
+
                             pbar?.Tick();
-                            _config?.ProgressCallback?.Invoke((double)tasksDone/_config.Parts);
+                            _config?.ProgressCallback?.Invoke((double)tasksDone / _config.Parts);
                         }).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
                         logger.LogError($"ERROR USING CORE CLIENT: {ex.Message}");
+                    }
+                    finally
+                    {
+                        mmf.Dispose();
                     }
                 }
                 else

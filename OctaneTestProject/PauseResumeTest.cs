@@ -20,6 +20,7 @@ namespace OctaneTestProject
         private CancellationTokenSource _cancelTokenSource;
         private ILogger _log;
         private ILoggerFactory _factory;
+        string outFile = Path.GetRandomFileName();
         
         [SetUp]
         public void Init()
@@ -43,15 +44,14 @@ namespace OctaneTestProject
         [TearDown]
         public void CleanUp()
         {
-            File.Delete("Chershire_Cat.24ee16b9.png");
+            //File.Delete(outFile);
         }
 
         [Test]
         public void PauseResumeFile()
         {
             const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
-            const string outFile = @"Chershire_Cat.24ee16b9.png";
-            
+
             _log.Information("Starting Pause Resume Test");
             
             var config = new OctaneConfiguration
