@@ -26,11 +26,9 @@ public class HTTPClientModule: Module
             };
 
             var retryHandler = new RetryHandler(clientHandler, factory, cfg.NumRetries);
-            //var basePart = new Uri(new Uri(_url).GetLeftPart(UriPartial.Authority));
             var _client = new HttpClient(retryHandler)
             {
                 MaxResponseContentBufferSize = cfg.BufferSize,
-                //BaseAddress = basePart
             };
 
             return _client;

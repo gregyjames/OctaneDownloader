@@ -35,6 +35,7 @@ namespace OctaneEngineCore.Clients;
 public interface IClient : IDisposable
 {
     public bool IsRangeSupported();
+    public void SetBaseAddress(string url);
     public void SetMmf(MemoryMappedFile file);
     public void SetProgressbar(ProgressBar bar);
     public void SetArrayPool(ArrayPool<Byte> pool);

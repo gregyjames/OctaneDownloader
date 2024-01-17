@@ -49,6 +49,12 @@ internal class DefaultClient : IClient
         _pbar = pbar;
     }
 
+    public void SetBaseAddress(string url)
+    {
+        var basePart = new Uri(new Uri(url).GetLeftPart(UriPartial.Authority));
+        _httpClient.BaseAddress = basePart;
+    }
+    
     public bool IsRangeSupported()
     {
         return false;

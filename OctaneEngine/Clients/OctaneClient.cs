@@ -56,6 +56,12 @@ internal class OctaneClient : IClient
         _log = loggerFactory.CreateLogger<IClient>();
     }
 
+    public void SetBaseAddress(string url)
+    {
+        var basePart = new Uri(new Uri(url).GetLeftPart(UriPartial.Authority));
+        _client.BaseAddress = basePart;
+    }
+    
     public bool IsRangeSupported()
     {
         return true;

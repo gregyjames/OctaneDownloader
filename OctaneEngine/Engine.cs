@@ -46,7 +46,6 @@ namespace OctaneEngine
         private readonly ILoggerFactory _factory;
         private readonly OctaneConfiguration _config;
         private readonly IClient _client;
-
         private readonly IClient _normalClient;
 
         public Engine(ILoggerFactory factory, OctaneConfiguration config, IClient client, IClient normalClient)
@@ -170,6 +169,7 @@ namespace OctaneEngine
             logger.LogInformation($"PART SIZE: {NetworkAnalyzer.PrettySize(partSize)}");
             
             stopwatch.Start();
+            _client.SetBaseAddress(url);
             
             try
             {
