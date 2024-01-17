@@ -48,13 +48,21 @@ internal class ThrottleStream : Stream, IStream
     }
 
     private readonly ILogger<ThrottleStream> _log;
-    private readonly int _maxBps;
-    private readonly Stream _parentStream;
+    private int _maxBps;
+    private Stream _parentStream;
     private readonly IScheduler _scheduler;
     private readonly IStopwatch _stopwatch;
 
     private long _processed;
 
+    public ThrottleStream(ILoggerFactory factory)
+    {
+        _scheduler = Scheduler.Immediate;
+        _log = factory.CreateLogger<ThrottleStream>();
+        _stopwatch = _scheduler.StartStopwatch();
+        _processed = 0;
+    }
+    
     public ThrottleStream(Stream parent, int maxBytesPerSecond, ILoggerFactory factory)
     {
         _maxBps = maxBytesPerSecond;
@@ -130,5 +138,15 @@ internal class ThrottleStream : Stream, IStream
     public override async ValueTask DisposeAsync()
     {
         await _parentStream.DisposeAsync();
+    }
+    
+    public void SetStreamParent(Stream stream)
+    {
+        _parentStream = stream;
+    }
+
+    public void SetBps(int maxBytesPerSecond)
+    {
+        _maxBps = maxBytesPerSecond;
     }
 }

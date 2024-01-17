@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Threading;
+using Autofac;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngine;
@@ -77,7 +79,12 @@ namespace OctaneTestProject
                     Proxy = null
                 };
 
-                var engine = new Engine(_factory, config);
+                var containerBuilder = new ContainerBuilder();
+                containerBuilder.RegisterInstance(_factory).As<ILoggerFactory>();
+                containerBuilder.RegisterInstance(config).As<OctaneConfiguration>();
+                containerBuilder.AddOctane();
+                var engineContainer = containerBuilder.Build();
+                var engine = engineContainer.Resolve<IEngine>();
                 engine.DownloadFile(url, outFile, _pauseTokenSource, _cancelTokenSource).Wait();
             }
             catch

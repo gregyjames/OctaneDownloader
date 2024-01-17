@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Autofac;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngine;
@@ -68,7 +69,12 @@ namespace OctaneTestProject
             
             _pauseTokenSource.Pause();
             
-            var engine = new Engine(_factory, config);
+            var containerBuilder = new ContainerBuilder();
+            containerBuilder.RegisterInstance(_factory).As<ILoggerFactory>();
+            containerBuilder.RegisterInstance(config).As<OctaneConfiguration>();
+            containerBuilder.AddOctane();
+            var engineContainer = containerBuilder.Build();
+            var engine = engineContainer.Resolve<IEngine>();
 
             Parallel.Invoke(
                 () => Action(_pauseTokenSource),
