@@ -15,14 +15,16 @@ using OctaneEngineCore;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 using System.Net.Http;
+using Autofac;
+using IEngine = OctaneEngineCore.IEngine;
 
 namespace BenchmarkOctaneProject
 {
     public class Program
     {
         private HttpClient _client = null;
-        private OctaneEngine.Engine _OctaneEngine = null;
-        private OctaneEngine.Engine _OctaneEngine2 = null;
+        private IEngine _OctaneEngine = null;
+        private IEngine _OctaneEngine2 = null;
         private PauseTokenSource pauseTokenSource;
         private CancellationTokenSource cancelTokenSource;
         private OctaneConfiguration config;
@@ -52,10 +54,22 @@ namespace BenchmarkOctaneProject
             config = new OctaneConfiguration(configRoot, factory);
             #endregion
 
-            _OctaneEngine = new OctaneEngine.Engine(null, config);
+            var containerBuilder = new ContainerBuilder();
+            containerBuilder.RegisterInstance(factory).As<ILoggerFactory>();
+            containerBuilder.RegisterInstance(config).As<OctaneConfiguration>();
+            containerBuilder.AddOctane();
+            var engineContainer = containerBuilder.Build();
+            _OctaneEngine = engineContainer.Resolve<IEngine>();
+            
+            //_OctaneEngine = new OctaneEngine.Engine(null, config);
 
+            containerBuilder = new ContainerBuilder();
+            containerBuilder.RegisterInstance(factory).As<ILoggerFactory>();
             config.LowMemoryMode = true;
-            _OctaneEngine2 = new OctaneEngine.Engine(null, config);
+            containerBuilder.RegisterInstance(config).As<OctaneConfiguration>();
+            containerBuilder.AddOctane();
+            engineContainer = containerBuilder.Build();
+            _OctaneEngine2 = engineContainer.Resolve<IEngine>();
 
             pauseTokenSource = new PauseTokenSource();
             cancelTokenSource = new CancellationTokenSource();
