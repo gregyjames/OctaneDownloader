@@ -117,10 +117,11 @@ namespace OctaneTestProject
                         if (file1Bytes[i] != file2Bytes[i])
                         {
                             equal = false;
+                            break;
                         }
-                    }
 
-                    equal = true;
+                        equal = true;
+                    }
                 }
                 Assert.IsTrue(equal);
             }

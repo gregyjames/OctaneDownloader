@@ -20,7 +20,7 @@ namespace OctaneTestProject
         private CancellationTokenSource _cancelTokenSource;
         private ILogger _log;
         private ILoggerFactory _factory;
-        string outFile = Path.GetRandomFileName();
+        readonly string _outFile = Path.GetRandomFileName();
         
         [SetUp]
         public void Init()
@@ -59,7 +59,7 @@ namespace OctaneTestProject
                 Parts = 2,
                 BufferSize = 8192,
                 ShowProgress = false,
-                DoneCallback = _ => Assert.IsTrue(File.Exists(outFile)),
+                DoneCallback = _ => Assert.IsTrue(File.Exists(_outFile)),
                 ProgressCallback = Console.WriteLine,
                 NumRetries = 20,
                 BytesPerSecond = 1,
@@ -78,7 +78,7 @@ namespace OctaneTestProject
 
             Parallel.Invoke(
                 () => Action(_pauseTokenSource),
-                () => engine.DownloadFile(url, outFile, _pauseTokenSource, _cancelTokenSource).Wait()
+                () => engine.DownloadFile(url, _outFile, _pauseTokenSource, _cancelTokenSource).Wait()
             );
         }
 

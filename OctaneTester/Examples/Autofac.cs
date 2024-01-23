@@ -30,13 +30,14 @@ public class Autofac
         var configRoot = builder.Build();
 
         var pauseTokenSource = new PauseTokenSource();
-        var cancelTokenSource = new CancellationTokenSource();
-            
+
+        using var cancelTokenSource = new CancellationTokenSource();
         var containerBuilder = new ContainerBuilder();
         containerBuilder.RegisterInstance(factory).As<ILoggerFactory>();
         containerBuilder.RegisterInstance(configRoot).As<IConfiguration>();
         containerBuilder.AddOctane();
         var engineContainer = containerBuilder.Build();
         var engine = engineContainer.Resolve<IEngine>();
+        engine.DownloadFile("", "", pauseTokenSource, cancelTokenSource);
     }
 }

@@ -45,8 +45,7 @@ namespace OctaneTester
             //seriLog.Information("Speed: {Result}", NetworkAnalyzer.GetCurrentNetworkSpeed().Result);
             //seriLog.Information("Latency: {Result}", NetworkAnalyzer.GetCurrentNetworkLatency().Result);
             var pauseTokenSource = new PauseTokenSource();
-            var cancelTokenSource = new CancellationTokenSource();
-            
+            using var cancelTokenSource = new CancellationTokenSource();
             var containerBuilder = new ContainerBuilder();
             containerBuilder.RegisterInstance(factory).As<ILoggerFactory>();
             containerBuilder.RegisterInstance(configRoot).As<IConfiguration>();
@@ -54,7 +53,6 @@ namespace OctaneTester
             var engineContainer = containerBuilder.Build();
             var engine = engineContainer.Resolve<IEngine>();
             engine.DownloadFile(Url, null, pauseTokenSource, cancelTokenSource).Wait();
-
         }
     }
 }

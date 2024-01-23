@@ -147,7 +147,6 @@ namespace OctaneEngine
                 var cancellation_token = Helpers.CreateCancellationToken(cancelTokenSource, _config, filename);
                 var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
                 var stopwatch = new Stopwatch();
-                var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, _length, MemoryMappedFileAccess.ReadWrite);
                 var memPool = ArrayPool<byte>.Create(_config.BufferSize, _config.Parts);
                 logger.LogInformation($"Range supported: {_range}");
                 var partSize = Convert.ToInt64(_length / _config.Parts);
@@ -173,57 +172,56 @@ namespace OctaneEngine
             
             try
             {
-                //Check if range is supported
-                if (_client.IsRangeSupported())
+                using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, _length, MemoryMappedFileAccess.ReadWrite))
                 {
-                    var pieces = Helpers.CreatePartsList(_length, partSize, logger);
-                    _client.SetMmf(mmf);
-                    _client.SetArrayPool(memPool);
-                    logger.LogInformation("Using Octane Client to download file.");
-                    var options = new ParallelOptions()
+                    //Check if range is supported
+                    if (_client.IsRangeSupported())
                     {
-                        MaxDegreeOfParallelism = Environment.ProcessorCount,
-                        CancellationToken = cancellation_token,
-                        //TaskScheduler = TaskScheduler.Current
-                    };
-                    ProgressBar pbar = null;
-                    if (_config.ShowProgress)
-                    {
-                        pbar = new ProgressBar(pieces.Count*2, "Downloading file...");
-                        _client.SetProgressbar(pbar);
-                    }
-
-                    try
-                    {
-                        await Parallel.ForEachAsync(pieces, options, async (piece, token) =>
+                        var pieces = Helpers.CreatePartsList(_length, partSize, logger);
+                        _client.SetMmf(mmf);
+                        _client.SetArrayPool(memPool);
+                        logger.LogInformation("Using Octane Client to download file.");
+                        var options = new ParallelOptions()
                         {
-                            await _client.Download(url, piece, cancellation_token, pause_token.Token);
+                            MaxDegreeOfParallelism = Environment.ProcessorCount,
+                            CancellationToken = cancellation_token,
+                            //TaskScheduler = TaskScheduler.Current
+                        };
+                        ProgressBar pbar = null;
+                        if (_config.ShowProgress)
+                        {
+                            pbar = new ProgressBar(pieces.Count * 2, "Downloading file...");
+                            _client.SetProgressbar(pbar);
+                        }
 
-                            Interlocked.Increment(ref tasksDone);
+                        try
+                        {
+                            await Parallel.ForEachAsync(pieces, options, async (piece, token) =>
+                            {
+                                await _client.Download(url, piece, cancellation_token, pause_token.Token);
 
-                            logger.LogTrace($"Finished {tasksDone}/{_config?.Parts} pieces!");
+                                Interlocked.Increment(ref tasksDone);
 
-                            pbar?.Tick();
-                            _config?.ProgressCallback?.Invoke((double)tasksDone / _config.Parts);
-                        }).ConfigureAwait(false);
+                                logger.LogTrace($"Finished {tasksDone}/{_config?.Parts} pieces!");
+
+                                pbar?.Tick();
+                                _config?.ProgressCallback?.Invoke((double)tasksDone / _config.Parts);
+                            }).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError($"ERROR USING CORE CLIENT: {ex.Message}");
+                        }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        logger.LogError($"ERROR USING CORE CLIENT: {ex.Message}");
+                        logger.LogInformation("Using Default Client to download file.");
+                        await _normalClient.Download(url, (0, 0), cancellation_token, pause_token.Token);
                     }
-                    finally
-                    {
-                        mmf.Dispose();
-                    }
-                }
-                else
-                {
-                    logger.LogInformation("Using Default Client to download file.");
-                    await _normalClient.Download(url, (0,0), cancellation_token, pause_token.Token);
-                }
 
-                success = true;
-                logger.LogInformation("File downloaded successfully.");
+                    success = true;
+                    logger.LogInformation("File downloaded successfully.");
+                }
             }
             catch (Exception ex)
             {

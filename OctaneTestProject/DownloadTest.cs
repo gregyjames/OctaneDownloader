@@ -20,7 +20,7 @@ namespace OctaneTestProject
         private CancellationTokenSource _cancelTokenSource;
         private ILogger _log;
         private ILoggerFactory _factory;
-        string outFile = Path.GetRandomFileName();
+        readonly string _outFile = Path.GetRandomFileName();
         
         [SetUp]
         public void Init()
@@ -70,7 +70,7 @@ namespace OctaneTestProject
                     DoneCallback = _ =>
                     {
                         Console.WriteLine("Done!");
-                        Assert.IsTrue(File.Exists(outFile));
+                        Assert.IsTrue(File.Exists(_outFile));
                     },
                     ProgressCallback = Console.WriteLine,
                     NumRetries = 20,
@@ -85,7 +85,7 @@ namespace OctaneTestProject
                 containerBuilder.AddOctane();
                 var engineContainer = containerBuilder.Build();
                 var engine = engineContainer.Resolve<IEngine>();
-                engine.DownloadFile(url, outFile, _pauseTokenSource, _cancelTokenSource).Wait();
+                engine.DownloadFile(url, _outFile, _pauseTokenSource, _cancelTokenSource).Wait();
             }
             catch
             {
