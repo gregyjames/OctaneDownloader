@@ -27,7 +27,6 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
@@ -36,151 +35,30 @@ using Collections.Pooled;
 using Microsoft.Extensions.Logging;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
-using OctaneEngineCore.ColorConsoleLogger;
 using OctaneEngineCore.ShellProgressBar;
 
 // ReSharper disable All
 
 namespace OctaneEngine
 {
-    public class Engine
+    public class Engine: IEngine
     {
         private readonly ILoggerFactory _factory;
-        private OctaneConfiguration _config;
+        private readonly OctaneConfiguration _config;
+        private readonly IClient _client;
+        private readonly IClient _normalClient;
 
-        public Engine() { }
-        public Engine(ILoggerFactory factory, OctaneConfiguration config)
+        public Engine(ILoggerFactory factory, OctaneConfiguration config, IClient client, IClient normalClient)
         {
             _factory = factory;
             _config = config;
+            _client = client;
+            _normalClient = normalClient;
         }
         
         #region Helpers
-        private ILoggerFactory createLoggerFactory(ILoggerFactory loggerFactory)
+        private void Cleanup(ILogger logger, Stopwatch stopwatch, OctaneConfiguration config, bool success)
         {
-            var factory = loggerFactory ?? new LoggerFactory();
-            if (loggerFactory == null)
-            {
-                factory.AddProvider(new ColorConsoleLoggerProvider(new ColorConsoleLoggerConfiguration()));
-            }
-
-            return factory;
-        }
-        private OctaneConfiguration createConfiguration(OctaneConfiguration config, ILogger logger)
-        {
-            if (config == null)
-            {
-                logger.LogInformation("Octane config not providing, using default configuration.");
-                config = new OctaneConfiguration();
-            }
-
-            logger.LogInformation($"CONFIGURATION: {config.ToString()}");
-
-            return config;
-        }
-        private CancellationToken createCancellationToken(CancellationTokenSource cancelTokenSource, OctaneConfiguration config, string outFile)
-        {
-            var cancellation_token = cancelTokenSource?.Token ?? new CancellationToken();
-            cancellation_token.Register(new Action(() =>
-            {
-                config.DoneCallback?.Invoke(false);
-                if (File.Exists(outFile))
-                {
-                    File.Delete(outFile);
-                }
-            }));
-
-            return cancellation_token;
-        }
-        private async Task<(long, bool)> getFileSizeAndRangeSupport(string url)
-        {
-            using (var client = new HttpClient())
-            {
-                var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-                var responseLength = response.Content.Headers.ContentLength ?? 0;
-                var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
-
-                return (responseLength, rangeSupported);
-            }
-            
-        }
-        private HttpClient createHTTPClient(OctaneConfiguration config, ILoggerFactory factory, string url)
-        {
-            var clientHandler = new HttpClientHandler()
-            {
-                PreAuthenticate = true,
-                UseDefaultCredentials = true,
-                Proxy = config.Proxy,
-                UseProxy = config.UseProxy,
-                MaxConnectionsPerServer = config.Parts,
-                UseCookies = false,
-                ServerCertificateCustomValidationCallback = (_, _, _, _) => true
-            };
-
-            var retryHandler = new RetryHandler(clientHandler, factory, config.NumRetries);
-            var basePart = new Uri(new Uri(url).GetLeftPart(UriPartial.Authority));
-            var _client = new HttpClient(retryHandler)
-            {
-                MaxResponseContentBufferSize = config.BufferSize,
-                BaseAddress = basePart
-            };
-
-            return _client;
-        }
-        private PooledList<ValueTuple<long, long>> createPartsList(bool rangeSupported, long responseLength, long partSize, ILogger logger)
-        {
-            var pieces = new PooledList<ValueTuple<long, long>>();
-            //Loop to add all the events to the queue
-            if (rangeSupported)
-            {
-                for (long i = 0; i < responseLength; i += partSize)
-                {
-                    //Increment the start by one byte for all parts but the first which starts from zero.
-                    if (i != 0)
-                    {
-                        i += 1;
-                    }
-                    var j = Math.Min(i + partSize, responseLength);
-                    pieces.Add(new ValueTuple<long, long>(i, j));
-                    logger.LogTrace($"Piece with range ({pieces.First().Item1},{pieces.First().Item2}) added to tasks queue.");
-                }
-            }
-
-            return pieces;
-        }
-        private ProgressBar createProgressBar(OctaneConfiguration config, ILogger logger)
-        {
-            //Options for progress base
-            var options = new ProgressBarOptions
-            {
-                ProgressBarOnBottom = false,
-                BackgroundCharacter = '\u2593',
-                DenseProgressBar = false,
-                DisplayTimeInRealTime = false
-            };
-            
-            var pbar = config.ShowProgress
-                ? new ProgressBar(config.Parts, "Downloading File...", options)
-                : null;
-            if (pbar == null)
-            {
-                logger.LogInformation("Progress bar disabled.");
-            }
-
-            return pbar;
-        }
-        private void checkURL(string url, ILogger logger)
-        {
-            if (url == null)
-            {
-                logger.LogCritical("No URL provided (null value).");
-                throw new ArgumentNullException(nameof(url));
-            }
-        }
-        private void Cleanup(ILogger logger, Stopwatch stopwatch, HttpClient _client, OctaneConfiguration config, bool success)
-        {
-            logger.LogTrace("Restored GC mode.");
-            _client.Dispose();
             stopwatch.Stop();
             logger.LogInformation($"File downloaded in {stopwatch.ElapsedMilliseconds} ms.");
             logger.LogTrace("Calling callback function...");
@@ -215,6 +93,42 @@ namespace OctaneEngine
             return numParts;
         }
         
+        private async Task<(long, bool)> getFileSizeAndRangeSupport(string url)
+        {
+            using var client = new HttpClient();
+            var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            var responseLength = response.Content.Headers.ContentLength ?? 0;
+            var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
+            return (responseLength, rangeSupported);
+        }
+
+        /// <summary>
+        /// Sets the progress callback for when the progress bar isn't being used.
+        /// </summary>
+        /// <param name="callback">The Action that is called when a part is completed. </param>
+        public void SetProgressCallback(Action<double> callback)
+        {
+            _config.ProgressCallback += callback;
+        }
+
+        /// <summary>
+        /// Sets the download completed action.
+        /// </summary>
+        /// <param name="callback">The action to be called when the download in done. Returns a bool indicating success.</param>
+        public void SetDoneCallback(Action<bool> callback)
+        {
+            _config.DoneCallback += callback;
+        }
+
+        /// <summary>
+        /// Sets the proxy server to use when downloading the file.
+        /// </summary>
+        /// <param name="proxy"></param>
+        public void SetProxy(IWebProxy proxy)
+        {
+            _config.Proxy = proxy;
+        }
+        
         /// <summary>
         ///     The core octane download function. 
         /// </summary>
@@ -224,105 +138,99 @@ namespace OctaneEngine
         /// <param name="cancelTokenSource">The cancellation token for canceling the task.</param>
         public async Task DownloadFile(string url, string outFile = null, PauseTokenSource pauseTokenSource = null, CancellationTokenSource cancelTokenSource = null)
         {
+            var (_length, _range) = await getFileSizeAndRangeSupport(url);
+            
             #region Varible Initilization
-            var factory = createLoggerFactory(_factory);
-            var logger = factory.CreateLogger("OctaneEngine");
-            logger.LogTrace("Setting GC to sustained low latency mode.");
-            var success = false;
-            var cancellation_token = createCancellationToken(cancelTokenSource, _config, outFile);
-            checkURL(url, logger);
-            _config = createConfiguration(_config, logger);
-            var pause_token = pauseTokenSource ?? new PauseTokenSource(factory);
-            var filename = outFile ?? Path.GetFileName(new Uri(url).LocalPath);
-            var stopwatch = new Stopwatch();
-            var memPool = ArrayPool<byte>.Create(_config.BufferSize, _config.Parts);
-            var (responseLength, rangeSupported) = await getFileSizeAndRangeSupport(url);
-            logger.LogInformation($"Range supported: {rangeSupported}");
-            var partSize = Convert.ToInt64(responseLength / _config.Parts);
-            var pieces = createPartsList(rangeSupported, responseLength, partSize, logger);
-            var _client = createHTTPClient(_config, factory, url);
-            int tasksDone = 0;
+                var logger = _factory.CreateLogger("OctaneEngine");
+                var filename = outFile ?? Path.GetFileName(new Uri(url).LocalPath);
+                var success = false;
+                var cancellation_token = Helpers.CreateCancellationToken(cancelTokenSource, _config, filename);
+                var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
+                var stopwatch = new Stopwatch();
+                var memPool = ArrayPool<byte>.Create(_config.BufferSize, _config.Parts);
+                logger.LogInformation($"Range supported: {_range}");
+                var partSize = Convert.ToInt64(_length / _config.Parts);
+                int tasksDone = 0;
             #endregion
             
             #region ServicePoint Configuration
-            logger.LogInformation($"Server file name: {filename}.");
-            ServicePointManager.Expect100Continue = false;
-            ServicePointManager.DefaultConnectionLimit = 10000;
-            ServicePointManager.SetTcpKeepAlive(true, Int32.MaxValue,1);
-            ServicePointManager.MaxServicePoints = _config.Parts;
-            #if NET6_0_OR_GREATER
-                ServicePointManager.ReusePort = true;
-            #endif
+                logger.LogInformation($"Server file name: {filename}.");
+                ServicePointManager.Expect100Continue = false;
+                ServicePointManager.DefaultConnectionLimit = 10000;
+                ServicePointManager.SetTcpKeepAlive(true, Int32.MaxValue,1);
+                ServicePointManager.MaxServicePoints = _config.Parts;
+                #if NET6_0_OR_GREATER
+                    ServicePointManager.ReusePort = true;
+                #endif
             #endregion
             
-            logger.LogInformation($"TOTAL SIZE: {NetworkAnalyzer.PrettySize(responseLength)}");
+            logger.LogInformation($"TOTAL SIZE: {NetworkAnalyzer.PrettySize(_length)}");
             logger.LogInformation($"PART SIZE: {NetworkAnalyzer.PrettySize(partSize)}");
             
             stopwatch.Start();
+            _client.SetBaseAddress(url);
             
-            //Create memory mapped file to hold the file
-            using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, responseLength, MemoryMappedFileAccess.ReadWrite))
+            try
             {
-                try
+                using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, _length, MemoryMappedFileAccess.ReadWrite))
                 {
-                    var pbar = createProgressBar(_config, logger);
-
-                    //Create a client based on if range is supported or not..
-                    using (IClient client = rangeSupported ? new OctaneClient(_config, _client, factory, mmf, pbar, memPool) : new DefaultClient(_client, mmf, memPool, _config, pbar, partSize))
+                    //Check if range is supported
+                    if (_client.IsRangeSupported())
                     {
-                        //Check if range is supported
-                        if (rangeSupported)
+                        var pieces = Helpers.CreatePartsList(_length, partSize, logger);
+                        _client.SetMmf(mmf);
+                        _client.SetArrayPool(memPool);
+                        logger.LogInformation("Using Octane Client to download file.");
+                        var options = new ParallelOptions()
                         {
-                            logger.LogInformation("Using Octane Client to download file.");
-                            try
-                            {
-                                await Parallel.ForEachAsync(pieces, new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = cancellation_token, TaskScheduler = TaskScheduler.Current}, async (piece, token) =>
-                                    {
-                                        var message = await client.SendMessage(url, piece, token, pause_token.Token);
-                                        await client.ReadResponse(message, piece, token, pause_token.Token);
-
-                                        Interlocked.Increment(ref tasksDone);
-                                        if (_config?.ProgressCallback != null)
-                                        {
-                                            await Task.Run(() => _config?.ProgressCallback((tasksDone + 0.0) / (pieces.Count + 0.0)), token);
-                                        }
-
-                                        logger.LogTrace($"Finished {tasksDone}/{_config?.Parts} pieces!");
-                                    });
-                            }
-                            catch(Exception ex)
-                            {
-                                logger.LogError($"ERROR USING CORE CLIENT: {ex.Message}");
-                            }
-                        }
-                        else
+                            MaxDegreeOfParallelism = Environment.ProcessorCount,
+                            CancellationToken = cancellation_token,
+                            //TaskScheduler = TaskScheduler.Current
+                        };
+                        ProgressBar pbar = null;
+                        if (_config.ShowProgress)
                         {
-                            logger.LogInformation("Using Default Client to download file.");
-                            var message = await client.SendMessage(url, (0, 0), cancellation_token, pause_token.Token);
-                            await client.ReadResponse(message, (0, 0), cancellation_token, pause_token.Token);
+                            pbar = new ProgressBar(pieces.Count * 2, "Downloading file...");
+                            _client.SetProgressbar(pbar);
                         }
-                    }
-                    
-                    success = true;
-                    logger.LogInformation("File downloaded successfully.");
-                }
-                catch (Exception ex)
-                {
-                    if (ex.GetType().FullName == "System.InvalidOperationException")
-                    {
-                        logger.LogInformation("Allocated size too small but file downloaded successfully.");
-                        success = true;
+
+                        try
+                        {
+                            await Parallel.ForEachAsync(pieces, options, async (piece, token) =>
+                            {
+                                await _client.Download(url, piece, cancellation_token, pause_token.Token);
+
+                                Interlocked.Increment(ref tasksDone);
+
+                                logger.LogTrace($"Finished {tasksDone}/{_config?.Parts} pieces!");
+
+                                pbar?.Tick();
+                                _config?.ProgressCallback?.Invoke((double)tasksDone / _config.Parts);
+                            }).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError($"ERROR USING CORE CLIENT: {ex.Message}");
+                        }
                     }
                     else
                     {
-                        logger.LogError($"{ex.GetType().FullName}: {ex.Message}");
-                        success = false;
+                        logger.LogInformation("Using Default Client to download file.");
+                        await _normalClient.Download(url, (0, 0), cancellation_token, pause_token.Token);
                     }
+
+                    success = true;
+                    logger.LogInformation("File downloaded successfully.");
                 }
-                finally
-                {
-                    Cleanup(logger, stopwatch, _client, _config, success);
-                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"{ex.GetType().FullName}: {ex.Message}");
+                success = false;
+            }
+            finally
+            {
+                Cleanup(logger, stopwatch, _config, success);
             }
         }
     }

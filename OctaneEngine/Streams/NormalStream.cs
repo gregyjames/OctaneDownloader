@@ -17,7 +17,12 @@ internal class NormalStream: Stream, IStream
         base.Dispose(disposing);
     }
 
-    private readonly Stream _stream;
+    private Stream _stream;
+    
+    public NormalStream()
+    {
+        _stream = null;
+    }
     public NormalStream(Stream stream)
     {
         _stream = stream;
@@ -99,5 +104,15 @@ internal class NormalStream: Stream, IStream
     public override async ValueTask DisposeAsync()
     {
         await _stream.DisposeAsync();
+    }
+    
+    public void SetStreamParent(Stream stream)
+    {
+        _stream = stream;
+    }
+
+    public void SetBps(int maxBytesPerSecond)
+    {
+        // Method intentionally left empty.
     }
 }

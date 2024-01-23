@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Threading;
+using Autofac;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngine;
@@ -18,6 +20,7 @@ namespace OctaneTestProject
         private CancellationTokenSource _cancelTokenSource;
         private ILogger _log;
         private ILoggerFactory _factory;
+        readonly string _outFile = Path.GetRandomFileName();
         
         [SetUp]
         public void Init()
@@ -43,7 +46,7 @@ namespace OctaneTestProject
         {
             try
             {
-                File.Delete("Chershire_Cat.24ee16b9.png");
+                //File.Delete(outFile);
             }
             catch
             {
@@ -55,7 +58,6 @@ namespace OctaneTestProject
         public void DownloadFile()
         {
             const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
-            const string outFile = @"Chershire_Cat.24ee16b9.png";
 
             _log.Information("Starting File Download Test");
             try
@@ -68,7 +70,7 @@ namespace OctaneTestProject
                     DoneCallback = _ =>
                     {
                         Console.WriteLine("Done!");
-                        Assert.IsTrue(File.Exists(outFile));
+                        Assert.IsTrue(File.Exists(_outFile));
                     },
                     ProgressCallback = Console.WriteLine,
                     NumRetries = 20,
@@ -77,8 +79,13 @@ namespace OctaneTestProject
                     Proxy = null
                 };
 
-                var engine = new Engine(_factory, config);
-                engine.DownloadFile(url, outFile, _pauseTokenSource, _cancelTokenSource).Wait();
+                var containerBuilder = new ContainerBuilder();
+                containerBuilder.RegisterInstance(_factory).As<ILoggerFactory>();
+                containerBuilder.RegisterInstance(config).As<OctaneConfiguration>();
+                containerBuilder.AddOctane();
+                var engineContainer = containerBuilder.Build();
+                var engine = engineContainer.Resolve<IEngine>();
+                engine.DownloadFile(url, _outFile, _pauseTokenSource, _cancelTokenSource).Wait();
             }
             catch
             {

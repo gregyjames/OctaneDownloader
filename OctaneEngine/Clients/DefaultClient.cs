@@ -37,23 +37,45 @@ namespace OctaneEngineCore.Clients;
 internal class DefaultClient : IClient
 {
     private readonly HttpClient _httpClient;
-    private readonly MemoryMappedFile _mmf;
-    private readonly ArrayPool<byte> _memPool;
+    private MemoryMappedFile _mmf;
+    private ArrayPool<byte> _memPool;
     private readonly OctaneConfiguration _config;
     private readonly ProgressBar _pbar;
-    private readonly long _partsize;
 
-    public DefaultClient(HttpClient httpClient, MemoryMappedFile mmf, ArrayPool<byte> memPool, OctaneConfiguration config, ProgressBar pbar, long partsize)
+    public DefaultClient(HttpClient httpClient, OctaneConfiguration config, ProgressBar pbar = null)
     {
         _httpClient = httpClient;
-        _mmf = mmf;
-        _memPool = memPool;
         _config = config;
         _pbar = pbar;
-        _partsize = partsize;
     }
 
-    public async PooledTask CopyMessageContentToStreamWithProgressAsync(HttpResponseMessage message, Stream stream, IProgress<long> progress)
+    public void SetBaseAddress(string url)
+    {
+        var basePart = new Uri(new Uri(url).GetLeftPart(UriPartial.Authority));
+        _httpClient.BaseAddress = basePart;
+    }
+    
+    public bool IsRangeSupported()
+    {
+        return false;
+    }
+
+    public void SetMmf(MemoryMappedFile file)
+    {
+        _mmf = file;
+    }
+
+    public void SetProgressbar(ProgressBar bar)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void SetArrayPool(ArrayPool<byte> pool)
+    {
+        _memPool = pool;
+    }
+    
+    private async PooledTask CopyMessageContentToStreamWithProgressAsync(HttpResponseMessage message, Stream stream, IProgress<long> progress)
     {
         byte[] buffer = _memPool.Rent(_config.BufferSize);
         long totalBytesWritten = 0;
@@ -78,10 +100,8 @@ internal class DefaultClient : IClient
             }
         }
     }
-
-
-    public async PooledTask<HttpResponseMessage> SendMessage(string url, (long, long) piece,
-        CancellationToken cancellationToken, PauseToken pauseToken)
+    
+    public async PooledTask Download(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         if (pauseToken.IsPaused)
         {
@@ -89,12 +109,9 @@ internal class DefaultClient : IClient
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
-        return await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+        var message = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
-    }
-
-    public async PooledTask ReadResponse(HttpResponseMessage message, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
-    {
+        
         if (pauseToken.IsPaused)
         {
             await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
@@ -106,7 +123,7 @@ internal class DefaultClient : IClient
         {
             totalWritten += bytesWritten;
 
-            if (totalWritten % (_partsize / _config.BufferSize) == 0)
+            if (totalWritten % ((piece.Item2-piece.Item1) / _config.BufferSize) == 0)
             {
                 _pbar?.Tick();
             }
