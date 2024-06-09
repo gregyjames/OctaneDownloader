@@ -81,24 +81,30 @@ internal class NormalStream: Stream, IStream
 
     public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
     {
-        var bytesRead = 0;
-        var totalBytesRead = 0;
-        while (totalBytesRead < count)
+        try
         {
-            bytesRead = await _stream.ReadAsync(buffer, offset + totalBytesRead, count - totalBytesRead, cancellationToken);
-            if (bytesRead == 0) // End of stream
-            {
-                break;
-            }
-            totalBytesRead += bytesRead;
+            var memory = new Memory<byte>(buffer, offset, count);
+            await _stream.ReadExactlyAsync(memory, cancellationToken);
+            return count;
         }
-        return totalBytesRead;
+        catch (EndOfStreamException)
+        {
+            // Handle end of stream if necessary
+            return 0;
+        }
     }
 
-    public async Task<int> ReadAsync(Memory<byte> buffer, CancellationToken token)
+    public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token)
     {
-        var bytesRead = await _stream.ReadAsync(buffer, token);
-        return bytesRead;
+        try
+        {
+            return await _stream.ReadAsync(buffer, token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // Handle cancellation
+            return 0;
+        }
     }
 
     public override async ValueTask DisposeAsync()

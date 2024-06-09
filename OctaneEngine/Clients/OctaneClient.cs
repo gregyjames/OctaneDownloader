@@ -23,11 +23,15 @@
 
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using OctaneEngine;
 using OctaneEngineCore.ShellProgressBar;
@@ -46,6 +50,19 @@ internal class OctaneClient : IClient
     private ArrayPool<byte> _memPool;
     private MemoryMappedFile _mmf;
     private ProgressBar _progressBar;
+    
+    const string DllName = "rust_to_csharp"; // Adjust the name according to your platform
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int download_partial_file(
+        string url,
+        ulong start,
+        ulong end,
+        IntPtr buffer,
+        ulong buffer_len);
+
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void free_buffer(IntPtr buffer, ulong buffer_len);
 
     public OctaneClient(OctaneConfiguration config, HttpClient httpClient, ILoggerFactory loggerFactory, ProgressBar progressBar = null)
     {
@@ -80,17 +97,79 @@ internal class OctaneClient : IClient
     {
         _memPool = pool;
     }
-    
+
+    private static async IAsyncEnumerable<int> ProcessStreamAsync(IStream stream1, MemoryMappedViewStream stream2, byte[] readbuffer, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var memory = readbuffer.AsMemory();
+        while (true)
+        {
+            var bytesRead = await stream1.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
+            if (bytesRead == 0)
+            {
+                break;
+            }
+            await stream2.WriteAsync(readbuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+            yield return bytesRead;
+        }
+    }
+
+    /*
+    private static async IAsyncEnumerable<long> ProcessStreamLowMemoryAsync(IStream stream1, MemoryMappedFile _mmf,
+        byte[] readbuffer, (long, long) piece, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        long bytesReadOverall = 0;
+        var memory = readbuffer.AsMemory();
+        
+        while (true)
+        {
+            /*
+            var bytesRead = await stream1.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
+
+            if (bytesRead == 0)
+            {
+                break;
+            }
+
+            using var accessor = _mmf.CreateViewAccessor(piece.Item1 + bytesReadOverall, bytesRead, MemoryMappedFileAccess.Write);
+            accessor.WriteArray(0, readbuffer, 0, bytesRead);
+            bytesReadOverall += bytesRead;
+            yield return bytesReadOverall;
+            
+            
+            IntPtr buffer;
+            ulong buffer_len;
+
+            //int result = download_partial_file(_url, (ulong)piece.Item1, (ulong)piece.Item2, buffer, out buffer_len);
+            var result = 0;
+            using var accessor = _mmf.CreateViewAccessor(piece.Item1 + bytesReadOverall, (long)buffer_len, MemoryMappedFileAccess.Write);
+            
+            if (result != 0)
+            {
+                Console.WriteLine("Failed to download the file.");
+                break;
+            }
+            
+            byte[] data = new byte[buffer_len];
+            Marshal.Copy(buffer, data, 0, (int)buffer_len);
+            accessor.WriteArray(0, data, 0, (int)buffer_len);
+            free_buffer(buffer, buffer_len);
+            bytesReadOverall += (long)buffer_len;
+            yield return bytesReadOverall;
+        }
+    }
+    */
+    private static string _url = "";
     public async PooledTask Download(string url,(long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
+        _url = url;
         _log.LogTrace("Sending request for range ({PieceItem1},{PieceItem2})...", piece.Item1, piece.Item2);
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
-        request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
-        var message = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
-            .ConfigureAwait(false);
+        //using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
+        //request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
+        //var message = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+        //    .ConfigureAwait(false);
         
         #region Variable Declaration
-        var readbuffer = _memPool.Rent(_config.BufferSize);
+        //var readbuffer = _memPool.Rent(_config.BufferSize);
         _log.LogInformation("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
         var stopwatch = new Stopwatch();
         var programBps = _config.BytesPerSecond / _config.Parts;
@@ -112,82 +191,66 @@ internal class OctaneClient : IClient
         }
         
         stopwatch.Start();
-        if (message.IsSuccessStatusCode)
+        if (true)
         {
             _log.LogInformation("HTTP request returned success status code for piece ({PieceItem1},{PieceItem2})", piece.Item1, piece.Item2);
-            await using (var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
-            {
-                IStream _stream = _config.BytesPerSecond <= 1 ? new NormalStream() : new ThrottleStream(_loggerFactory);
-                _stream.SetStreamParent(networkStream);
-                _stream.SetBps(programBps);
+            
+            /*
+            IntPtr buffer;
+            ulong buffer_len;
 
-                using var child = _progressBar?.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", childOptions);
-
-                if (_config.LowMemoryMode)
-                {
-                    try
-                    {
-                        while (true)
-                        {
-                            var bytesRead = await _stream.ReadAsync(readbuffer.AsMemory(), cancellationToken);
-
-                            if (bytesRead == 0)
-                            {
-                                break;
-                            }
-                            
-                            using (var accessor = _mmf.CreateViewAccessor(piece.Item1 + bytesReadOverall, bytesRead,
-                                       MemoryMappedFileAccess.Write))
-                            {
-                                accessor.WriteArray(0, readbuffer, 0, bytesRead);
-                                bytesReadOverall += bytesRead;
-                                child?.Tick((int)bytesReadOverall);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _log.LogError(ex.Message);
-                        throw;
-                    }
-                }
-                else
-                {
-                    var stream = _mmf.CreateViewStream(piece.Item1, 0);
-                    try
-                    {
-                        while (true)
-                        {
-                            var bytesRead = await _stream.ReadAsync(readbuffer.AsMemory(), cancellationToken);
-                            if (bytesRead == 0)
-                            {
-                                break;
-                            }
-                            await stream.WriteAsync(readbuffer.AsMemory().Slice(0, bytesRead), cancellationToken);
-                            bytesReadOverall += bytesRead;
-                            child?.Tick((int)bytesReadOverall);
-                        }
-                    }
-                    finally
-                    {
-                        // Flush and dispose of the MemoryMappedViewStream
-                        await stream.FlushAsync(cancellationToken);
-                        await stream.DisposeAsync();
-                        await _stream.DisposeAsync();
-                    }
-                }
-
-            }
-
-            _log.LogInformation("Buffer returned to memory pool");
+            int result = download_partial_file(_url, (ulong)piece.Item1, piece.Item2, out buffer, out buffer_len);
+            using var accessor = _mmf.CreateViewAccessor(piece.Item1 + bytesReadOverall, (long)buffer_len, MemoryMappedFileAccess.Write);
+            
+            Marshal.Copy(buffer, readbuffer, 0, (int)buffer_len);
+            accessor.WriteArray(0, readbuffer, 0, (int)buffer_len);
+            free_buffer(buffer, buffer_len);
+            */
+            
+            /*
+        var readbuffer = _memPool.Rent((int)(piece.Item2 - piece.Item1) + 1);
+        GCHandle handle = GCHandle.Alloc(readbuffer, GCHandleType.Pinned);
+        IntPtr buffer = handle.AddrOfPinnedObject();
+            
+        try
+        {
+            int result = download_partial_file(url, (ulong)piece.Item1, (ulong)piece.Item2, buffer,
+                (ulong)readbuffer.Length);
+            using var accessor = _mmf.CreateViewAccessor(piece.Item1, (long)result, MemoryMappedFileAccess.Write);
+            accessor.WriteArray(0, readbuffer, 0, (int)result);
         }
-        _memPool.Return(readbuffer);
+        finally
+        {
+            handle.Free();
+            _memPool.Return(readbuffer);
+        }
+        */
+
+            await Task.Run(() => { unsafeWrite(piece, url); }, cancellationToken);
+        }
+        
         _progressBar?.Tick();
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) done", piece.Item1, piece.Item2);
         stopwatch.Stop();
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds} ms", piece.Item1, piece.Item2, stopwatch.ElapsedMilliseconds);
     }
 
+    void unsafeWrite((long, long) piece, string url)
+    {
+        unsafe
+        {
+
+            var readbuffer = _memPool.Rent((int)(piece.Item2 - piece.Item1) + 1);
+            fixed (byte* pBuffer = readbuffer)
+            {
+                IntPtr buffer = (IntPtr)pBuffer;
+                int result = download_partial_file(url, (ulong)piece.Item1, (ulong)piece.Item2, buffer, (ulong)readbuffer.Length);
+                using var accessor = _mmf.CreateViewAccessor(piece.Item1, (long)result, MemoryMappedFileAccess.Write);
+                accessor.WriteArray(0, readbuffer, 0, (int)result);
+            }
+            _memPool.Return(readbuffer);
+        }
+    }
     public void Dispose()
     {
         //_client?.Dispose();

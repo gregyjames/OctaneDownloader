@@ -27,15 +27,18 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Collections.Pooled;
+using CommunityToolkit.HighPerformance.Helpers;
 using Microsoft.Extensions.Logging;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
 using OctaneEngineCore.ShellProgressBar;
+using PooledAwait;
 
 // ReSharper disable All
 
@@ -196,9 +199,10 @@ namespace OctaneEngine
 
                         try
                         {
+                            
                             await Parallel.ForEachAsync(pieces, options, async (piece, token) =>
                             {
-                                await _client.Download(url, piece, cancellation_token, pause_token.Token);
+                                await _client.Download(url, piece, cancellation_token, pause_token.Token).ConfigureAwait(false);
 
                                 Interlocked.Increment(ref tasksDone);
 

@@ -1,4 +1,6 @@
+using System;
 using System.Net.Http;
+using System.Net.Security;
 using Autofac;
 using Microsoft.Extensions.Logging;
 using OctaneEngine;
@@ -14,21 +16,26 @@ public class HTTPClientModule: Module
             var factory = ctx.Resolve<ILoggerFactory>();
             var cfg = ctx.Resolve<OctaneConfiguration>();
             
-            var clientHandler = new HttpClientHandler()
+            var socketsHandler = new SocketsHttpHandler
             {
                 PreAuthenticate = true,
-                UseDefaultCredentials = true,
                 Proxy = cfg.Proxy,
                 UseProxy = cfg.UseProxy,
                 MaxConnectionsPerServer = cfg.Parts,
                 UseCookies = false,
-                ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+                SslOptions = new SslClientAuthenticationOptions
+                {
+                    RemoteCertificateValidationCallback = (_, _, _, _) => true,
+                },
+                PooledConnectionLifetime = TimeSpan.FromMinutes(10), // Recycle connections every 10 minutes,
+                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5),
+                EnableMultipleHttp2Connections = true
             };
 
-            var retryHandler = new RetryHandler(clientHandler, factory, cfg.NumRetries);
+            var retryHandler = new RetryHandler(socketsHandler, factory, cfg.NumRetries);
             var _client = new HttpClient(retryHandler)
             {
-                MaxResponseContentBufferSize = cfg.BufferSize,
+                MaxResponseContentBufferSize = cfg.BufferSize
             };
 
             return _client;
