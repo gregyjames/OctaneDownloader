@@ -1,11 +1,13 @@
 use reqwest::blocking::{Client, Response};
 use reqwest::header::RANGE;
-use std::ffi::{CStr};
+use std::ffi::{CStr, CString};
 use std::io::Read;
 use std::os::raw::{c_char, c_uchar};
 use std::slice;
 use lazy_static::lazy_static;
 use std::time::Duration;
+
+pub type CallDelegate = extern "C" fn(*const c_char);
 
 lazy_static! {
     static ref CLIENT: Client = Client::builder()
@@ -21,6 +23,11 @@ fn fetch_range(url: &str, range: &str) -> Result<Response, reqwest::Error> {
         .send()
 }
 
+fn call_callback(s: &str, callback: CallDelegate) {
+    let c_string = CString::new(s).unwrap();
+    callback(c_string.as_ptr());
+}
+
 #[no_mangle]
 pub extern "C" fn download_partial_file(
     url: *const c_char,
@@ -28,6 +35,7 @@ pub extern "C" fn download_partial_file(
     end: u64,
     buffer: *mut c_uchar,
     buffer_len: usize,
+    callback: CallDelegate
 ) -> i32 {
     let c_str = unsafe {
         assert!(!url.is_null());
@@ -64,6 +72,8 @@ pub extern "C" fn download_partial_file(
             Err(_) => return -1,
         }
     }
+
+    call_callback(format!("start: {}, end: {}, total: {}, buffersize: {}", start, end, end-start, buffer_len).as_str(), callback);
 
     total_read as i32
 }
