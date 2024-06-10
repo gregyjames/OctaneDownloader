@@ -1,0 +1,25 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <!-- Define the Rust files to compile -->
+    <RustSource Include="src\*.rs" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <RustOutputDir>\target\release</RustOutputDir>
+  </PropertyGroup>
+
+  <Target Name="Clean">
+    <RemoveDir Directories="$(RustOutputDir)" />
+  </Target>
+
+  <Target Name="Build" DependsOnTargets="Clean">
+    <!-- Ensure Cargo is installed -->
+    <Exec Command="cargo --version" ContinueOnError="false" />
+
+    <!-- Build the Rust project -->
+    <Exec Command="cargo build --release" ContinueOnError="false" />
+
+    <!-- Output the location of the built library -->
+    <Message Text="Rust library built at: $(RustOutputDir)\libcore.dylib" />
+  </Target>
+</Project>
