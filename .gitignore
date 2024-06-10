@@ -28,3 +28,5 @@ OctaneTester/.DS_Store
 
 .idea/.idea.Octane/.idea/
 .idea/
+
+Core/target/
