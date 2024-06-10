@@ -8,6 +8,10 @@
 ![alt tag](https://image.ibb.co/h2tK8v/Untitled_1.png)
 
 
+## This is an experimental version of Octane that incorparates a Rust core that handles the downloading, rather than using HTTP Client. It then uses unsafe methods in c# to pass and write the downloaded content to a C# MemoryMappedViewAccessor object.
+
+### Much more testing is needed, and distribution of this version probably won't occur, since the rust code needs to be compiled for a specific platform (win, mac, linux, etc). Feel free to check it out and let me know what you think. The cargo project is configured for MSBuild so compiling the solution will also compile the Rust project, just make sure you have cargo installed.
+
 A high Performance C# file downloader that asyncrounously downloads files as pieces. Made as a faster, more efficent replacement to Microsoft's WebClient.Want to see the library in action? Check out [Octane YouTube Extractor](https://github.com/gregyjames/OCTANE-YoutubeExtractor)
 
 # Installation
