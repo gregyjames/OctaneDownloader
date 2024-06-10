@@ -26,6 +26,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
@@ -51,7 +52,7 @@ internal class OctaneClient : IClient
     private MemoryMappedFile _mmf;
     private ProgressBar _progressBar;
     
-    const string DllName = "rust_to_csharp"; // Adjust the name according to your platform
+    const string DllName = "core"; // Adjust the name according to your platform
 
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     private static extern int download_partial_file(
@@ -226,7 +227,10 @@ internal class OctaneClient : IClient
         }
         */
 
-            await Task.Run(() => { unsafeWrite(piece, url); }, cancellationToken);
+            await Task.Run(() =>
+            {
+                UnsafeWrite(piece, url);
+            }, cancellationToken);
         }
         
         _progressBar?.Tick();
@@ -235,20 +239,26 @@ internal class OctaneClient : IClient
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds} ms", piece.Item1, piece.Item2, stopwatch.ElapsedMilliseconds);
     }
 
-    void unsafeWrite((long, long) piece, string url)
+    void UnsafeWrite((long, long) piece, string url)
     {
-        unsafe
+        var readbuffer = _memPool.Rent((int)(piece.Item2 - piece.Item1) + 1);
+        try
         {
-
-            var readbuffer = _memPool.Rent((int)(piece.Item2 - piece.Item1) + 1);
-            fixed (byte* pBuffer = readbuffer)
+            unsafe
             {
-                IntPtr buffer = (IntPtr)pBuffer;
-                int result = download_partial_file(url, (ulong)piece.Item1, (ulong)piece.Item2, buffer, (ulong)readbuffer.Length);
-                using var accessor = _mmf.CreateViewAccessor(piece.Item1, (long)result, MemoryMappedFileAccess.Write);
-                accessor.WriteArray(0, readbuffer, 0, (int)result);
+                fixed (byte* pBuffer = readbuffer)
+                {
+                    IntPtr buffer = (IntPtr)pBuffer;
+                    int result = download_partial_file(url, (ulong)piece.Item1, (ulong)piece.Item2, buffer,
+                        (ulong)readbuffer.Length);
+                    using var accessor = _mmf.CreateViewAccessor(piece.Item1, (long)result, MemoryMappedFileAccess.Write);
+                    accessor.WriteArray(0, readbuffer, 0, (int)result);
+                }
             }
-            _memPool.Return(readbuffer);
+        }
+        finally
+        {
+            _memPool.Return(readbuffer, true);
         }
     }
     public void Dispose()

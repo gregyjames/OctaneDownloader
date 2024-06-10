@@ -49,6 +49,8 @@
         <PackageReference Include="AsyncEnumerator" Version="4.0.2" Condition="'$(TargetFramework)' == 'net461' OR '$(TargetFramework)' == 'net472'" />
         <PackageReference Include="Autofac" Version="8.0.0" />
         <PackageReference Include="CommunityToolkit.HighPerformance" Version="8.2.2" />
+        <PackageReference Include="Microsoft.Build" Version="17.10.4" />
+        <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.10.4" />
         <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
@@ -63,10 +65,14 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Content Include="..\..\..\..\..\Projects\rust_to_csharp\target\release\librust_to_csharp.dylib">
-        <Link>librust_to_csharp.dylib</Link>
+      <Content Include="..\Core\target\release\libcore.dylib">
+        <Link>libcore.dylib</Link>
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </Content>
     </ItemGroup>
+
+    <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+      <Exec Command="msbuild -t:Build $(SolutionDir)/core/build.proj" />
+    </Target>
 
 </Project>
