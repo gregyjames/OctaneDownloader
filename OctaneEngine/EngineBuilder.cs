@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using Autofac;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Memory;
 using Microsoft.Extensions.Logging;
 using OctaneEngine;
 
@@ -33,10 +35,19 @@ public static class EngineBuilder
         {
             containerBuilder.RegisterInstance(factory).As<ILoggerFactory>();
         }
-
         if (config != null)
         {
-            containerBuilder.RegisterInstance(config).As<IConfiguration>();
+            var builder = new ConfigurationBuilder();
+            var configuration = builder.AddInMemoryCollection(new Dictionary<string, string> {
+                ["octane:Parts"] = config.Parts.ToString(),
+                ["octane:BufferSize"] = config.BufferSize.ToString(),
+                ["octane:ShowProgress"] = config.ShowProgress.ToString(),
+                ["octane:NumRetries"] = config.NumRetries.ToString(),
+                ["octane:BytesPerSecond"] = config.BytesPerSecond.ToString(),
+                ["octane:UseProxy"] = config.UseProxy.ToString(),
+                ["octane:LowMemoryMode"] = config.LowMemoryMode.ToString(),
+            }).Build();
+            containerBuilder.RegisterInstance(configuration).As<IConfiguration>();
         }
         containerBuilder.AddOctane();
         var engineContainer = containerBuilder.Build();
