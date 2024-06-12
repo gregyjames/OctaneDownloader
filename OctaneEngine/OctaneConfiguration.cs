@@ -22,7 +22,6 @@
  */
 
 using System;
-using System.IO;
 using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -47,6 +46,17 @@ public class OctaneConfiguration
         LowMemoryMode = false;
     }
 
+    public OctaneConfiguration(int parts = 4, int bufferSize = 8096, bool showProgress = true, int numRetries = 10, int bytesPerSecond = 1,
+        bool useProxy = false, bool lowMemoryMode = false)
+    {
+        Parts = parts;
+        BufferSize = bufferSize;
+        ShowProgress = showProgress;
+        NumRetries = numRetries;
+        BytesPerSecond = bytesPerSecond;
+        UseProxy = useProxy;
+        LowMemoryMode = lowMemoryMode;
+    }
     public OctaneConfiguration(IConfiguration config, ILoggerFactory factory)
     {
         _logger = factory.CreateLogger<OctaneConfiguration>();
@@ -92,16 +102,6 @@ public class OctaneConfiguration
     public bool ShowProgress { get; set; }
 
     /// <summary>
-    ///     The Action<bool> function to call when the download is finished.
-    /// </summary>
-    public Action<bool> DoneCallback { get; set; }
-
-    /// <summary>
-    ///     The Action<double> function to call to report download progress.
-    /// </summary>
-    public Action<double> ProgressCallback { get; set; }
-
-    /// <summary>
     ///     Number of times to retry if the connection fails.
     /// </summary>
     public int NumRetries { get; set; }
@@ -119,7 +119,17 @@ public class OctaneConfiguration
     /// <summary>
     ///     The Proxy settings to use.
     /// </summary>
-    public IWebProxy Proxy { get; set; }
+    protected internal IWebProxy Proxy { get; set; }
+    
+    /// <summary>
+    ///     The Action<bool> function to call when the download is finished.
+    /// </summary>
+    protected internal Action<bool> DoneCallback { get; set; }
+
+    /// <summary>
+    ///     The Action<double> function to call to report download progress.
+    /// </summary>
+    protected internal Action<double> ProgressCallback { get; set; }
     public override string ToString()
     {
         var s =

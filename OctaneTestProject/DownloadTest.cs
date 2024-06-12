@@ -67,16 +67,9 @@ namespace OctaneTestProject
                     Parts = 2,
                     BufferSize = 8192,
                     ShowProgress = false,
-                    DoneCallback = _ =>
-                    {
-                        Console.WriteLine("Done!");
-                        Assert.IsTrue(File.Exists(_outFile));
-                    },
-                    ProgressCallback = Console.WriteLine,
                     NumRetries = 20,
                     BytesPerSecond = 1,
                     UseProxy = false,
-                    Proxy = null
                 };
 
                 var containerBuilder = new ContainerBuilder();
@@ -85,6 +78,13 @@ namespace OctaneTestProject
                 containerBuilder.AddOctane();
                 var engineContainer = containerBuilder.Build();
                 var engine = engineContainer.Resolve<IEngine>();
+                engine.SetProxy(null);
+                engine.SetDoneCallback(_ =>
+                {
+                    Console.WriteLine("Done!");
+                    Assert.IsTrue(File.Exists(_outFile));
+                });
+                engine.SetProgressCallback(Console.WriteLine);
                 engine.DownloadFile(url, _outFile, _pauseTokenSource, _cancelTokenSource).Wait();
             }
             catch

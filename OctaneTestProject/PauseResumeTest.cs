@@ -59,12 +59,9 @@ namespace OctaneTestProject
                 Parts = 2,
                 BufferSize = 8192,
                 ShowProgress = false,
-                DoneCallback = _ => Assert.IsTrue(File.Exists(_outFile)),
-                ProgressCallback = Console.WriteLine,
                 NumRetries = 20,
                 BytesPerSecond = 1,
-                UseProxy = false,
-                Proxy = null
+                UseProxy = false
             };
             
             _pauseTokenSource.Pause();
@@ -76,6 +73,9 @@ namespace OctaneTestProject
             var engineContainer = containerBuilder.Build();
             var engine = engineContainer.Resolve<IEngine>();
 
+            engine.SetDoneCallback(_ => Assert.IsTrue(File.Exists(_outFile)));
+            engine.SetProgressCallback(Console.WriteLine);
+            engine.SetProxy(null);
             Parallel.Invoke(
                 () => Action(_pauseTokenSource),
                 () => engine.DownloadFile(url, _outFile, _pauseTokenSource, _cancelTokenSource).Wait()

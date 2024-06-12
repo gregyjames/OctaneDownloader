@@ -75,12 +75,9 @@ namespace OctaneTestProject
                     Parts = 2,
                     BufferSize = 8192,
                     ShowProgress = false,
-                    DoneCallback = _ => done = true,
-                    ProgressCallback = Console.WriteLine,
                     NumRetries = 20,
                     BytesPerSecond = 1,
                     UseProxy = false,
-                    Proxy = null
                 };
 
                 if (File.Exists("original.png"))
@@ -91,6 +88,10 @@ namespace OctaneTestProject
                     containerBuilder.AddOctane();
                     var engineContainer = containerBuilder.Build();
                     var engine = engineContainer.Resolve<IEngine>();
+                    engine.SetDoneCallback(_ => done = true);
+                    engine.SetProgressCallback(Console.WriteLine);
+                    engine.SetProxy(null);
+                        
                     var t = engine.DownloadFile(url, outFile, _pauseTokenSource, _cancelTokenSource);
                     t.Wait();
                 }
