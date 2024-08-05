@@ -208,6 +208,11 @@ namespace OctaneEngine
                                 _config?.ProgressCallback?.Invoke((double)tasksDone / _config.Parts);
                             }).ConfigureAwait(false);
                         }
+                        catch (OperationCanceledException ex)
+                        {
+                            logger.LogError("TASK WAS CANCELLED.");
+                            File.Delete(filename);
+                        }
                         catch (Exception ex)
                         {
                             logger.LogError($"ERROR USING CORE CLIENT: {ex.Message}");
