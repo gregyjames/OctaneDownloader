@@ -92,7 +92,7 @@ namespace OctaneTestProject
                     engine.SetProgressCallback(Console.WriteLine);
                     engine.SetProxy(null);
                         
-                    var t = engine.DownloadFile(url, outFile, _pauseTokenSource, _cancelTokenSource);
+                    var t = engine.DownloadFile(new OctaneRequest(){URL = url}, outFile, _pauseTokenSource, _cancelTokenSource);
                     t.Wait();
                 }
             }

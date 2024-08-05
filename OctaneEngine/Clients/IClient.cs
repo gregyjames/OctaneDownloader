@@ -39,5 +39,6 @@ public interface IClient : IDisposable
     public void SetMmf(MemoryMappedFile file);
     public void SetProgressbar(ProgressBar bar);
     public void SetArrayPool(ArrayPool<Byte> pool);
+    public void SetHeaders(OctaneRequest req);
     public PooledTask Download(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken);
 }

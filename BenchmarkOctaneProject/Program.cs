@@ -78,13 +78,13 @@ namespace BenchmarkOctaneProject
         [Benchmark]
         public async Task BenchmarkOctane()
         {
-            await _OctaneEngine.DownloadFile(Url, "output0.zip", pauseTokenSource, cancelTokenSource);
+            await _OctaneEngine.DownloadFile(new OctaneRequest(){URL = ""}, "output0.zip", pauseTokenSource, cancelTokenSource);
         }
 
         [Benchmark]
         public async Task BenchmarkOctaneLowMemory()
         {
-            await _OctaneEngine2.DownloadFile(Url, "output1.zip", pauseTokenSource, cancelTokenSource);
+            await _OctaneEngine2.DownloadFile(new OctaneRequest(){URL = ""}, "output1.zip", pauseTokenSource, cancelTokenSource);
         }
         [Benchmark]
         public async Task BenchmarkHttpClient()

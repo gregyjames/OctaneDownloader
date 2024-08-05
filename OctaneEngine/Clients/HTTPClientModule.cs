@@ -30,7 +30,7 @@ public class HTTPClientModule: Module
             {
                 MaxResponseContentBufferSize = cfg.BufferSize,
             };
-
+            
             return _client;
         }).As<HttpClient>().SingleInstance();
     }

@@ -80,7 +80,15 @@ internal class OctaneClient : IClient
     {
         _memPool = pool;
     }
-    
+
+    public void SetHeaders(OctaneRequest req)
+    {
+        foreach (var pair in req.Headers)
+        {
+            _client.DefaultRequestHeaders.Add(pair.Key, pair.Value);
+        }
+    }
+
     public async PooledTask Download(string url,(long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         _log.LogTrace("Sending request for range ({PieceItem1},{PieceItem2})...", piece.Item1, piece.Item2);

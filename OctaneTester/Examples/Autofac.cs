@@ -38,6 +38,6 @@ public class Autofac
         containerBuilder.AddOctane();
         var engineContainer = containerBuilder.Build();
         var engine = engineContainer.Resolve<IEngine>();
-        engine.DownloadFile("", "", pauseTokenSource, cancelTokenSource);
+        engine.DownloadFile(new OctaneRequest(){URL = ""}, "", pauseTokenSource, cancelTokenSource);
     }
 }
