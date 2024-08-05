@@ -1,11 +1,8 @@
 ![C#](https://github.com/gregyjames/OctaneDownloader/actions/workflows/dotnet.yml/badge.svg)
 [![CodeQL](https://github.com/gregyjames/OctaneDownloader/actions/workflows/codeql-analysis.yml/badge.svg?branch=master)](https://github.com/gregyjames/OctaneDownloader/actions/workflows/codeql-analysis.yml)
 [![CodeFactor](https://www.codefactor.io/repository/github/gregyjames/octanedownloader/badge)](https://www.codefactor.io/repository/github/gregyjames/octanedownloader)
-[![codebeat badge](https://codebeat.co/badges/9154fd6f-ac4b-4f00-8910-66488582efcd)](https://codebeat.co/projects/github-com-gregyjames-octanedownloader-master)
 [![NuGet latest version](https://badgen.net/nuget/v/OctaneEngineCore)](https://www.nuget.org/packages/OctaneEngineCore)
-![NuGet Downloads](https://img.shields.io/nuget/dt/OctaneEngineCore)
-
-![alt tag](https://image.ibb.co/h2tK8v/Untitled_1.png)
+![Nuget](https://img.shields.io/nuget/dt/OctaneEngineCore)
 
 
 A high Performance C# file downloader that asyncrounously downloads files as pieces. Made as a faster, more efficent replacement to Microsoft's WebClient.Want to see the library in action? Check out [Octane YouTube Extractor](https://github.com/gregyjames/OCTANE-YoutubeExtractor)
@@ -27,47 +24,49 @@ dotnet add package OctaneEngineCore
 
 # Usage
 ```csharp
-private const string Url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
-        
-private static void Main(){
-     #region Logging Configuration
-          var seriLog = new LoggerConfiguration()
-               .Enrich.FromLogContext()
-               .MinimumLevel.Error()
-               .WriteTo.Async(a => a.File("./OctaneLog.txt"))
-               .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen))
-               .CreateLogger();
-            var factory = LoggerFactory.Create(logging =>
-            {
-                logging.AddSerilog(seriLog);
-            });
-     #endregion
+#region Logging Configuration
+var seriLog = new LoggerConfiguration()
+    .Enrich.FromLogContext()
+    .MinimumLevel.Error()
+    .WriteTo.Async(a => a.File("./OctaneLog.txt"))
+    .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen))
+    .CreateLogger();
+    var factory = LoggerFactory.Create(logging => {
+        logging.AddSerilog(seriLog);
+    });
+#endregion
 
-     #region Configuration Loading
-          var builder = new ConfigurationBuilder();
-          builder.SetBasePath(Directory.GetCurrentDirectory())
-               .AddJsonFile("appsettings.json", true, true);
-          var configRoot = builder.Build();
-     #endregion
+#region Configuration Loading
+    var builder = new ConfigurationBuilder();
+    builder.SetBasePath(Directory.GetCurrentDirectory())
+        .AddJsonFile("appsettings.json", true, true);
+    var configRoot = builder.Build();
+#endregion
 
-     #region Find and Set optimal number of parts
-          //var optimalNumberOfParts = Engine.GetOptimalNumberOfParts(Url).Result;
-          //seriLog.Information("Optimal number of parts to download file: {OptimalNumberOfParts}", optimalNumberOfParts);
-          //seriLog.Information("Speed: {Result}", NetworkAnalyzer.GetCurrentNetworkSpeed().Result);
-          //seriLog.Information("Latency: {Result}", NetworkAnalyzer.GetCurrentNetworkLatency().Result);
-     #endregion
-
-     var pauseTokenSource = new PauseTokenSource();
-     using var cancelTokenSource = new CancellationTokenSource();
-     var containerBuilder = new ContainerBuilder();
-     containerBuilder.RegisterInstance(factory).As<ILoggerFactory>();
-     containerBuilder.RegisterInstance(configRoot).As<IConfiguration>();
-     containerBuilder.AddOctane();
-     var engineContainer = containerBuilder.Build();
-     var engine = engineContainer.Resolve<IEngine>();
-     engine.DownloadFile(Url, null, pauseTokenSource, cancelTokenSource).Wait();
-}
-        
+#region Find and Set optimal number of parts
+    //var optimalNumberOfParts = Engine.GetOptimalNumberOfParts(Url).Result;
+    //seriLog.Information("Optimal number of parts to download file: {OptimalNumberOfParts}", optimalNumberOfParts);
+#endregion
+            
+//seriLog.Information("Speed: {Result}", NetworkAnalyzer.GetCurrentNetworkSpeed().Result);
+//seriLog.Information("Latency: {Result}", NetworkAnalyzer.GetCurrentNetworkLatency().Result);
+var pauseTokenSource = new PauseTokenSource();
+using var cancelTokenSource = new CancellationTokenSource();
+var containerBuilder = new ContainerBuilder();
+containerBuilder.RegisterInstance(factory).As<ILoggerFactory>();
+containerBuilder.RegisterInstance(configRoot).As<IConfiguration>();
+containerBuilder.AddOctane();
+var engineContainer = containerBuilder.Build();
+var engine = engineContainer.Resolve<IEngine>();
+engine.DownloadFile(
+    new OctaneRequest(){
+        URL = Url,
+        Headers = new Dictionary<string, string>(){}
+    }, 
+    null, 
+    pauseTokenSource, 
+    cancelTokenSource
+).Wait();
 ```
 
 # Benchmark

@@ -85,7 +85,7 @@ namespace OctaneTestProject
                     Assert.IsTrue(File.Exists(_outFile));
                 });
                 engine.SetProgressCallback(Console.WriteLine);
-                engine.DownloadFile(url, _outFile, _pauseTokenSource, _cancelTokenSource).Wait();
+                engine.DownloadFile(new OctaneRequest(){URL = url}, _outFile, _pauseTokenSource, _cancelTokenSource).Wait();
             }
             catch
             {
