@@ -136,7 +136,7 @@ namespace OctaneEngine
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
         /// <param name="pauseTokenSource">The pause token source to use for pausing and resuming.</param>
         /// <param name="cancelTokenSource">The cancellation token for canceling the task.</param>
-        public async Task DownloadFile(string url, string outFile = null, PauseTokenSource pauseTokenSource = null, CancellationTokenSource cancelTokenSource = null)
+        public async Task DownloadFile(string url, string outFile = null, PauseTokenSource pauseTokenSource = null, CancellationToken cancelToken = default(CancellationToken))
         {
             var (_length, _range) = await getFileSizeAndRangeSupport(url);
             
@@ -144,13 +144,13 @@ namespace OctaneEngine
                 var logger = _factory.CreateLogger("OctaneEngine");
                 var filename = outFile ?? Path.GetFileName(new Uri(url).LocalPath);
                 var success = false;
-                var cancellation_token = Helpers.CreateCancellationToken(cancelTokenSource, _config, filename);
                 var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
                 var stopwatch = new Stopwatch();
                 var memPool = ArrayPool<byte>.Create(_config.BufferSize, _config.Parts);
                 logger.LogInformation($"Range supported: {_range}");
                 var partSize = Convert.ToInt64(_length / _config.Parts);
                 int tasksDone = 0;
+                var childTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancelToken); //Create a child token for the task
             #endregion
             
             #region ServicePoint Configuration
@@ -168,7 +168,7 @@ namespace OctaneEngine
             logger.LogInformation($"PART SIZE: {NetworkAnalyzer.PrettySize(partSize)}");
             
             stopwatch.Start();
-            _client.SetBaseAddress(url);
+            _client.SetBaseAddress(url); 
             
             try
             {
@@ -184,7 +184,7 @@ namespace OctaneEngine
                         var options = new ParallelOptions()
                         {
                             MaxDegreeOfParallelism = Environment.ProcessorCount,
-                            CancellationToken = cancellation_token,
+                            CancellationToken = childTokenSource.Token,
                             //TaskScheduler = TaskScheduler.Current
                         };
                         ProgressBar pbar = null;
@@ -198,7 +198,7 @@ namespace OctaneEngine
                         {
                             await Parallel.ForEachAsync(pieces, options, async (piece, token) =>
                             {
-                                await _client.Download(url, piece, cancellation_token, pause_token.Token);
+                                await _client.Download(url, piece, token, pause_token.Token);
 
                                 Interlocked.Increment(ref tasksDone);
 
@@ -221,7 +221,7 @@ namespace OctaneEngine
                     else
                     {
                         logger.LogInformation("Using Default Client to download file.");
-                        await _normalClient.Download(url, (0, 0), cancellation_token, pause_token.Token);
+                        await _normalClient.Download(url, (0, 0), cancelToken, pause_token.Token);
                     }
 
                     success = true;

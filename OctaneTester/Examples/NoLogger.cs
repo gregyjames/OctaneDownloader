@@ -27,6 +27,6 @@ public class NoLogger
         containerBuilder.AddOctane();
         var engineContainer = containerBuilder.Build();
         var engine = engineContainer.Resolve<IEngine>();
-        engine.DownloadFile("", "", pauseTokenSource, cancelTokenSource);
+        engine.DownloadFile("", "", pauseTokenSource, cancelTokenSource.Token);
     }
 }
