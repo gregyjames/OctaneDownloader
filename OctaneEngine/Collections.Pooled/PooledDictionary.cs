@@ -912,7 +912,6 @@ namespace Collections.Pooled
                     }
                     collisionCount++;
                 } while (true);
-
             }
 
             bool updateFreeList = false;
