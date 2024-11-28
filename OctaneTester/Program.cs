@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using Autofac;
@@ -52,7 +53,14 @@ namespace OctaneTester
             containerBuilder.AddOctane();
             var engineContainer = containerBuilder.Build();
             var engine = engineContainer.Resolve<IEngine>();
-            engine.DownloadFile(Url, null, pauseTokenSource, cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest()
+            {
+                URL = Url,
+                Headers = new Dictionary<string, string>()
+                {
+                    
+                }
+            }, null, pauseTokenSource, cancelTokenSource).Wait();
         }
     }
 }
