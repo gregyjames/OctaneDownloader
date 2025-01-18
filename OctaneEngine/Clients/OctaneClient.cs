@@ -90,7 +90,7 @@ internal class OctaneClient : IClient
             .ConfigureAwait(false);
         
         #region Variable Declaration
-        var readbuffer = _memPool.Rent(_config.BufferSize);
+        var readBuffer = _memPool.Rent(_config.BufferSize);
         _log.LogInformation("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
         var stopwatch = new Stopwatch();
         var programBps = _config.BytesPerSecond / _config.Parts;
@@ -117,9 +117,9 @@ internal class OctaneClient : IClient
             _log.LogInformation("HTTP request returned success status code for piece ({PieceItem1},{PieceItem2})", piece.Item1, piece.Item2);
             await using (var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
             {
-                IStream _stream = _config.BytesPerSecond <= 1 ? new NormalStream() : new ThrottleStream(_loggerFactory);
-                _stream.SetStreamParent(networkStream);
-                _stream.SetBps(programBps);
+                IStream wrappedStream = _config.BytesPerSecond <= 1 ? new NormalStream() : new ThrottleStream(_loggerFactory);
+                wrappedStream.SetStreamParent(networkStream);
+                wrappedStream.SetBps(programBps);
 
                 using var child = _progressBar?.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", childOptions);
 
@@ -129,7 +129,7 @@ internal class OctaneClient : IClient
                     {
                         while (true)
                         {
-                            var bytesRead = await _stream.ReadAsync(readbuffer.AsMemory(), cancellationToken);
+                            var bytesRead = await wrappedStream.ReadAsync(readBuffer.AsMemory(), cancellationToken);
 
                             if (bytesRead == 0)
                             {
@@ -139,7 +139,7 @@ internal class OctaneClient : IClient
                             using (var accessor = _mmf.CreateViewAccessor(piece.Item1 + bytesReadOverall, bytesRead,
                                        MemoryMappedFileAccess.Write))
                             {
-                                accessor.WriteArray(0, readbuffer, 0, bytesRead);
+                                accessor.WriteArray(0, readBuffer, 0, bytesRead);
                                 bytesReadOverall += bytesRead;
                                 child?.Tick((int)bytesReadOverall);
                             }
@@ -147,7 +147,7 @@ internal class OctaneClient : IClient
                     }
                     catch (Exception ex)
                     {
-                        _log.LogError(ex.Message);
+                        _log.LogError(ex, "Error: {ex}", ex);
                         throw;
                     }
                 }
@@ -158,12 +158,12 @@ internal class OctaneClient : IClient
                     {
                         while (true)
                         {
-                            var bytesRead = await _stream.ReadAsync(readbuffer.AsMemory(), cancellationToken);
+                            var bytesRead = await wrappedStream.ReadAsync(readBuffer.AsMemory(), cancellationToken);
                             if (bytesRead == 0)
                             {
                                 break;
                             }
-                            await stream.WriteAsync(readbuffer.AsMemory().Slice(0, bytesRead), cancellationToken);
+                            await stream.WriteAsync(readBuffer.AsMemory().Slice(0, bytesRead), cancellationToken);
                             bytesReadOverall += bytesRead;
                             child?.Tick((int)bytesReadOverall);
                         }
@@ -173,7 +173,7 @@ internal class OctaneClient : IClient
                         // Flush and dispose of the MemoryMappedViewStream
                         await stream.FlushAsync(cancellationToken);
                         await stream.DisposeAsync();
-                        await _stream.DisposeAsync();
+                        await wrappedStream.DisposeAsync();
                     }
                 }
 
@@ -181,7 +181,7 @@ internal class OctaneClient : IClient
 
             _log.LogInformation("Buffer returned to memory pool");
         }
-        _memPool.Return(readbuffer);
+        _memPool.Return(readBuffer);
         _progressBar?.Tick();
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) done", piece.Item1, piece.Item2);
         stopwatch.Stop();

@@ -31,7 +31,6 @@ using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using Collections.Pooled;
 using Microsoft.Extensions.Logging;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
@@ -210,12 +209,12 @@ namespace OctaneEngine
                         }
                         catch (OperationCanceledException ex)
                         {
-                            logger.LogError("TASK WAS CANCELLED.");
+                            logger.LogError(ex, "TASK WAS CANCELLED. {ex}", ex);
                             File.Delete(filename);
                         }
                         catch (Exception ex)
                         {
-                            logger.LogError($"ERROR USING CORE CLIENT: {ex.Message}");
+                            logger.LogError(ex, "ERROR USING CORE CLIENT: {ex}", ex);
                         }
                     }
                     else
@@ -230,7 +229,7 @@ namespace OctaneEngine
             }
             catch (Exception ex)
             {
-                logger.LogError($"{ex.GetType().FullName}: {ex.Message}");
+                logger.LogError(ex, "{errType}: {errMessage}", ex.GetType().FullName, ex.Message);
                 success = false;
             }
             finally
