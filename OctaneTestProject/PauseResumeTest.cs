@@ -72,8 +72,8 @@ namespace OctaneTestProject
             containerBuilder.AddOctane();
             var engineContainer = containerBuilder.Build();
             var engine = engineContainer.Resolve<IEngine>();
-
-            engine.SetDoneCallback(_ => Assert.IsTrue(File.Exists(_outFile)));
+            
+            engine.SetDoneCallback(_ => Assert.That(File.Exists(_outFile), Is.True));
             engine.SetProgressCallback(Console.WriteLine);
             engine.SetProxy(null);
             Parallel.Invoke(

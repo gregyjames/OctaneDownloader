@@ -124,7 +124,7 @@ namespace OctaneTestProject
                         equal = true;
                     }
                 }
-                Assert.IsTrue(equal);
+                Assert.That(equal, Is.True);
             }
         }
     }
