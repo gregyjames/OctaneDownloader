@@ -75,6 +75,14 @@ internal class DefaultClient : IClient
         _memPool = pool;
     }
     
+    public void SetHeaders(OctaneRequest req)
+    {
+        foreach (var pair in req.Headers)
+        {
+            _httpClient.DefaultRequestHeaders.Add(pair.Key, pair.Value);
+        }
+    }
+    
     private async PooledTask CopyMessageContentToStreamWithProgressAsync(HttpResponseMessage message, Stream stream, IProgress<long> progress)
     {
         byte[] buffer = _memPool.Rent(_config.BufferSize);
