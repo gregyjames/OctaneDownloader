@@ -82,7 +82,7 @@ namespace OctaneTestProject
                 engine.SetDoneCallback(_ =>
                 {
                     Console.WriteLine("Done!");
-                    Assert.IsTrue(File.Exists(_outFile));
+                    Assert.That(File.Exists(_outFile), Is.True);
                 });
                 engine.SetProgressCallback(Console.WriteLine);
                 engine.DownloadFile(url, _outFile, _pauseTokenSource, _cancelTokenSource).Wait();
