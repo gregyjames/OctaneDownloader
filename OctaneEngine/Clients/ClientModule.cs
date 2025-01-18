@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using OctaneEngine;
 using OctaneEngineCore.ColorConsoleLogger;
 using OctaneEngineCore.ShellProgressBar;
-using OctaneEngineCore.Streams;
 
 namespace OctaneEngineCore.Clients;
 
@@ -24,14 +23,14 @@ public class ClientModule: Module
         builder.Register(context =>
         {
             var registered = context.TryResolve(out IConfiguration config);
-            var OCconfig = !registered ? new OctaneConfiguration() : new OctaneConfiguration(config, context.Resolve<ILoggerFactory>());
+            var octaneConfiguration = !registered ? new OctaneConfiguration() : new OctaneConfiguration(config, context.Resolve<ILoggerFactory>());
 
-            if (OCconfig.ShowProgress)
+            if (octaneConfiguration.ShowProgress)
             {
                 // Register ProgressBar
                 builder.RegisterModule(new ProgressModule());
             }
-            return OCconfig;
+            return octaneConfiguration;
         }).As<OctaneConfiguration>().IfNotRegistered(typeof(OctaneConfiguration)).SingleInstance();
         
         // Register HTTPClient Instance
