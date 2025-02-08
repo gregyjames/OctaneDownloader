@@ -29,6 +29,7 @@ using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Net;
 using System.Net.Http;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -61,12 +62,11 @@ namespace OctaneEngine
             stopwatch.Stop();
             logger.LogInformation($"File downloaded in {stopwatch.ElapsedMilliseconds} ms.");
             logger.LogTrace("Calling callback function...");
-            config.DoneCallback?.Invoke(success);
-
             if (!success)
             {
                 logger.LogError("Download Failed.");
             }
+            config.DoneCallback?.Invoke(success);
         }
         #endregion
 
@@ -137,40 +137,41 @@ namespace OctaneEngine
         /// <param name="cancelTokenSource">The cancellation token for canceling the task.</param>
         public async Task DownloadFile(string url, string outFile = null, PauseTokenSource pauseTokenSource = null, CancellationTokenSource cancelTokenSource = null)
         {
-            var (_length, _range) = await getFileSizeAndRangeSupport(url);
-            
-            #region Varible Initilization
-                var logger = _factory.CreateLogger("OctaneEngine");
-                var filename = outFile ?? Path.GetFileName(new Uri(url).LocalPath);
-                var success = false;
-                var cancellation_token = Helpers.CreateCancellationToken(cancelTokenSource, _config, filename);
-                var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
-                var stopwatch = new Stopwatch();
-                var memPool = ArrayPool<byte>.Create(_config.BufferSize, _config.Parts);
-                logger.LogInformation($"Range supported: {_range}");
-                var partSize = Convert.ToInt64(_length / _config.Parts);
-                int tasksDone = 0;
-            #endregion
-            
-            #region ServicePoint Configuration
-                logger.LogInformation($"Server file name: {filename}.");
-                ServicePointManager.Expect100Continue = false;
-                ServicePointManager.DefaultConnectionLimit = 10000;
-                ServicePointManager.SetTcpKeepAlive(true, Int32.MaxValue,1);
-                ServicePointManager.MaxServicePoints = _config.Parts;
-                #if NET6_0_OR_GREATER
-                    ServicePointManager.ReusePort = true;
-                #endif
-            #endregion
-            
-            logger.LogInformation($"TOTAL SIZE: {NetworkAnalyzer.PrettySize(_length)}");
-            logger.LogInformation($"PART SIZE: {NetworkAnalyzer.PrettySize(partSize)}");
-            
-            stopwatch.Start();
-            _client.SetBaseAddress(url);
+            var stopwatch = new Stopwatch();
+            var logger = _factory.CreateLogger<Engine>();
+            var success = false;
             
             try
             {
+                var (_length, _range) = await getFileSizeAndRangeSupport(url);
+            
+                #region Varible Initilization
+                    var filename = outFile ?? Path.GetFileName(new Uri(url).LocalPath);
+                    var cancellation_token = Helpers.CreateCancellationToken(cancelTokenSource, _config, filename);
+                    var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
+                    var memPool = ArrayPool<byte>.Create(_config.BufferSize, _config.Parts);
+                    logger.LogInformation("Range supported: {range}", _range);
+                    var partSize = Convert.ToInt64(_length / _config.Parts);
+                    int tasksDone = 0;
+                #endregion
+            
+                #region ServicePoint Configuration
+                    logger.LogInformation("Server file name: {filename}.", filename);
+                    ServicePointManager.Expect100Continue = false;
+                    ServicePointManager.DefaultConnectionLimit = 10000;
+                    ServicePointManager.SetTcpKeepAlive(true, Int32.MaxValue,1);
+                    ServicePointManager.MaxServicePoints = _config.Parts;
+                    #if NET6_0_OR_GREATER
+                        ServicePointManager.ReusePort = true;
+                    #endif
+                #endregion
+            
+                logger.LogInformation("TOTAL SIZE: {length}", NetworkAnalyzer.PrettySize(_length));
+                logger.LogInformation("PART SIZE: {partSize}", NetworkAnalyzer.PrettySize(partSize));
+            
+                stopwatch.Start();
+                _client.SetBaseAddress(url);
+            
                 using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, _length, MemoryMappedFileAccess.ReadWrite))
                 {
                     //Check if range is supported
@@ -201,36 +202,67 @@ namespace OctaneEngine
 
                                 Interlocked.Increment(ref tasksDone);
 
-                                logger.LogTrace($"Finished {tasksDone}/{_config?.Parts} pieces!");
+                                logger.LogTrace("Finished {tasks}/{parts} pieces!", tasksDone, _config?.Parts);
 
                                 pbar?.Tick();
                                 _config?.ProgressCallback?.Invoke((double)tasksDone / _config.Parts);
+
+                                success = true;
+                                logger.LogInformation("File downloaded successfully.");
                             }).ConfigureAwait(false);
                         }
                         catch (OperationCanceledException ex)
                         {
-                            logger.LogError(ex, "TASK WAS CANCELLED. {ex}", ex);
+                            logger.LogError(ex, "TASK WAS CANCELLED: {ex}", ex);
                             File.Delete(filename);
+                            throw;
+                        }
+                        catch (AggregateException ex)
+                        {
+                            File.Delete(filename);
+                            throw;
+                        }
+                        catch (System.OutOfMemoryException ex)
+                        {
+                            logger.LogError(ex, "TASK WAS CANCELLED DUE TO RUNNING OUT OF MEMORY: {ex}", ex);
+                            File.Delete(filename);
+                            throw;
                         }
                         catch (Exception ex)
                         {
                             logger.LogError(ex, "ERROR USING CORE CLIENT: {ex}", ex);
+                            File.Delete(filename);
+                            throw;
                         }
                     }
                     else
                     {
                         logger.LogInformation("Using Default Client to download file.");
-                        await _normalClient.Download(url, (0, 0), cancellation_token, pause_token.Token);
-                    }
+                        try
+                        {
+                            await _normalClient.Download(url, (0, 0), cancellation_token, pause_token.Token);
+                            success = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError(ex, "ERROR USING CORE CLIENT: {ex}", ex);
+                            throw;
+                        }
 
-                    success = true;
-                    logger.LogInformation("File downloaded successfully.");
+                        logger.LogInformation("File downloaded successfully.");
+                    }
                 }
+            }
+            catch (AggregateException aggEx)
+            {
+                // Attempts to preserve the stack trace while only throwing the inner exception
+                var innerCause = Helpers.GetFirstRealException(aggEx);
+                ExceptionDispatchInfo.Capture(innerCause).Throw();
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "{errType}: {errMessage}", ex.GetType().FullName, ex.Message);
                 success = false;
+                logger.LogError(ex, "ERROR DOWNLOADING FILE: {ex}", ex);
             }
             finally
             {

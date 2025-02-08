@@ -41,4 +41,45 @@ public static class Helpers
 
         return cancellation_token;
     }
+    
+    internal static Exception GetFirstRealException(Exception exception)
+    {
+        if (exception == null)
+        {
+            return null;
+        }
+
+        var current = exception;
+
+        while (true)
+        {
+            if (current is AggregateException aggEx)
+            {
+                // Flatten aggregates (in case we have multiple or nested AggregateExceptions)
+                var flattened = aggEx.Flatten();
+
+                // If after flattening there are no inner exceptions, we're done
+                if (flattened?.InnerExceptions?.Count == 0)
+                {
+                    break;
+                }
+
+                // Take the *first* of the flattened exceptions
+                // (If you want to handle multiple, you'd iterate or choose otherwise)
+                current = flattened.InnerExceptions[0];
+            }
+            else if (current?.InnerException != null)
+            {
+                // Move to the next inner exception until there's none
+                current = current.InnerException;
+            }
+            else
+            {
+                // No further nesting
+                break;
+            }
+        }
+
+        return current;
+    }
 }
