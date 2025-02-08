@@ -140,14 +140,16 @@ namespace OctaneEngine
             var stopwatch = new Stopwatch();
             var logger = _factory.CreateLogger<Engine>();
             var success = false;
+            var filename = string.Empty;
+            var clientType = string.Empty;
             
             try
             {
                 var (_length, _range) = await getFileSizeAndRangeSupport(url);
             
                 #region Varible Initilization
-                    var filename = outFile ?? Path.GetFileName(new Uri(url).LocalPath);
-                    var cancellation_token = Helpers.CreateCancellationToken(cancelTokenSource, _config, filename);
+                    filename = outFile ?? Path.GetFileName(new Uri(url).LocalPath);
+                    var cancellation_token = Helpers.CreateCancellationToken(cancelTokenSource, _config);
                     var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
                     var memPool = ArrayPool<byte>.Create(_config.BufferSize, _config.Parts);
                     logger.LogInformation("Range supported: {range}", _range);
@@ -177,6 +179,7 @@ namespace OctaneEngine
                     //Check if range is supported
                     if (_client.IsRangeSupported())
                     {
+                        clientType = "Octane";
                         var pieces = Helpers.CreatePartsList(_length, partSize, logger);
                         _client.SetMmf(mmf);
                         _client.SetArrayPool(memPool);
@@ -211,33 +214,21 @@ namespace OctaneEngine
                                 logger.LogInformation("File downloaded successfully.");
                             }).ConfigureAwait(false);
                         }
-                        catch (OperationCanceledException ex)
+                        catch (AggregateException aggEx)
                         {
-                            logger.LogError(ex, "TASK WAS CANCELLED: {ex}", ex);
-                            File.Delete(filename);
-                            throw;
-                        }
-                        catch (AggregateException ex)
-                        {
-                            File.Delete(filename);
-                            throw;
-                        }
-                        catch (System.OutOfMemoryException ex)
-                        {
-                            logger.LogError(ex, "TASK WAS CANCELLED DUE TO RUNNING OUT OF MEMORY: {ex}", ex);
-                            File.Delete(filename);
-                            throw;
+                            // Attempts to preserve the stack trace while only throwing the inner exception
+                            var innerCause = Helpers.GetFirstRealException(aggEx);
+                            ExceptionDispatchInfo.Capture(innerCause).Throw();
                         }
                         catch (Exception ex)
                         {
-                            logger.LogError(ex, "ERROR USING CORE CLIENT: {ex}", ex);
-                            File.Delete(filename);
                             throw;
                         }
                     }
                     else
                     {
                         logger.LogInformation("Using Default Client to download file.");
+                        clientType = "Normal";
                         try
                         {
                             await _normalClient.Download(url, (0, 0), cancellation_token, pause_token.Token);
@@ -245,7 +236,6 @@ namespace OctaneEngine
                         }
                         catch (Exception ex)
                         {
-                            logger.LogError(ex, "ERROR USING CORE CLIENT: {ex}", ex);
                             throw;
                         }
 
@@ -253,19 +243,17 @@ namespace OctaneEngine
                     }
                 }
             }
-            catch (AggregateException aggEx)
-            {
-                // Attempts to preserve the stack trace while only throwing the inner exception
-                var innerCause = Helpers.GetFirstRealException(aggEx);
-                ExceptionDispatchInfo.Capture(innerCause).Throw();
-            }
             catch (Exception ex)
             {
                 success = false;
-                logger.LogError(ex, "ERROR DOWNLOADING FILE: {ex}", ex);
+                logger.LogError(ex, "Error Downloading File with {clientType} client: {ex}", clientType, ex);
             }
             finally
             {
+                if (!success)
+                {
+                    File.Delete(filename);
+                }
                 Cleanup(logger, stopwatch, _config, success);
             }
         }

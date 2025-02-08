@@ -27,18 +27,9 @@ public static class Helpers
         return pieces;
     }
     
-    internal static CancellationToken CreateCancellationToken(CancellationTokenSource cancelTokenSource, OctaneConfiguration config, string outFile)
+    internal static CancellationToken CreateCancellationToken(CancellationTokenSource cancelTokenSource, OctaneConfiguration config)
     {
         var cancellation_token = cancelTokenSource?.Token ?? new CancellationToken();
-        cancellation_token.Register(new Action(() =>
-        {
-            config.DoneCallback?.Invoke(false);
-            if (File.Exists(outFile))
-            {
-                File.Delete(outFile);
-            }
-        }));
-
         return cancellation_token;
     }
     
