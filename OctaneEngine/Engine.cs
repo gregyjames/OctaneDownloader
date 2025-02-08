@@ -220,7 +220,7 @@ namespace OctaneEngine
                             var innerCause = Helpers.GetFirstRealException(aggEx);
                             ExceptionDispatchInfo.Capture(innerCause).Throw();
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
                             throw;
                         }
@@ -234,7 +234,7 @@ namespace OctaneEngine
                             await _normalClient.Download(url, (0, 0), cancellation_token, pause_token.Token);
                             success = true;
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
                             throw;
                         }

@@ -57,7 +57,7 @@ public static class Helpers
 
                 // Take the *first* of the flattened exceptions
                 // (If you want to handle multiple, you'd iterate or choose otherwise)
-                current = flattened.InnerExceptions[0];
+                current = flattened?.InnerExceptions[0];
             }
             else if (current?.InnerException != null)
             {
