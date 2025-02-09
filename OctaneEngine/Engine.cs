@@ -135,7 +135,7 @@ namespace OctaneEngine
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
         /// <param name="pauseTokenSource">The pause token source to use for pausing and resuming.</param>
         /// <param name="cancelTokenSource">The cancellation token for canceling the task.</param>
-        public async Task DownloadFile(string url, string outFile = null, PauseTokenSource pauseTokenSource = null, CancellationTokenSource cancelTokenSource = null)
+        public async Task DownloadFile(OctaneRequest request, PauseTokenSource pauseTokenSource = null, CancellationTokenSource cancelTokenSource = null)
         {
             var stopwatch = new Stopwatch();
             var logger = _factory.CreateLogger<Engine>();
@@ -145,10 +145,10 @@ namespace OctaneEngine
             
             try
             {
-                var (_length, _range) = await getFileSizeAndRangeSupport(url);
+                var (_length, _range) = await getFileSizeAndRangeSupport(request.Url);
             
                 #region Varible Initilization
-                    filename = outFile ?? Path.GetFileName(new Uri(url).LocalPath);
+                    filename = request.OutFile ?? Path.GetFileName(new Uri(request.Url).LocalPath);
                     var cancellation_token = Helpers.CreateCancellationToken(cancelTokenSource, _config);
                     var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
                     var memPool = ArrayPool<byte>.Create(_config.BufferSize, _config.Parts);
@@ -172,7 +172,8 @@ namespace OctaneEngine
                 logger.LogInformation("PART SIZE: {partSize}", NetworkAnalyzer.PrettySize(partSize));
             
                 stopwatch.Start();
-                _client.SetBaseAddress(url);
+                _client.SetBaseAddress(request.Url);
+                _client.SetHeaders(request.Headers);
             
                 using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, _length, MemoryMappedFileAccess.ReadWrite))
                 {
@@ -201,7 +202,7 @@ namespace OctaneEngine
                         {
                             await Parallel.ForEachAsync(pieces, options, async (piece, token) =>
                             {
-                                await _client.Download(url, piece, cancellation_token, pause_token.Token);
+                                await _client.Download(request.Url, piece, cancellation_token, pause_token.Token);
 
                                 Interlocked.Increment(ref tasksDone);
 
@@ -232,7 +233,7 @@ namespace OctaneEngine
                         clientType = "Normal";
                         try
                         {
-                            await _normalClient.Download(url, (0, 0), cancellation_token, pause_token.Token).ConfigureAwait(false);
+                            await _normalClient.Download(request.Url, (0, 0), cancellation_token, pause_token.Token).ConfigureAwait(false);
                             success = true;
                         }
                         catch (Exception)
