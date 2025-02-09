@@ -23,6 +23,7 @@
 
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.IO.MemoryMappedFiles;
 using System.Net.Http;
 using System.Threading;
@@ -36,6 +37,7 @@ public interface IClient : IDisposable
 {
     public bool IsRangeSupported();
     public void SetBaseAddress(string url);
+    public void SetHeaders(Dictionary<string, string>? headers);
     public void SetMmf(MemoryMappedFile file);
     public void SetProgressbar(ProgressBar bar);
     public void SetArrayPool(ArrayPool<Byte> pool);

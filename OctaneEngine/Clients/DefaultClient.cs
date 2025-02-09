@@ -23,6 +23,7 @@
 
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Net.Http;
@@ -54,7 +55,19 @@ internal class DefaultClient : IClient
         var basePart = new Uri(new Uri(url).GetLeftPart(UriPartial.Authority));
         _httpClient.BaseAddress = basePart;
     }
-    
+
+    public void SetHeaders(Dictionary<string, string>? headers)
+    {
+        if (headers is not null)
+        {
+            _httpClient.DefaultRequestHeaders.Clear();
+            foreach (var header in headers)
+            {
+                _httpClient.DefaultRequestHeaders.Add(header.Key, header.Value);
+            }
+        }
+    }
+
     public bool IsRangeSupported()
     {
         return false;
