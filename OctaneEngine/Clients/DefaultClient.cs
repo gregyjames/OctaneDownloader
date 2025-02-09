@@ -128,7 +128,7 @@ internal class DefaultClient : IClient
                 _pbar?.Tick();
             }
         });
-        using var stream = _mmf.CreateViewStream();
+        await using var stream = _mmf.CreateViewStream();
         await CopyMessageContentToStreamWithProgressAsync(message, stream, progress);
     }
 

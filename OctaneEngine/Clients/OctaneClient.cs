@@ -114,7 +114,7 @@ internal class OctaneClient : IClient
         stopwatch.Start();
         if (message.IsSuccessStatusCode)
         {
-            _log.LogInformation("HTTP request returned success status code for piece ({PieceItem1},{PieceItem2})", piece.Item1, piece.Item2);
+            _log.LogInformation("HTTP request returned success status code {code} for piece ({PieceItem1},{PieceItem2})", (int)message.StatusCode ,piece.Item1, piece.Item2);
             await using (var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
             {
                 IStream wrappedStream = _config.BytesPerSecond <= 1 ? new NormalStream() : new ThrottleStream(_loggerFactory);
