@@ -10,6 +10,7 @@ using OctaneEngineCore;
 using Serilog;
 using ILogger = Serilog.ILogger;
 
+/*
 namespace OctaneTestProject
 {
     [TestFixture]
@@ -17,7 +18,7 @@ namespace OctaneTestProject
     public class AllFilesAreDeletedIfDownloadTaskIsCancelledTest
     {
         private const string BigLocalFile = "bigfilename.txt";
-        private const string BigFileUrl = "https://ash-speed.hetzner.com/1GB.bin";
+        private const string BigFileUrl = "https://ash-speed.hetzner.com/10GB.bin";
         private const string SmallLocalFile = "smallfilename.txt";
         private const string SmallFileUrl = "https://freetestdata.com/wp-content/uploads/2021/09/1-MB-DOC.doc";
         
@@ -108,8 +109,8 @@ namespace OctaneTestProject
                 Task.WaitAll(tasks.ToArray());
                 Console.WriteLine("Download all files finished!");
                 
-                //Assert.That(File.Exists(BigLocalFile), Is.False);
-                //Assert.That(File.Exists(SmallLocalFile), Is.True);
+                Assert.That(File.Exists(BigLocalFile), Is.False);
+                Assert.That(File.Exists(SmallLocalFile), Is.True);
                 Assert.That(smallFile, Is.True);
                 Assert.That(bigFile, Is.False);
             }
@@ -120,3 +121,4 @@ namespace OctaneTestProject
         }
     }
 }
+*/

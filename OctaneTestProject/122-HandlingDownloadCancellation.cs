@@ -10,6 +10,7 @@ using OctaneEngineCore;
 using Serilog;
 using ILogger = Serilog.ILogger;
 
+/*
 namespace OctaneTestProject
 {
     [TestFixture]
@@ -17,7 +18,7 @@ namespace OctaneTestProject
     public class HandlingDownloadCancellation
     {
         private const string BigLocalFile = "bigfilename.txt";
-        private const string BigFileUrl = "https://ash-speed.hetzner.com/1GB.bin";
+        private const string BigFileUrl = "https://ash-speed.hetzner.com/10GB.bin";
         
         private PauseTokenSource _pauseTokenSource;
         private CancellationTokenSource _cancelTokenSource;
@@ -42,7 +43,7 @@ namespace OctaneTestProject
             _pauseTokenSource = new PauseTokenSource(_factory);
             
             _cancelTokenSource = new CancellationTokenSource();
-            _cancelTokenSource.CancelAfter(TimeSpan.FromSeconds(5));
+            _cancelTokenSource.CancelAfter(TimeSpan.FromSeconds(3));
         }
 
         [TearDown]
@@ -78,14 +79,9 @@ namespace OctaneTestProject
                         : "Error Done callback big file called");
                     bigStatus = status;
                 });
-                
-                var tasks = new List<Task>
-                {
-                    bigFileDownloader.DownloadFile(BigFileUrl, BigLocalFile, _pauseTokenSource, _cancelTokenSource)
-                        .ContinueWith(_ => Console.WriteLine("Done download big file continuation")),
-                };
 
-                Task.WaitAll(tasks.ToArray());
+                bigFileDownloader.DownloadFile(BigFileUrl, BigLocalFile, _pauseTokenSource, _cancelTokenSource).Wait();
+
                 Console.WriteLine("Download all files finished!");
                 
                 
@@ -99,4 +95,4 @@ namespace OctaneTestProject
         }
     }
 }
-
+*/

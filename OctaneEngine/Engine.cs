@@ -1,4 +1,4 @@
-﻿/*
+/*
  * The MIT License (MIT)
  * Copyright (c) 2015 Greg James
  * 
@@ -210,9 +210,10 @@ namespace OctaneEngine
                                 pbar?.Tick();
                                 _config?.ProgressCallback?.Invoke((double)tasksDone / _config.Parts);
 
-                                success = true;
                                 logger.LogInformation("File downloaded successfully.");
                             }).ConfigureAwait(false);
+                            
+                            success = true;
                         }
                         catch (AggregateException aggEx)
                         {
@@ -231,11 +232,12 @@ namespace OctaneEngine
                         clientType = "Normal";
                         try
                         {
-                            await _normalClient.Download(url, (0, 0), cancellation_token, pause_token.Token);
+                            await _normalClient.Download(url, (0, 0), cancellation_token, pause_token.Token).ConfigureAwait(false);
                             success = true;
                         }
                         catch (Exception)
                         {
+                            success = false;
                             throw;
                         }
 
