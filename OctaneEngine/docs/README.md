@@ -21,6 +21,7 @@ dotnet add package OctaneEngineCore
 * Proxy Support
 * Pause/Resume Support
 * JSON/Microsoft.Extensions.Configuration Support
+* Headers
 
 # Usage
 ```csharp
