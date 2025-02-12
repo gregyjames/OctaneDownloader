@@ -24,6 +24,7 @@ dotnet add package OctaneEngineCore
 * Proxy Support
 * Pause/Resume Support
 * JSON/Microsoft.Extensions.Configuration Support
+* Headers
 
 # Usage
 ```csharp
@@ -65,7 +66,7 @@ private static void Main(){
      containerBuilder.AddOctane();
      var engineContainer = containerBuilder.Build();
      var engine = engineContainer.Resolve<IEngine>();
-     engine.DownloadFile(Url, null, pauseTokenSource, cancelTokenSource).Wait();
+     engine.DownloadFile(new OctaneRequest(Url, null), pauseTokenSource, cancelTokenSource).Wait();
 }
         
 ```

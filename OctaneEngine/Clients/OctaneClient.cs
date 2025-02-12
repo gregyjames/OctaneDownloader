@@ -23,6 +23,7 @@
 
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
 using System.Net.Http;
@@ -60,6 +61,18 @@ internal class OctaneClient : IClient
     {
         var basePart = new Uri(new Uri(url).GetLeftPart(UriPartial.Authority));
         _client.BaseAddress = basePart;
+    }
+    
+    public void SetHeaders(Dictionary<string, string>? headers)
+    {
+        if (headers is not null)
+        {
+            _client.DefaultRequestHeaders.Clear();
+            foreach (var header in headers)
+            {
+                _client.DefaultRequestHeaders.Add(header.Key, header.Value);
+            }
+        }
     }
     
     public bool IsRangeSupported()
