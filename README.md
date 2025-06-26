@@ -27,6 +27,7 @@ dotnet add package OctaneEngineCore
 * Headers
 
 # Usage
+### Program.cs
 ```csharp
 private const string Url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
         
@@ -71,6 +72,18 @@ private static void Main(){
         
 ```
 
+### appsettings.json
+```json
+"octane": {
+    "Parts": 8,
+    "BufferSize": 8196,
+    "ShowProgress": true,
+    "NumRetries": 10,
+    "BytesPerSecond": 1,
+    "UseProxy": false,
+    "LowMemoryMode": false
+  }
+```
 # Benchmark
 
 ```
