@@ -13,10 +13,10 @@ public static class ContainerBuilderExtensions
     {
         builder.RegisterModule(new ClientModule());
         builder.Register(ctx => new Engine(
-            ctx.Resolve<ILoggerFactory>(), 
             ctx.Resolve<OctaneConfiguration>(),
             ctx.ResolveKeyed<IClient>(ClientTypes.Octane),
-            ctx.ResolveKeyed<IClient>(ClientTypes.Normal))
+            ctx.ResolveKeyed<IClient>(ClientTypes.Normal),
+            ctx.Resolve<ILoggerFactory>())
         ).As<IEngine>().SingleInstance();
     }
 }
