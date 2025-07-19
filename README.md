@@ -30,22 +30,17 @@ dotnet add package OctaneEngineCore
 ### Program.cs
 ```csharp
 const string url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
-        
-// Create configuration directly
-var config = new OctaneConfiguration {
-    Parts = 6,
-    BufferSize = 8192,
-    ShowProgress = true,
-    NumRetries = 3,
-    BytesPerSecond = 1,
-    UseProxy = false,
-    LowMemoryMode = false
-};
-        
+
 // Create engine directly without builder - no DI required (if you don't want it!)
-var engine = EngineBuilder.Create()
-    .WithConfiguration(config)
-    .Build();
+var engine = EngineBuilder.Create().WithConfiguration(config => {
+        config.Parts = 8;
+        config.BufferSize = 8192;
+        config.ShowProgress = true;
+        config.NumRetries = 10;
+        config.BytesPerSecond = 1;
+        config.UseProxy = false;
+        config.LowMemoryMode = false;
+}).Build();
         
 // Setup download
 var pauseTokenSource = new PauseTokenSource();
@@ -54,7 +49,46 @@ using var cancelTokenSource = new CancellationTokenSource();
 // Download the file
 engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource.Token).Wait();  
 ```
+## If you want to use Dependency Injection
+### Program.cs
+```csharp
+await Host.CreateDefaultBuilder(args).UseSerilog((context, configuration) =>
+{
+        configuration
+                .Enrich.FromLogContext()
+                .MinimumLevel.Fatal()
+                .WriteTo.Async(a => a.File("./OctaneLog.txt"))
+                .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen));
+}).ConfigureAppConfiguration(configurationBuilder =>
+{
+        configurationBuilder.AddJsonFile("appsettings.json");
+}).UseOctaneEngine().ConfigureServices(collection =>
+{
+        collection.AddHostedService<DownloadService>();
+}).RunConsoleAsync();
+```
 
+### DownloadService
+```csharp
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
+using OctaneEngineCore;
+
+namespace OctaneTester;
+
+public class DownloadService(IEngine engine, IHostApplicationLifetime lifetime) : BackgroundService
+{
+    private const string Url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        var pauseTokenSource = new PauseTokenSource();
+        await engine.DownloadFile(new OctaneRequest(Url, null), pauseTokenSource, stoppingToken);
+        lifetime.StopApplication();
+    }
+}
+```
 ### appsettings.json
 ```json
 "Octane": {
