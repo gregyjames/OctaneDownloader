@@ -24,7 +24,7 @@ public static class ClientModule
             
             return new OctaneClient(cfg, client, factory, progress);
         });
-        services.AddKeyedSingleton<IClient>(ClientTypes.Normal, (provider, o) =>
+        services.AddKeyedTransient<IClient>(ClientTypes.Normal, (provider, o) =>
         {
             var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
             var client = provider.GetRequiredService<HttpClient>();

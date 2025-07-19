@@ -10,7 +10,7 @@ public static class HTTPClientModule
 {
     internal static void AddHTTPClient(this IServiceCollection services)
     {
-        services.AddSingleton<HttpClientHandler>(provider =>
+        services.AddTransient<HttpClientHandler>(provider =>
         {
             var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
             return new HttpClientHandler()
@@ -25,7 +25,7 @@ public static class HTTPClientModule
             };
         });
 
-        services.AddSingleton<RetryHandler>(provider =>
+        services.AddTransient<RetryHandler>(provider =>
         {
             var handler = provider.GetRequiredService<HttpClientHandler>();
             var factory = provider.GetRequiredService<ILoggerFactory>();
@@ -34,7 +34,7 @@ public static class HTTPClientModule
             return new RetryHandler(handler, factory, cfg.NumRetries);
         });
 
-        services.AddSingleton<HttpClient>(provider =>
+        services.AddTransient<HttpClient>(provider =>
         {
             var handler = provider.GetRequiredService<RetryHandler>();
             var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
