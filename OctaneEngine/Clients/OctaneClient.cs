@@ -26,9 +26,12 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
+using System.IO.Pipelines;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using OctaneEngine;
 using OctaneEngineCore.ShellProgressBar;
@@ -103,8 +106,6 @@ internal class OctaneClient : IClient
             .ConfigureAwait(false);
         
         #region Variable Declaration
-        var readBuffer = _memPool.Rent(_config.BufferSize);
-        _log.LogInformation("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
         var stopwatch = new Stopwatch();
         var programBps = _config.BytesPerSecond / _config.Parts;
         long bytesReadOverall = 0;
@@ -127,7 +128,7 @@ internal class OctaneClient : IClient
         stopwatch.Start();
         if (message.IsSuccessStatusCode)
         {
-            _log.LogInformation("HTTP request returned success status code {code} for piece ({PieceItem1},{PieceItem2})", (int)message.StatusCode ,piece.Item1, piece.Item2);
+            _log.LogDebug("HTTP request returned success status code {code} for piece ({PieceItem1:N0}, {PieceItem2:N0})", (int)message.StatusCode , piece.Item1, piece.Item2);
             await using (var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
             {
                 IStream wrappedStream = _config.BytesPerSecond <= 1 ? new NormalStream() : new ThrottleStream(_loggerFactory);
@@ -141,25 +142,26 @@ internal class OctaneClient : IClient
 
                 if (_config.LowMemoryMode)
                 {
+                    if (_config.BytesPerSecond > 1)
+                    {
+                        throw new ArgumentException("Low memory mode cannot be used while bytes per second is enabled (greater than 1).");
+                    }
+                    
                     try
                     {
-                        while (true)
-                        {
-                            var bytesRead = await wrappedStream.ReadAsync(readBuffer.AsMemory(), cancellationToken);
-
-                            if (bytesRead == 0)
-                            {
-                                break;
-                            }
-                            
-                            using (var accessor = _mmf.CreateViewAccessor(piece.Item1 + bytesReadOverall, bytesRead,
-                                       MemoryMappedFileAccess.Write))
-                            {
-                                accessor.WriteArray(0, readBuffer, 0, bytesRead);
-                                bytesReadOverall += bytesRead;
-                                child?.Tick((int)bytesReadOverall);
-                            }
-                        }
+                        var pipeOptions = new PipeOptions(
+                            pool: null, // use default
+                            readerScheduler: PipeScheduler.ThreadPool,
+                            writerScheduler: PipeScheduler.ThreadPool,
+                            pauseWriterThreshold: _config.BufferSize * 4,
+                            resumeWriterThreshold: _config.BufferSize,
+                            minimumSegmentSize: _config.BufferSize,
+                            useSynchronizationContext: false
+                        );
+                        var pipe = new Pipe(pipeOptions);
+                        var writing = FillPipeAsync(wrappedStream, pipe.Writer, cancellationToken);
+                        var reading = ReadPipeToFileAsync(pipe.Reader, piece, child, cancellationToken);
+                        await Task.WhenAll(reading, writing);
                     }
                     catch (Exception ex)
                     {
@@ -169,6 +171,8 @@ internal class OctaneClient : IClient
                 }
                 else
                 {
+                    var readBuffer = _memPool.Rent(_config.BufferSize);
+                    _log.LogDebug("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
                     var stream = _mmf.CreateViewStream(piece.Item1, 0);
                     try
                     {
@@ -191,28 +195,134 @@ internal class OctaneClient : IClient
                         await stream.DisposeAsync();
                         await wrappedStream.DisposeAsync();
                     }
+                    _memPool.Return(readBuffer);
+                    _log.LogInformation("Buffer returned to memory pool");
                 }
 
             }
-
-            _log.LogInformation("Buffer returned to memory pool");
         }
-        _memPool.Return(readBuffer);
+        else
+        {
+            _log.LogError("HTTP request returned success status code {code} for piece ({PieceItem1},{PieceItem2})", (int)message.StatusCode , NetworkAnalyzer.PrettySize(piece.Item1), NetworkAnalyzer.PrettySize(piece.Item2));
+        }
+        
         // Only tick the progress bar if ShowProgress is enabled
         if (_config.ShowProgress)
         {
             _progressBar?.Tick();
         }
-        _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) done", piece.Item1, piece.Item2);
         stopwatch.Stop();
-        _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds} ms", piece.Item1, piece.Item2, stopwatch.ElapsedMilliseconds);
+        _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds}ms.", NetworkAnalyzer.PrettySize(piece.Item1), NetworkAnalyzer.PrettySize(piece.Item2), stopwatch.ElapsedMilliseconds);
     }
 
+    public async Task FillPipeAsync(IStream stream, PipeWriter writer, CancellationToken token)
+    {
+        while (true)
+        {
+            var memory = writer.GetMemory(_config.BufferSize);
+            int bytesRead = await stream.ReadAsync(memory, token);
+
+            if (bytesRead == 0)
+                break; // End of stream
+
+            writer.Advance(bytesRead);
+
+            var result = await writer.FlushAsync(token);
+            if (result.IsCompleted || result.IsCanceled)
+                break; // The reader is done or cancelled
+        }
+    }
+    
+    private async Task ReadPipeToFileAsync(PipeReader reader, (long, long) piece, ChildProgressBar child, CancellationToken token)
+    {
+        long accessorLength = piece.Item2 - piece.Item1 + 1;
+        using var accessor = _mmf.CreateViewAccessor(piece.Item1, accessorLength);
+        long writeOffset = 0;
+
+        int tickStep = _config.BufferSize * 2;
+        int lastTick = 0;
+
+        while (true)
+        {
+            ReadResult result = await reader.ReadAsync(token);
+            ReadOnlySequence<byte> buffer = result.Buffer;
+
+            foreach (var segment in buffer)
+            {
+                var span = segment.Span;
+                int bytesToWrite = span.Length;
+
+                // Ensure we don't write past the accessor's capacity
+                long remaining = accessorLength - writeOffset;
+                if (remaining <= 0)
+                    break;
+
+                int safeBytesToWrite = (int)Math.Min(bytesToWrite, remaining);
+
+                WriteToAccessor(accessor, span[..safeBytesToWrite], writeOffset);
+
+                writeOffset += safeBytesToWrite;
+
+                if (writeOffset - lastTick >= tickStep || writeOffset == accessorLength)
+                {
+                    child?.Tick((int)writeOffset);
+                    lastTick = (int)writeOffset;
+                }
+
+                if (writeOffset >= accessorLength)
+                    break;
+            }
+
+            reader.AdvanceTo(buffer.End);
+
+            if (result.IsCompleted || result.IsCanceled || writeOffset >= accessorLength)
+            {
+                break;
+            }
+        }
+        
+        accessor.Flush();
+    }
+    
+    //todo: find a way to acquire the pointer outside of the loop
+    private unsafe void WriteToAccessor(MemoryMappedViewAccessor accessor, ReadOnlySpan<byte> buffer, long offset)
+    {
+        var accessorLength = accessor.Capacity;
+        long remaining = accessorLength - offset;
+        int safeBytesToWrite = (int)Math.Min(buffer.Length, remaining);
+
+        if (safeBytesToWrite <= 0)
+            return;
+
+        byte* accessorPtr = null;
+
+        try
+        {
+            accessor.SafeMemoryMappedViewHandle.AcquirePointer(ref accessorPtr);
+
+            byte* dest = accessorPtr + accessor.PointerOffset + offset;
+
+            fixed (byte* src = buffer)
+            {
+                //Buffer.MemoryCopy(src, dest, remaining, safeBytesToWrite);
+                Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Error writing to accessor with offset {offset}.", offset);
+        }
+        finally
+        {
+            accessor.SafeMemoryMappedViewHandle.ReleasePointer();
+        }
+    }
+    
     public void Dispose()
     {
-        //_client?.Dispose();
-        //_loggerFactory?.Dispose();
-        //_mmf?.Dispose();
-        //_progressBar?.Dispose();
+        _client?.Dispose();
+        _loggerFactory?.Dispose();
+        _mmf?.Dispose();
+        _progressBar?.Dispose();
     }
 }
