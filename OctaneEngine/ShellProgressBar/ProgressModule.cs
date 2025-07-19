@@ -1,15 +1,16 @@
-using Autofac;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using OctaneEngine;
 
 namespace OctaneEngineCore.ShellProgressBar;
 
-public class ProgressModule: Module
+public static class ProgressModule
 {
-    protected override void Load(ContainerBuilder builder)
+    internal static IServiceCollection AddProgressBar(this IServiceCollection services)
     {
-        builder.Register(ctx =>
+        services.AddTransient<ProgressBar>(provider =>
         {
-            var cfg = ctx.Resolve<OctaneConfiguration>();
+            var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
             var options = new ProgressBarOptions
             {
                 ProgressBarOnBottom = false,
@@ -17,9 +18,8 @@ public class ProgressModule: Module
                 DenseProgressBar = false,
                 DisplayTimeInRealTime = false
             };
-
-            var pbar = new ProgressBar(cfg.Parts, "Downloading File...", options);
-            return pbar;
-        }).As<ProgressBar>().InstancePerDependency();
+            return new ProgressBar(cfg.Parts, "Downloading File...", options);
+        });
+        return services;
     }
 }

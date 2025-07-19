@@ -1,6 +1,5 @@
 using System.IO;
 using System.Threading;
-using Autofac;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OctaneEngineCore;
@@ -13,6 +12,7 @@ public class Autofac
 {
     public void AutofacExample()
     {
+        /*
         var seriLog = new LoggerConfiguration()
             .Enrich.FromLogContext()
             .MinimumLevel.Error()
@@ -39,5 +39,6 @@ public class Autofac
         var engineContainer = containerBuilder.Build();
         var engine = engineContainer.Resolve<IEngine>();
         engine.DownloadFile(new OctaneRequest("", ""), pauseTokenSource, cancelTokenSource);
+        */
     }
 }

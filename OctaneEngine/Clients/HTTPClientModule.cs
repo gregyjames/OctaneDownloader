@@ -1,20 +1,19 @@
 using System.Net.Http;
-using Autofac;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using OctaneEngine;
 
 namespace OctaneEngineCore.Clients;
 
-public class HTTPClientModule: Module
+public static class HTTPClientModule
 {
-    protected override void Load(ContainerBuilder builder)
+    internal static IServiceCollection AddHTTPClient(this IServiceCollection services)
     {
-        builder.Register(ctx =>
+        services.AddSingleton<HttpClientHandler>(provider =>
         {
-            var factory = ctx.Resolve<ILoggerFactory>();
-            var cfg = ctx.Resolve<OctaneConfiguration>();
-            
-            var clientHandler = new HttpClientHandler()
+            var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
+            return new HttpClientHandler()
             {
                 PreAuthenticate = true,
                 UseDefaultCredentials = true,
@@ -24,14 +23,27 @@ public class HTTPClientModule: Module
                 UseCookies = false,
                 ServerCertificateCustomValidationCallback = (_, _, _, _) => true
             };
+        });
 
-            var retryHandler = new RetryHandler(clientHandler, factory, cfg.NumRetries);
-            var _client = new HttpClient(retryHandler)
+        services.AddSingleton<RetryHandler>(provider =>
+        {
+            var handler = provider.GetRequiredService<HttpClientHandler>();
+            var factory = provider.GetRequiredService<ILoggerFactory>();
+            var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
+            
+            return new RetryHandler(handler, factory, cfg.NumRetries);
+        });
+
+        services.AddSingleton<HttpClient>(provider =>
+        {
+            var handler = provider.GetRequiredService<RetryHandler>();
+            var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
+            return new HttpClient(handler)
             {
                 MaxResponseContentBufferSize = cfg.BufferSize,
             };
+        });
 
-            return _client;
-        }).As<HttpClient>().SingleInstance();
+        return services;
     }
 }

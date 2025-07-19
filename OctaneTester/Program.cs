@@ -1,8 +1,10 @@
 using System;
 using System.IO;
 using System.Threading;
-using Autofac;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OctaneEngine;
 using OctaneEngineCore;
@@ -13,46 +15,22 @@ namespace OctaneTester
 {
     internal static class Program
     {
-        private const string Url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
-        
-        private static void Main()
+        private static async Task Main(string[] args)
         {
-            #region Logging Configuration
-            var seriLog = new LoggerConfiguration()
-                .Enrich.FromLogContext()
-                .MinimumLevel.Information()
-                .WriteTo.Async(a => a.File("./OctaneLog.txt"))
-                .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen))
-                .CreateLogger();
-            var factory = LoggerFactory.Create(logging =>
+            await Host.CreateDefaultBuilder(args).UseSerilog((context, configuration) =>
             {
-                logging.AddSerilog(seriLog);
-            });
-            #endregion
-
-            #region Configuration Loading
-            var builder = new ConfigurationBuilder();
-            builder.SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", true, true);
-            var configRoot = builder.Build();
-            #endregion
-
-            #region Find and Set optimal number of parts
-            //var optimalNumberOfParts = Engine.GetOptimalNumberOfParts(Url).Result;
-            //seriLog.Information("Optimal number of parts to download file: {OptimalNumberOfParts}", optimalNumberOfParts);
-            #endregion
-            
-            //seriLog.Information("Speed: {Result}", NetworkAnalyzer.GetCurrentNetworkSpeed().Result);
-            //seriLog.Information("Latency: {Result}", NetworkAnalyzer.GetCurrentNetworkLatency().Result);
-            var pauseTokenSource = new PauseTokenSource();
-            using var cancelTokenSource = new CancellationTokenSource();
-            var containerBuilder = new ContainerBuilder();
-            containerBuilder.RegisterInstance(factory).As<ILoggerFactory>();
-            containerBuilder.RegisterInstance(configRoot).As<IConfiguration>();
-            containerBuilder.AddOctane();
-            var engineContainer = containerBuilder.Build();
-            var engine = engineContainer.Resolve<IEngine>();
-            engine.DownloadFile(new OctaneRequest(Url, null), pauseTokenSource, cancelTokenSource).Wait();
+                configuration
+                    .Enrich.FromLogContext()
+                    .MinimumLevel.Information()
+                    .WriteTo.Async(a => a.File("./OctaneLog.txt"))
+                    .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen));
+            }).ConfigureAppConfiguration(configurationBuilder =>
+            {
+                configurationBuilder.AddJsonFile("appsettings.json");
+            }).UseOctaneEngine().ConfigureServices(collection =>
+            {
+                collection.AddHostedService<DownloadService>();
+            }).RunConsoleAsync();
         }
     }
 }
