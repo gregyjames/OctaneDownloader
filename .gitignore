@@ -28,3 +28,7 @@ OctaneTester/.DS_Store
 
 .idea/.idea.Octane/.idea/
 .idea/
+
+OctaneTester/OctaneLog.txt
+
+*.zip

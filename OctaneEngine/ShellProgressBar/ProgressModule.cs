@@ -11,6 +11,11 @@ public static class ProgressModule
         services.AddTransient<ProgressBar>(provider =>
         {
             var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
+            
+            // Only create a ProgressBar if ShowProgress is enabled
+            if (!cfg.ShowProgress)
+                return null;
+                
             var options = new ProgressBarOptions
             {
                 ProgressBarOnBottom = false,

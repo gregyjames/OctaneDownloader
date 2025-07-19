@@ -134,7 +134,10 @@ internal class OctaneClient : IClient
                 wrappedStream.SetStreamParent(networkStream);
                 wrappedStream.SetBps(programBps);
 
-                using var child = _progressBar?.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", childOptions);
+                // Only create child progress bar if ShowProgress is enabled and we have a progress bar
+                using var child = (_config.ShowProgress && _progressBar != null) 
+                    ? _progressBar.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", childOptions)
+                    : null;
 
                 if (_config.LowMemoryMode)
                 {
@@ -195,7 +198,11 @@ internal class OctaneClient : IClient
             _log.LogInformation("Buffer returned to memory pool");
         }
         _memPool.Return(readBuffer);
-        _progressBar?.Tick();
+        // Only tick the progress bar if ShowProgress is enabled
+        if (_config.ShowProgress)
+        {
+            _progressBar?.Tick();
+        }
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) done", piece.Item1, piece.Item2);
         stopwatch.Stop();
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds} ms", piece.Item1, piece.Item2, stopwatch.ElapsedMilliseconds);
