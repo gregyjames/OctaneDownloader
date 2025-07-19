@@ -33,42 +33,42 @@ public class OctaneConfiguration
     /// <summary>
     ///     The number of parts to download in parallel.
     /// </summary>
-    public int Parts { get; set; }
+    public int Parts { get; set; } = 8;
 
     /// <summary>
     /// Determines whether to use a Stream (max performance/high memory) or accessor (lower memory use)
     /// </summary>
-    public bool LowMemoryMode { get; set; }
-    
+    public bool LowMemoryMode { get; set; } = true;
+
     /// <summary>
     ///     The memory buffer size to use, default 8192.
     /// </summary>
-    public int BufferSize { get; set; }
+    public int BufferSize { get; set; } = 8196;
 
     /// <summary>
     ///     Show a progress bar
     /// </summary>
-    public bool ShowProgress { get; set; }
+    public bool ShowProgress { get; set; } = false;
 
     /// <summary>
     ///     Number of times to retry if the connection fails.
     /// </summary>
-    public int NumRetries { get; set; }
+    public int NumRetries { get; set; } = 10;
 
     /// <summary>
     ///     Use this option to throttle the download of the file. Use 1 to disable throttling.
     /// </summary>
-    public int BytesPerSecond { get; set; }
+    public int BytesPerSecond { get; set; } = 1;
 
     /// <summary>
     ///     Enable if you want to use a proxy
     /// </summary>
-    public bool UseProxy { get; set; }
+    public bool UseProxy { get; set; } = false;
 
     /// <summary>
     ///     The Proxy settings to use.
     /// </summary>
-    public IWebProxy Proxy { get; set; }
+    public IWebProxy? Proxy { get; set; } = null;
     
     /// <summary>
     ///     The Action<bool> function to call when the download is finished.

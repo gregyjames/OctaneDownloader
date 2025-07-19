@@ -136,7 +136,8 @@ internal class DefaultClient : IClient
         {
             totalWritten += bytesWritten;
 
-            if (totalWritten % ((piece.Item2-piece.Item1) / _config.BufferSize) == 0)
+            // Only update progress bar if ShowProgress is enabled
+            if (_config.ShowProgress && totalWritten % ((piece.Item2-piece.Item1) / _config.BufferSize) == 0)
             {
                 _pbar?.Tick();
             }

@@ -5,7 +5,7 @@ using OctaneEngineCore;
 
 namespace OctaneTester;
 
-public class DownloadService(IEngine engine) : BackgroundService
+public class DownloadService(IEngine engine, IHostApplicationLifetime lifetime) : BackgroundService
 {
     private const string Url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
 
@@ -14,5 +14,6 @@ public class DownloadService(IEngine engine) : BackgroundService
         var pauseTokenSource = new PauseTokenSource();
         using var cancelTokenSource = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         await engine.DownloadFile(new OctaneRequest(Url, null), pauseTokenSource, cancelTokenSource);
+        lifetime.StopApplication();
     }
 }

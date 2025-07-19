@@ -21,13 +21,16 @@ namespace OctaneTester
             {
                 configuration
                     .Enrich.FromLogContext()
-                    .MinimumLevel.Information()
+                    .MinimumLevel.Fatal()
                     .WriteTo.Async(a => a.File("./OctaneLog.txt"))
                     .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen));
             }).ConfigureAppConfiguration(configurationBuilder =>
             {
                 configurationBuilder.AddJsonFile("appsettings.json");
-            }).UseOctaneEngine().ConfigureServices(collection =>
+            }).UseOctaneEngine(configuration =>
+            {
+                configuration.ShowProgress = false;
+            }).ConfigureServices(collection =>
             {
                 collection.AddHostedService<DownloadService>();
             }).RunConsoleAsync();
