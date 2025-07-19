@@ -1,6 +1,9 @@
 using System.IO;
+using System.Threading;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using OctaneEngine;
 using OctaneEngineCore;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
@@ -11,8 +14,9 @@ public class NoAutofac
 {
     public void NoAutoFacExample()
     {
-        /*
-        #region Logging Example
+        const string url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
+        
+        // Setup logging
         var seriLog = new LoggerConfiguration()
             .Enrich.FromLogContext()
             .MinimumLevel.Error()
@@ -23,16 +27,36 @@ public class NoAutofac
         {
             logging.AddSerilog(seriLog);
         });
-        #endregion
 
-        #region Configuration Loading
+        // Setup configuration
         var builder = new ConfigurationBuilder();
         builder.SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", true, true);
         var configRoot = builder.Build();
-        #endregion
 
-        EngineBuilder.Build(factory, configRoot);
-        */
+        // Setup dependency injection without IHostBuilder
+        var services = new ServiceCollection();
+        
+        // Add logging
+        services.AddSingleton<ILoggerFactory>(factory);
+        
+        // Add Octane Engine with configuration from JSON
+        services.AddOctaneEngine(configRoot);
+        
+        // Build the service provider
+        var serviceProvider = services.BuildServiceProvider();
+        
+        // Get the engine from DI
+        var engine = serviceProvider.GetRequiredService<IEngine>();
+        
+        // Setup download
+        var pauseTokenSource = new PauseTokenSource();
+        using var cancelTokenSource = new CancellationTokenSource();
+        
+        // Download the file
+        engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource).Wait();
+        
+        // Cleanup
+        serviceProvider.Dispose();
     }
 }

@@ -2,20 +2,15 @@
 
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
-using BenchmarkDotNet.Diagnosers;
-using BenchmarkDotNet.Engines;
 using BenchmarkDotNet.Environments;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Loggers;
 using BenchmarkDotNet.Running;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OctaneEngine;
 using OctaneEngineCore;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
-using System.Net.Http;
-using Autofac;
 using IEngine = OctaneEngineCore.IEngine;
 
 namespace BenchmarkOctaneProject
@@ -45,31 +40,16 @@ namespace BenchmarkOctaneProject
             {
                 logging.AddSerilog(seriLog);
             });
-
-            #region Configuration Loading
-            var builder = new ConfigurationBuilder();
-            builder.SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", true, true);
-            var configRoot = builder.Build();
-            config = new OctaneConfiguration(configRoot, factory);
-            #endregion
-
-            var containerBuilder = new ContainerBuilder();
-            containerBuilder.RegisterInstance(factory).As<ILoggerFactory>();
-            containerBuilder.RegisterInstance(config).As<OctaneConfiguration>();
-            containerBuilder.AddOctane();
-            var engineContainer = containerBuilder.Build();
-            _OctaneEngine = engineContainer.Resolve<IEngine>();
             
-            //_OctaneEngine = new OctaneEngine.Engine(null, config);
-
-            containerBuilder = new ContainerBuilder();
-            containerBuilder.RegisterInstance(factory).As<ILoggerFactory>();
-            config.LowMemoryMode = true;
-            containerBuilder.RegisterInstance(config).As<OctaneConfiguration>();
-            containerBuilder.AddOctane();
-            engineContainer = containerBuilder.Build();
-            _OctaneEngine2 = engineContainer.Resolve<IEngine>();
+            _OctaneEngine = EngineBuilder.Create().WithConfiguration(configuration =>
+            {
+                
+            }).WithLogger(factory).Build();
+            
+            _OctaneEngine2 = EngineBuilder.Create().WithConfiguration(configuration =>
+            {
+                configuration.LowMemoryMode = true;
+            }).WithLogger(factory).Build();
 
             pauseTokenSource = new PauseTokenSource();
             cancelTokenSource = new CancellationTokenSource();

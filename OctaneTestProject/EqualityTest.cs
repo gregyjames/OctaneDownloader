@@ -2,8 +2,6 @@
 using System.IO;
 using System.Net.Http;
 using System.Threading;
-using System.Threading.Tasks;
-using Autofac;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngine;
@@ -82,12 +80,7 @@ namespace OctaneTestProject
 
                 if (File.Exists("original.png"))
                 {
-                    var containerBuilder = new ContainerBuilder();
-                    containerBuilder.RegisterInstance(_factory).As<ILoggerFactory>();
-                    containerBuilder.RegisterInstance(config).As<OctaneConfiguration>();
-                    containerBuilder.AddOctane();
-                    var engineContainer = containerBuilder.Build();
-                    var engine = engineContainer.Resolve<IEngine>();
+                    var engine = EngineBuilder.Create().WithConfiguration(config).WithLogger(_factory).Build();
                     engine.SetDoneCallback(_ => done = true);
                     engine.SetProgressCallback(Console.WriteLine);
                     engine.SetProxy(null);
