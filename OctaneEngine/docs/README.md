@@ -25,41 +25,44 @@ dotnet add package OctaneEngineCore
 
 # Usage
 ```csharp
-private const string Url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
-private static void Main()
-{
-     //Logging Setup
-     var seriLog = new LoggerConfiguration()
-          .Enrich.FromLogContext()
-          .MinimumLevel.Verbose()
-          .WriteTo.File("./OctaneLog.txt")
-          .WriteTo.Console(theme: AnsiConsoleTheme.Sixteen)
-          .CreateLogger();
-     var factory = LoggerFactory.Create(logging => {
-          logging.AddSerilog(seriLog);
-     });
-
-     //JSON Config Loading
-     var builder = new ConfigurationBuilder();
-     builder.SetBasePath(Directory.GetCurrentDirectory())
-          .AddJsonFile("appsettings.json", true, true);
-     var configRoot = builder.Build();
-     var config = new OctaneConfiguration(configRoot, factory);
-            
-     //Find Optimal number of parts
-     var optimalNumberOfParts = Engine.GetOptimalNumberOfParts(Url).Result;
-     seriLog.Information("Optimal number of parts to download file: {OptimalNumberOfParts}", optimalNumberOfParts);
-            
-     seriLog.Information("Speed: {Result}", NetworkAnalyzer.GetCurrentNetworkSpeed().Result);
-     seriLog.Information("Latency: {Result}", NetworkAnalyzer.GetCurrentNetworkLatency().Result);
-     var pauseTokenSource = new PauseTokenSource();
-     var cancelTokenSource = new CancellationTokenSource();
-            
-     var octaneEngine = new Engine(factory, config);
-     engine.DownloadFile(new OctaneRequest(Url, null), pauseTokenSource, cancelTokenSource).Wait();
+const string url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
         
+// Create configuration directly
+var config = new OctaneConfiguration {
+    Parts = 6,
+    BufferSize = 8192,
+    ShowProgress = true,
+    NumRetries = 3,
+    BytesPerSecond = 1,
+    UseProxy = false,
+    LowMemoryMode = false
+};
+        
+// Create engine directly without builder - no DI required
+var engine = EngineBuilder.Create()
+    .WithConfiguration(config)
+    .Build();
+        
+// Setup download
+var pauseTokenSource = new PauseTokenSource();
+using var cancelTokenSource = new CancellationTokenSource();
+        
+// Download the file
+engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource).Wait();  
 ```
 
+### appsettings.json
+```json
+"Octane": {
+    "Parts": 8,
+    "BufferSize": 8196,
+    "ShowProgress": true,
+    "NumRetries": 10,
+    "BytesPerSecond": 1,
+    "UseProxy": false,
+    "LowMemoryMode": false
+}
+```
 # Benchmark
 
 ```
