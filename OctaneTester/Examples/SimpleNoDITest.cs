@@ -36,7 +36,7 @@ public class SimpleNoDITest
             Console.WriteLine($"Starting download from: {url}");
             
             // Download the file
-            engine.DownloadFile(new OctaneRequest(url, "test-download.bin"), pauseTokenSource, cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, "test-download.bin"), pauseTokenSource, cancelTokenSource.Token).Wait();
             
             Console.WriteLine("Download completed successfully!");
         }

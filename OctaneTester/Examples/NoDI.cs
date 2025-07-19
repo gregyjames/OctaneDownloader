@@ -31,7 +31,7 @@ public class NoDI
         using var cancelTokenSource = new CancellationTokenSource();
         
         // Download the file
-        engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource).Wait();
+        engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource.Token).Wait();
     }
 
     public void NoDIWithLoggerExample()
@@ -67,7 +67,7 @@ public class NoDI
         using var cancelTokenSource = new CancellationTokenSource();
         
         // Download the file
-        engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource).Wait();
+        engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource.Token).Wait();
     }
 
     public void NoDIMinimalExample()
@@ -82,7 +82,7 @@ public class NoDI
         using var cancelTokenSource = new CancellationTokenSource();
         
         // Download the file
-        engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource).Wait();
+        engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource.Token).Wait();
     }
 
     public void NoDIDirectExample()
@@ -111,6 +111,6 @@ public class NoDI
         using var cancelTokenSource = new CancellationTokenSource();
         
         // Download the file
-        engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource).Wait();
+        engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource.Token).Wait();
     }
 } 

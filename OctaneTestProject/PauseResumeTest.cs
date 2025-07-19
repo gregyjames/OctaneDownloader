@@ -72,7 +72,7 @@ namespace OctaneTestProject
             engine.SetProxy(null);
             Parallel.Invoke(
                 () => Action(_pauseTokenSource),
-                () => engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait()
+                () => engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait()
             );
         }
 

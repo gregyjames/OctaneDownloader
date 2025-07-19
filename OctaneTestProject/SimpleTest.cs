@@ -79,7 +79,7 @@ namespace OctaneTestProject
                 Console.WriteLine($"Download completed with success: {success}");
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
             
             Assert.That(doneCalled, Is.True, "Done callback should be called");
         }
@@ -102,7 +102,7 @@ namespace OctaneTestProject
                 Console.WriteLine($"Download completed with success: {success}");
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
             
             Assert.That(doneCalled, Is.True, "Done callback should be called");
         }
@@ -134,7 +134,7 @@ namespace OctaneTestProject
                 Console.WriteLine($"Download completed with success: {success}");
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
             
             Assert.That(doneCalled, Is.True, "Done callback should be called");
         }
@@ -176,7 +176,7 @@ namespace OctaneTestProject
                 Console.WriteLine($"Download completed with success: {success}");
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
             
             Assert.That(progressCalled, Is.True, "Progress callback should be called");
             Assert.That(doneCalled, Is.True, "Done callback should be called");
@@ -209,7 +209,7 @@ namespace OctaneTestProject
                 Console.WriteLine($"Download completed with success: {success}");
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
             
             Assert.That(doneCalled, Is.True, "Done callback should be called");
         }

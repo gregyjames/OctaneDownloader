@@ -1,9 +1,7 @@
 using System;
 using System.IO;
-using System.Threading;
 using Collections.Pooled;
 using Microsoft.Extensions.Logging;
-using OctaneEngine;
 
 namespace OctaneEngineCore;
 
@@ -26,13 +24,7 @@ public static class Helpers
             
         return pieces;
     }
-    
-    internal static CancellationToken CreateCancellationToken(CancellationTokenSource cancelTokenSource, OctaneConfiguration config)
-    {
-        var cancellation_token = cancelTokenSource?.Token ?? new CancellationToken();
-        return cancellation_token;
-    }
-    
+
     internal static Exception GetFirstRealException(Exception exception)
     {
         if (exception == null)

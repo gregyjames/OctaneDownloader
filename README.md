@@ -52,7 +52,7 @@ var pauseTokenSource = new PauseTokenSource();
 using var cancelTokenSource = new CancellationTokenSource();
         
 // Download the file
-engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource).Wait();  
+engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource.Token).Wait();  
 ```
 
 ### appsettings.json

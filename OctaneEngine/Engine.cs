@@ -152,7 +152,7 @@ namespace OctaneEngine
         /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
         /// <param name="pauseTokenSource">The pause token source to use for pausing and resuming.</param>
         /// <param name="cancelTokenSource">The cancellation token for canceling the task.</param>
-        public async Task DownloadFile(OctaneRequest request, PauseTokenSource pauseTokenSource = null, CancellationTokenSource cancelTokenSource = null)
+        public async Task DownloadFile(OctaneRequest request, PauseTokenSource pauseTokenSource = null, CancellationToken token = default)
         {
             var stopwatch = new Stopwatch();
             var success = false;
@@ -165,7 +165,7 @@ namespace OctaneEngine
             
                 #region Varible Initilization
                     filename = request.OutFile ?? Path.GetFileName(new Uri(request.Url).LocalPath);
-                    var cancellation_token = Helpers.CreateCancellationToken(cancelTokenSource, _config);
+                    var cancellation_token = token;
                     var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
                     var memPool = ArrayPool<byte>.Create(_config.BufferSize, _config.Parts);
                     _logger.LogInformation("Range supported: {range}", _range);

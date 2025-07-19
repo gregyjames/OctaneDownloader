@@ -91,7 +91,7 @@ namespace OctaneTestProject
                 Assert.That(success, Is.True);
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
             
             Assert.That(progressCallCount, Is.GreaterThan(0), "Progress callback should be called");
             Assert.That(doneCallCount, Is.EqualTo(1), "Done callback should be called exactly once");
@@ -136,7 +136,7 @@ namespace OctaneTestProject
                 Assert.That(success, Is.True);
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
             
             Assert.That(progressCallCount, Is.GreaterThan(0), "Progress callback should be called even when progress bar is disabled");
             Assert.That(doneCallCount, Is.EqualTo(1), "Done callback should be called exactly once");
@@ -163,7 +163,7 @@ namespace OctaneTestProject
             Assert.That(engine, Is.Not.Null);
             
             // No callbacks set
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
             
             Assert.That(File.Exists(_outFile), Is.True, "File should be downloaded successfully");
         }

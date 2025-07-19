@@ -69,7 +69,7 @@ namespace OctaneTestProject
                 Assert.That(File.Exists(_outFile), Is.True);
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
         }
 
         [Test]
@@ -98,7 +98,7 @@ namespace OctaneTestProject
                 Assert.That(File.Exists(_outFile), Is.True);
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
         }
 
         [Test]
@@ -127,7 +127,7 @@ namespace OctaneTestProject
                 Assert.That(File.Exists(_outFile), Is.True);
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
         }
 
         [Test]
@@ -161,7 +161,7 @@ namespace OctaneTestProject
                 Assert.That(File.Exists(_outFile), Is.True);
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
         }
 
         [Test]
@@ -196,7 +196,7 @@ namespace OctaneTestProject
                 Assert.That(File.Exists(_outFile), Is.True);
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
         }
     }
 } 

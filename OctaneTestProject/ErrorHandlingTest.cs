@@ -76,7 +76,7 @@ namespace OctaneTestProject
             
             try
             {
-                engine.DownloadFile(new OctaneRequest(invalidUrl, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+                engine.DownloadFile(new OctaneRequest(invalidUrl, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
             }
             catch (Exception)
             {
@@ -110,7 +110,7 @@ namespace OctaneTestProject
             
             try
             {
-                engine.DownloadFile(new OctaneRequest(nonExistentUrl, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+                engine.DownloadFile(new OctaneRequest(nonExistentUrl, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
             }
             catch (Exception)
             {
@@ -153,7 +153,7 @@ namespace OctaneTestProject
             
             try
             {
-                engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+                engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
             }
             catch (OperationCanceledException)
             {
@@ -196,7 +196,7 @@ namespace OctaneTestProject
                 Assert.That(File.Exists(_outFile), Is.True);
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
         }
 
         [Test]
@@ -225,7 +225,7 @@ namespace OctaneTestProject
                 Assert.That(File.Exists(_outFile), Is.True);
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
         }
 
         [Test]
@@ -254,7 +254,7 @@ namespace OctaneTestProject
                 Assert.That(File.Exists(_outFile), Is.True);
             });
             
-            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
         }
     }
 } 

@@ -77,7 +77,7 @@ namespace OctaneTestProject
                     Assert.That(status, Is.False);
                 });
                 engine.SetProgressCallback(Console.WriteLine);
-                engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource).Wait();
+                engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
             }
             catch
             {
