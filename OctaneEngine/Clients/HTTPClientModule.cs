@@ -8,7 +8,7 @@ namespace OctaneEngineCore.Clients;
 
 public static class HTTPClientModule
 {
-    internal static IServiceCollection AddHTTPClient(this IServiceCollection services)
+    internal static void AddHTTPClient(this IServiceCollection services)
     {
         services.AddSingleton<HttpClientHandler>(provider =>
         {
@@ -43,7 +43,5 @@ public static class HTTPClientModule
                 MaxResponseContentBufferSize = cfg.BufferSize,
             };
         });
-
-        return services;
     }
 }

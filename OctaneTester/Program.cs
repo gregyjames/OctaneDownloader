@@ -27,10 +27,7 @@ namespace OctaneTester
             }).ConfigureAppConfiguration(configurationBuilder =>
             {
                 configurationBuilder.AddJsonFile("appsettings.json");
-            }).UseOctaneEngine(configuration =>
-            {
-                configuration.ShowProgress = false;
-            }).ConfigureServices(collection =>
+            }).UseOctaneEngine().ConfigureServices(collection =>
             {
                 collection.AddHostedService<DownloadService>();
             }).RunConsoleAsync();

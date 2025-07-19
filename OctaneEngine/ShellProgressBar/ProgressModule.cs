@@ -6,7 +6,7 @@ namespace OctaneEngineCore.ShellProgressBar;
 
 public static class ProgressModule
 {
-    internal static IServiceCollection AddProgressBar(this IServiceCollection services)
+    internal static void AddProgressBar(this IServiceCollection services)
     {
         services.AddTransient<ProgressBar>(provider =>
         {
@@ -25,6 +25,5 @@ public static class ProgressModule
             };
             return new ProgressBar(cfg.Parts, "Downloading File...", options);
         });
-        return services;
     }
 }

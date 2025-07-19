@@ -11,7 +11,7 @@ namespace OctaneEngineCore.Clients;
 public enum ClientTypes { Octane, Normal }
 public static class ClientModule
 {
-    public static IServiceCollection AddClient(this IServiceCollection services)
+    public static void AddClient(this IServiceCollection services)
     {
         services.AddHTTPClient();
 
@@ -32,7 +32,5 @@ public static class ClientModule
 
             return new DefaultClient(client, cfg, progress);
         });
-
-        return services;
     }
 }
