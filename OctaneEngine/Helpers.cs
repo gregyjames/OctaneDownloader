@@ -1,27 +1,32 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
-using Collections.Pooled;
 using Microsoft.Extensions.Logging;
 
 namespace OctaneEngineCore;
 
 public static class Helpers
 {
-    internal static PooledList<ValueTuple<long, long>> CreatePartsList(long responseLength, long partSize, ILogger logger)
+    internal static List<ValueTuple<long, long>> CreatePartsList(long responseLength, int parts, ILogger logger)
     {
-        var pieces = new PooledList<ValueTuple<long, long>>();
-        //Loop to add all the events to the queue
-        for (long i = 0; i < responseLength; i += partSize) {
-            //Increment the start by one byte for all parts but the first which starts from zero.
-            if (i != 0) {
-                i += 1;
-            }
-            var j = Math.Min(i + partSize, responseLength);
-            var piece = new ValueTuple<long, long>(i, j);
-            pieces.Add(piece);
-            logger.LogTrace($"Piece with range ({piece.Item1},{piece.Item2}) added to tasks queue.");
+        var pieces = new List<ValueTuple<long, long>>(parts);
+        if (parts <= 0) throw new ArgumentException("Parts must be positive", nameof(parts));
+        if (responseLength <= 0) throw new ArgumentException("Response length must be positive", nameof(responseLength));
+
+        long basePartSize = responseLength / parts;
+        logger.LogInformation("PART SIZE: {partSize}", NetworkAnalyzer.PrettySize(basePartSize));
+
+        long remainder = responseLength % parts;
+        long start = 0;
+        for (int i = 0; i < parts; i++)
+        {
+            // Distribute the remainder: the first 'remainder' parts get an extra byte
+            long thisPartSize = basePartSize + (i < remainder ? 1 : 0);
+            long end = start + thisPartSize - 1; // inclusive
+            pieces.Add((start, end));
+            logger.LogTrace($"Piece with range ({start},{end}) added to tasks queue.");
+            start = end + 1;
         }
-            
         return pieces;
     }
 

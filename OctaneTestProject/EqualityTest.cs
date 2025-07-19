@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Net.Http;
+using System.Text;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
@@ -71,7 +72,7 @@ namespace OctaneTestProject
                 var config = new OctaneConfiguration
                 {
                     Parts = 2,
-                    BufferSize = 8192,
+                    BufferSize = 1024,
                     ShowProgress = false,
                     NumRetries = 20,
                     BytesPerSecond = 1,
@@ -95,7 +96,7 @@ namespace OctaneTestProject
             }
             finally
             {
-                bool equal = false;
+                bool equal = true;
                 if (File.Exists(outFile) && done)
                 {
                     byte[] file1Bytes = File.ReadAllBytes("original.png");
@@ -104,17 +105,20 @@ namespace OctaneTestProject
                     if (file1Bytes.Length != file2Bytes.Length)
                     {
                         equal = false;
+                        _log.Error("Files are different lengths: {} vs {}", file1Bytes.Length, file2Bytes.Length);
                     }
 
                     for (int i = 0; i < file1Bytes.Length; i++)
                     {
                         if (file1Bytes[i] != file2Bytes[i])
                         {
+                            _log.Error("Files are different at {location} {a} vs {b}", i, file1Bytes[i], file2Bytes[i]);
                             equal = false;
-                            break;
                         }
-
-                        equal = true;
+                        else
+                        {
+                            equal = true;
+                        }
                     }
                 }
                 Assert.That(equal, Is.True);

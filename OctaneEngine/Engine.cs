@@ -76,8 +76,6 @@ namespace OctaneEngine
         #region Helpers
         private void Cleanup(Stopwatch stopwatch, OctaneConfiguration config, bool success)
         {
-            stopwatch.Stop();
-            _logger.LogInformation($"File downloaded in {stopwatch.ElapsedMilliseconds} ms.");
             _logger.LogTrace("Calling callback function...");
             if (!success)
             {
@@ -169,7 +167,6 @@ namespace OctaneEngine
                     var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
                     var memPool = ArrayPool<byte>.Create(_config.BufferSize, _config.Parts);
                     _logger.LogInformation("Range supported: {range}", _range);
-                    var partSize = Convert.ToInt64(_length / _config.Parts);
                     int tasksDone = 0;
                 #endregion
             
@@ -185,8 +182,7 @@ namespace OctaneEngine
                 #endregion
             
                 _logger.LogInformation("TOTAL SIZE: {length}", NetworkAnalyzer.PrettySize(_length));
-                _logger.LogInformation("PART SIZE: {partSize}", NetworkAnalyzer.PrettySize(partSize));
-            
+                
                 stopwatch.Start();
                 _client.SetBaseAddress(request.Url);
                 _client.SetHeaders(request.Headers);
@@ -197,10 +193,10 @@ namespace OctaneEngine
                     if (_client.IsRangeSupported())
                     {
                         clientType = "Octane";
-                        var pieces = Helpers.CreatePartsList(_length, partSize, _logger);
+                        var pieces = Helpers.CreatePartsList(_length, _config.Parts, _logger);
                         _client.SetMmf(mmf);
                         _client.SetArrayPool(memPool);
-                        _logger.LogInformation("Using Octane Client to download file.");
+                        _logger.LogDebug("Using Octane Client to download file.");
                         var options = new ParallelOptions()
                         {
                             MaxDegreeOfParallelism = Environment.ProcessorCount,
@@ -221,13 +217,9 @@ namespace OctaneEngine
                                 await _client.Download(request.Url, piece, cancellation_token, pause_token.Token);
 
                                 Interlocked.Increment(ref tasksDone);
-
-                                _logger.LogTrace("Finished {tasks}/{parts} pieces!", tasksDone, _config?.Parts);
-
+                                
                                 pbar?.Tick();
                                 _config?.ProgressCallback?.Invoke((double)tasksDone / _config.Parts);
-
-                                _logger.LogInformation("File downloaded successfully.");
                             }).ConfigureAwait(false);
                             
                             success = true;
@@ -245,7 +237,7 @@ namespace OctaneEngine
                     }
                     else
                     {
-                        _logger.LogInformation("Using Default Client to download file.");
+                        _logger.LogDebug("Using Default Client to download file.");
                         clientType = "Normal";
                         try
                         {
@@ -257,8 +249,12 @@ namespace OctaneEngine
                             success = false;
                             throw;
                         }
-
-                        _logger.LogInformation("File downloaded successfully.");
+                    }
+                    
+                    stopwatch.Stop();
+                    if (success)
+                    {
+                        _logger.LogInformation($"File downloaded successfully in {stopwatch.ElapsedMilliseconds} ms.");
                     }
                 }
             }

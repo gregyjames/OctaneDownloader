@@ -31,7 +31,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using OctaneEngine;
 using OctaneEngineCore.ShellProgressBar;
-using PooledAwait;
 
 namespace OctaneEngineCore.Clients;
 
@@ -88,7 +87,7 @@ internal class DefaultClient : IClient
         _memPool = pool;
     }
     
-    private async PooledTask CopyMessageContentToStreamWithProgressAsync(HttpResponseMessage message, Stream stream, IProgress<long> progress)
+    private async Task CopyMessageContentToStreamWithProgressAsync(HttpResponseMessage message, Stream stream, IProgress<long> progress)
     {
         byte[] buffer = _memPool.Rent(_config.BufferSize);
         long totalBytesWritten = 0;
@@ -114,7 +113,7 @@ internal class DefaultClient : IClient
         }
     }
     
-    public async PooledTask Download(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
+    public async Task Download(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         if (pauseToken.IsPaused)
         {
