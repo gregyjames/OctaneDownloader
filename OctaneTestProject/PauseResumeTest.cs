@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Autofac;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngine;
@@ -66,12 +65,7 @@ namespace OctaneTestProject
             
             _pauseTokenSource.Pause();
             
-            var containerBuilder = new ContainerBuilder();
-            containerBuilder.RegisterInstance(_factory).As<ILoggerFactory>();
-            containerBuilder.RegisterInstance(config).As<OctaneConfiguration>();
-            containerBuilder.AddOctane();
-            var engineContainer = containerBuilder.Build();
-            var engine = engineContainer.Resolve<IEngine>();
+            var engine = EngineBuilder.Create().WithConfiguration(config).WithLogger(_factory).Build();
             
             engine.SetDoneCallback(_ => Assert.That(File.Exists(_outFile), Is.True));
             engine.SetProgressCallback(Console.WriteLine);

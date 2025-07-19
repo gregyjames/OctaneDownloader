@@ -1,0 +1,168 @@
+using System;
+using System.IO;
+using System.Threading;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using OctaneEngine;
+using OctaneEngineCore;
+using Serilog;
+using Serilog.Sinks.SystemConsole.Themes;
+
+namespace OctaneTester.Examples;
+
+public class NoHostBuilder
+{
+    public void NoHostBuilderExample()
+    {
+        const string url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
+        
+        // Setup logging
+        var seriLog = new LoggerConfiguration()
+            .Enrich.FromLogContext()
+            .MinimumLevel.Information()
+            .WriteTo.Async(a => a.File("./OctaneLog.txt"))
+            .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen))
+            .CreateLogger();
+        var factory = LoggerFactory.Create(logging =>
+        {
+            logging.AddSerilog(seriLog);
+        });
+
+        // Setup configuration
+        var builder = new ConfigurationBuilder();
+        builder.SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", true, true);
+        var configRoot = builder.Build();
+
+        // Setup dependency injection without IHostBuilder
+        var services = new ServiceCollection();
+        
+        // Add logging
+        services.AddSingleton<ILoggerFactory>(factory);
+        
+        // Add Octane Engine with configuration from JSON
+        services.AddOctaneEngine(configRoot);
+        
+        // Build the service provider
+        var serviceProvider = services.BuildServiceProvider();
+        
+        // Get the engine from DI
+        var engine = serviceProvider.GetRequiredService<IEngine>();
+        
+        // Setup download
+        var pauseTokenSource = new PauseTokenSource();
+        using var cancelTokenSource = new CancellationTokenSource();
+        
+        // Download the file
+        engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource).Wait();
+        
+        // Cleanup
+        serviceProvider.Dispose();
+    }
+
+    public void NoHostBuilderWithCustomConfigExample()
+    {
+        const string url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
+        
+        // Setup logging
+        var seriLog = new LoggerConfiguration()
+            .Enrich.FromLogContext()
+            .MinimumLevel.Information()
+            .WriteTo.Async(a => a.File("./OctaneLog.txt"))
+            .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen))
+            .CreateLogger();
+        var factory = LoggerFactory.Create(logging =>
+        {
+            logging.AddSerilog(seriLog);
+        });
+
+        // Create custom configuration
+        var config = new OctaneConfiguration
+        {
+            Parts = 4,
+            BufferSize = 8192,
+            ShowProgress = true,
+            NumRetries = 5,
+            BytesPerSecond = 1,
+            UseProxy = false,
+            LowMemoryMode = false
+        };
+
+        // Setup dependency injection without IHostBuilder
+        var services = new ServiceCollection();
+        
+        // Add logging
+        services.AddSingleton<ILoggerFactory>(factory);
+        
+        // Add Octane Engine with custom configuration
+        services.AddOctaneEngine(config);
+        
+        // Build the service provider
+        var serviceProvider = services.BuildServiceProvider();
+        
+        // Get the engine from DI
+        var engine = serviceProvider.GetRequiredService<IEngine>();
+        
+        // Setup download
+        var pauseTokenSource = new PauseTokenSource();
+        using var cancelTokenSource = new CancellationTokenSource();
+        
+        // Download the file
+        engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource).Wait();
+        
+        // Cleanup
+        serviceProvider.Dispose();
+    }
+
+    public void NoHostBuilderWithActionConfigExample()
+    {
+        const string url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
+        
+        // Setup logging
+        var seriLog = new LoggerConfiguration()
+            .Enrich.FromLogContext()
+            .MinimumLevel.Information()
+            .WriteTo.Async(a => a.File("./OctaneLog.txt"))
+            .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen))
+            .CreateLogger();
+        var factory = LoggerFactory.Create(logging =>
+        {
+            logging.AddSerilog(seriLog);
+        });
+
+        // Setup dependency injection without IHostBuilder
+        var services = new ServiceCollection();
+        
+        // Add logging
+        services.AddSingleton<ILoggerFactory>(factory);
+        
+        // Add Octane Engine with action-based configuration
+        services.AddOctaneEngine(config =>
+        {
+            config.Parts = 6;
+            config.BufferSize = 16384;
+            config.ShowProgress = false;
+            config.NumRetries = 3;
+            config.BytesPerSecond = 1;
+            config.UseProxy = false;
+            config.LowMemoryMode = true;
+        });
+        
+        // Build the service provider
+        var serviceProvider = services.BuildServiceProvider();
+        
+        // Get the engine from DI
+        var engine = serviceProvider.GetRequiredService<IEngine>();
+        
+        // Setup download
+        var pauseTokenSource = new PauseTokenSource();
+        using var cancelTokenSource = new CancellationTokenSource();
+        
+        // Download the file
+        engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource).Wait();
+        
+        // Cleanup
+        serviceProvider.Dispose();
+    }
+} 

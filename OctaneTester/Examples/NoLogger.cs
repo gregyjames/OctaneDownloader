@@ -1,7 +1,9 @@
 using System.IO;
 using System.Threading;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using OctaneEngine;
 using OctaneEngineCore;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
@@ -12,22 +14,34 @@ public class NoLogger
 {
     public void NoLoggerExample()
     {
-        /*
-        #region Configuration Loading
+        const string url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
+        
+        // Setup configuration
         var builder = new ConfigurationBuilder();
         builder.SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", true, true);
         var configRoot = builder.Build();
-        #endregion
         
+        // Setup dependency injection without IHostBuilder
+        var services = new ServiceCollection();
+        
+        // Add Octane Engine with configuration from JSON (no logging setup)
+        services.AddOctaneEngine(configRoot);
+        
+        // Build the service provider
+        var serviceProvider = services.BuildServiceProvider();
+        
+        // Get the engine from DI
+        var engine = serviceProvider.GetRequiredService<IEngine>();
+        
+        // Setup download
         var pauseTokenSource = new PauseTokenSource();
         using var cancelTokenSource = new CancellationTokenSource();
-        var containerBuilder = new ContainerBuilder();
-        containerBuilder.RegisterInstance(configRoot).As<IConfiguration>();
-        containerBuilder.AddOctane();
-        var engineContainer = containerBuilder.Build();
-        var engine = engineContainer.Resolve<IEngine>();
-        engine.DownloadFile(new OctaneRequest("", ""), pauseTokenSource, cancelTokenSource);
-        */
+        
+        // Download the file
+        engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource).Wait();
+        
+        // Cleanup
+        serviceProvider.Dispose();
     }
 }

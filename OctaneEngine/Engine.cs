@@ -60,6 +60,18 @@ namespace OctaneEngine
             _client = client;
             _normalClient = normalClient;
         }
+
+        /// <summary>
+        /// Creates a new Engine instance without dependency injection
+        /// </summary>
+        public Engine(OctaneConfiguration config, IClient client, IClient normalClient, ILoggerFactory? factory = null)
+        {
+            _factory = factory ?? NullLoggerFactory.Instance;
+            _logger = _factory.CreateLogger<Engine>();
+            _config = config ?? throw new ArgumentNullException(nameof(config));
+            _client = client ?? throw new ArgumentNullException(nameof(client));
+            _normalClient = normalClient ?? throw new ArgumentNullException(nameof(normalClient));
+        }
         
         #region Helpers
         private void Cleanup(Stopwatch stopwatch, OctaneConfiguration config, bool success)
