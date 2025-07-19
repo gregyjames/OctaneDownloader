@@ -307,9 +307,17 @@ internal class OctaneClient : IClient
                 Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
             }
         }
-        catch (Exception ex)
+        catch (AccessViolationException ex)
         {
-            _log.LogError(ex, "Error writing to accessor with offset {offset}.", offset);
+            _log.LogError(ex, "Memory access error while writing to accessor with offset {offset}.", offset);
+        }
+        catch (ArgumentException ex)
+        {
+            _log.LogError(ex, "Invalid argument error while writing to accessor with offset {offset}.", offset);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _log.LogError(ex, "Invalid operation error while writing to accessor with offset {offset}.", offset);
         }
         finally
         {
