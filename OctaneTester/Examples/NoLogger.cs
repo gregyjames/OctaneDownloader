@@ -1,6 +1,5 @@
 using System.IO;
 using System.Threading;
-using Autofac;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OctaneEngineCore;
@@ -13,6 +12,7 @@ public class NoLogger
 {
     public void NoLoggerExample()
     {
+        /*
         #region Configuration Loading
         var builder = new ConfigurationBuilder();
         builder.SetBasePath(Directory.GetCurrentDirectory())
@@ -28,5 +28,6 @@ public class NoLogger
         var engineContainer = containerBuilder.Build();
         var engine = engineContainer.Resolve<IEngine>();
         engine.DownloadFile(new OctaneRequest("", ""), pauseTokenSource, cancelTokenSource);
+        */
     }
 }

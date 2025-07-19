@@ -1,44 +1,38 @@
-using Autofac;
+using System.Net.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using OctaneEngine;
-using OctaneEngineCore.ColorConsoleLogger;
 using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngineCore.Clients;
 
 public enum ClientTypes { Octane, Normal }
-public class ClientModule: Module
+public static class ClientModule
 {
-    public ClientModule()
+    public static IServiceCollection AddClient(this IServiceCollection services)
     {
-    }
+        services.AddHTTPClient();
 
-    protected override void Load(ContainerBuilder builder)
-    {
-        // Logging 
-        builder.RegisterModule(new LoggerModule());
-
-        // Config
-        builder.Register(context =>
+        services.AddKeyedTransient<IClient>(ClientTypes.Octane, (provider, o) =>
         {
-            var registered = context.TryResolve(out IConfiguration config);
-            var octaneConfiguration = !registered ? new OctaneConfiguration() : new OctaneConfiguration(config, context.Resolve<ILoggerFactory>());
+            var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
+            var client = provider.GetRequiredService<HttpClient>();
+            var factory = provider.GetRequiredService<ILoggerFactory>();
+            var progress = provider.GetService<ProgressBar>();
+            
+            return new OctaneClient(cfg, client, factory, progress);
+        });
+        services.AddKeyedSingleton<IClient>(ClientTypes.Normal, (provider, o) =>
+        {
+            var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
+            var client = provider.GetRequiredService<HttpClient>();
+            var progress = provider.GetService<ProgressBar>();
 
-            if (octaneConfiguration.ShowProgress)
-            {
-                // Register ProgressBar
-                builder.RegisterModule(new ProgressModule());
-            }
-            return octaneConfiguration;
-        }).As<OctaneConfiguration>().IfNotRegistered(typeof(OctaneConfiguration)).SingleInstance();
-        
-        // Register HTTPClient Instance
-        builder.RegisterModule(new HTTPClientModule());
-        
-        // Register Client
-        builder.RegisterType<OctaneClient>().As<IClient>().SingleInstance().Keyed<IClient>(ClientTypes.Octane);
-        builder.RegisterType<DefaultClient>().As<IClient>().SingleInstance().Keyed<IClient>(ClientTypes.Normal);
+            return new DefaultClient(client, cfg, progress);
+        });
 
+        return services;
     }
 }

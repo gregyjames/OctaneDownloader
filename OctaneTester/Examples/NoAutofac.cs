@@ -11,6 +11,7 @@ public class NoAutofac
 {
     public void NoAutoFacExample()
     {
+        /*
         #region Logging Example
         var seriLog = new LoggerConfiguration()
             .Enrich.FromLogContext()
@@ -32,5 +33,6 @@ public class NoAutofac
         #endregion
 
         EngineBuilder.Build(factory, configRoot);
+        */
     }
 }

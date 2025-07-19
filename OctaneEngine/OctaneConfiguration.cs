@@ -30,57 +30,6 @@ namespace OctaneEngine;
 
 public class OctaneConfiguration
 {
-    private readonly ILogger<OctaneConfiguration> _logger;
-
-    public OctaneConfiguration()
-    {
-        Parts = 4;
-        BufferSize = 8096;
-        ShowProgress = false;
-        DoneCallback = null!;
-        ProgressCallback = null!;
-        NumRetries = 10;
-        BytesPerSecond = 1;
-        UseProxy = false;
-        Proxy = null;
-        LowMemoryMode = false;
-    }
-
-    public OctaneConfiguration(int parts = 4, int bufferSize = 8096, bool showProgress = true, int numRetries = 10, int bytesPerSecond = 1,
-        bool useProxy = false, bool lowMemoryMode = false)
-    {
-        Parts = parts;
-        BufferSize = bufferSize;
-        ShowProgress = showProgress;
-        NumRetries = numRetries;
-        BytesPerSecond = bytesPerSecond;
-        UseProxy = useProxy;
-        LowMemoryMode = lowMemoryMode;
-    }
-    public OctaneConfiguration(IConfiguration config, ILoggerFactory factory)
-    {
-        _logger = factory.CreateLogger<OctaneConfiguration>();
-        var octaneSection = config.GetSection("octane");
-        
-        if (octaneSection.Exists())
-        {
-            Parts = Convert.ToInt32(octaneSection?["Parts"]);
-            BufferSize = Convert.ToInt32(octaneSection?["BufferSize"]);
-            ShowProgress = Convert.ToBoolean(octaneSection?["ShowProgress"]);
-            NumRetries = Convert.ToInt32(octaneSection?["NumRetries"]);
-            BytesPerSecond = Convert.ToInt32(octaneSection?["BytesPerSecond"]);
-            UseProxy = Convert.ToBoolean(octaneSection?["UseProxy"]);
-            LowMemoryMode = Convert.ToBoolean(octaneSection?["LowMemoryMode"]);
-            DoneCallback = null!;
-            ProgressCallback = null!;
-            Proxy = null;
-        }
-
-        if (UseProxy && Proxy == null)
-        {
-            _logger.LogError("Proxy must be set on use proxy!");
-        }
-    }
     /// <summary>
     ///     The number of parts to download in parallel.
     /// </summary>
@@ -119,17 +68,18 @@ public class OctaneConfiguration
     /// <summary>
     ///     The Proxy settings to use.
     /// </summary>
-    protected internal IWebProxy Proxy { get; set; }
+    public IWebProxy Proxy { get; set; }
     
     /// <summary>
     ///     The Action<bool> function to call when the download is finished.
     /// </summary>
-    protected internal Action<bool> DoneCallback { get; set; }
+    public Action<bool> DoneCallback { get; set; }
 
     /// <summary>
     ///     The Action<double> function to call to report download progress.
     /// </summary>
-    protected internal Action<double> ProgressCallback { get; set; }
+    public Action<double> ProgressCallback { get; set; }
+    
     public override string ToString()
     {
         var s =

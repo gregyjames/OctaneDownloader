@@ -32,8 +32,10 @@ using System.Net.Http;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
 using OctaneEngineCore.ShellProgressBar;
@@ -50,11 +52,11 @@ namespace OctaneEngine
         private readonly IClient _normalClient;
         private readonly ILogger<Engine> _logger;
 
-        public Engine(OctaneConfiguration config, IClient client, IClient normalClient, ILoggerFactory? factory = null)
+        public Engine(IOptions<OctaneConfiguration> config, [FromKeyedServices(ClientTypes.Octane)] IClient client, [FromKeyedServices(ClientTypes.Normal)] IClient normalClient, ILoggerFactory? factory = null)
         {
-            _factory = factory ?? new NullLoggerFactory();
+            _factory = factory ?? NullLoggerFactory.Instance;
             _logger = _factory.CreateLogger<Engine>();
-            _config = config;
+            _config = config.Value;
             _client = client;
             _normalClient = normalClient;
         }
