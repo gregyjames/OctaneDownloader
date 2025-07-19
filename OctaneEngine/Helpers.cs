@@ -1,15 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
-using Collections.Pooled;
 using Microsoft.Extensions.Logging;
 
 namespace OctaneEngineCore;
 
 public static class Helpers
 {
-    internal static PooledList<ValueTuple<long, long>> CreatePartsList(long responseLength, int parts, ILogger logger)
+    internal static List<ValueTuple<long, long>> CreatePartsList(long responseLength, int parts, ILogger logger)
     {
-        var pieces = new PooledList<ValueTuple<long, long>>();
+        var pieces = new List<ValueTuple<long, long>>(parts);
         if (parts <= 0) throw new ArgumentException("Parts must be positive", nameof(parts));
         if (responseLength <= 0) throw new ArgumentException("Response length must be positive", nameof(responseLength));
 
