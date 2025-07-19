@@ -29,7 +29,6 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using OctaneEngineCore.ShellProgressBar;
-using PooledAwait;
 
 namespace OctaneEngineCore.Clients;
 
@@ -41,5 +40,5 @@ public interface IClient : IDisposable
     public void SetMmf(MemoryMappedFile file);
     public void SetProgressbar(ProgressBar bar);
     public void SetArrayPool(ArrayPool<Byte> pool);
-    public PooledTask Download(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken);
+    public Task Download(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken);
 }

@@ -36,7 +36,6 @@ using Microsoft.Extensions.Logging;
 using OctaneEngine;
 using OctaneEngineCore.ShellProgressBar;
 using OctaneEngineCore.Streams;
-using PooledAwait;
 
 // ReSharper disable TemplateIsNotCompileTimeConstantProblem
 
@@ -97,7 +96,7 @@ internal class OctaneClient : IClient
         _memPool = pool;
     }
     
-    public async PooledTask Download(string url,(long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
+    public async Task Download(string url,(long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         _log.LogTrace("Sending request for range ({PieceItem1},{PieceItem2})...", piece.Item1, piece.Item2);
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));

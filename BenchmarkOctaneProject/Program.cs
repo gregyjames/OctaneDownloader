@@ -17,12 +17,12 @@ namespace BenchmarkOctaneProject
 {
     public class Program
     {
-        private HttpClient _client = null;
-        private IEngine _OctaneEngine = null;
-        private IEngine _OctaneEngine2 = null;
-        private PauseTokenSource pauseTokenSource;
-        private CancellationTokenSource cancelTokenSource;
-        private OctaneConfiguration config;
+        private HttpClient? _client = null;
+        private IEngine? _octaneEngine = null;
+        private IEngine? _octaneEngine2 = null;
+        private PauseTokenSource? _pauseTokenSource;
+        private CancellationTokenSource? _cancelTokenSource;
+        private OctaneConfiguration? _config = null;
         [Params("http://link.testfile.org/150MB", "https://link.testfile.org/250MB", "https://link.testfile.org/500MB")]
         public string Url;
 
@@ -41,30 +41,30 @@ namespace BenchmarkOctaneProject
                 logging.AddSerilog(seriLog);
             });
             
-            _OctaneEngine = EngineBuilder.Create().WithConfiguration(configuration =>
+            _octaneEngine = EngineBuilder.Create().WithConfiguration(configuration =>
             {
                 
             }).WithLogger(factory).Build();
             
-            _OctaneEngine2 = EngineBuilder.Create().WithConfiguration(configuration =>
+            _octaneEngine2 = EngineBuilder.Create().WithConfiguration(configuration =>
             {
                 configuration.LowMemoryMode = true;
             }).WithLogger(factory).Build();
 
-            pauseTokenSource = new PauseTokenSource();
-            cancelTokenSource = new CancellationTokenSource();
+            _pauseTokenSource = new PauseTokenSource();
+            _cancelTokenSource = new CancellationTokenSource();
         }
         
         [Benchmark]
         public async Task BenchmarkOctane()
         {
-            await _OctaneEngine.DownloadFile(new OctaneRequest(Url, "output0.zip"), pauseTokenSource, cancelTokenSource.Token);
+            await _octaneEngine.DownloadFile(new OctaneRequest(Url, "output0.zip"), _pauseTokenSource, _cancelTokenSource.Token);
         }
 
         [Benchmark]
         public async Task BenchmarkOctaneLowMemory()
         {
-            await _OctaneEngine2.DownloadFile(new OctaneRequest(Url, "output1.zip"), pauseTokenSource, cancelTokenSource.Token);
+            await _octaneEngine2.DownloadFile(new OctaneRequest(Url, "output1.zip"), _pauseTokenSource, _cancelTokenSource.Token);
         }
         [Benchmark]
         public async Task BenchmarkHttpClient()
