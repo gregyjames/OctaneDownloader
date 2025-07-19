@@ -266,6 +266,7 @@ namespace OctaneEngine
             {
                 success = false;
                 _logger.LogError(ex, "Error Downloading File with {clientType} client: {ex}", clientType, ex);
+                throw;
             }
             finally
             {

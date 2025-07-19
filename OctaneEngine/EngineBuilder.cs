@@ -79,6 +79,19 @@ public class EngineBuilder
     /// </summary>
     public IEngine Build()
     {
+        // Validate and fix configuration values
+        if (_configuration.Parts <= 0)
+            _configuration.Parts = Environment.ProcessorCount;
+        
+        if (_configuration.BufferSize <= 0)
+            _configuration.BufferSize = 8192;
+        
+        if (_configuration.NumRetries < 0)
+            _configuration.NumRetries = 3;
+        
+        if (_configuration.BytesPerSecond <= 0)
+            _configuration.BytesPerSecond = 1;
+
         if (_client == null)
         {
             // Create HTTP client handler
@@ -88,7 +101,7 @@ public class EngineBuilder
                 UseDefaultCredentials = true,
                 Proxy = _configuration.Proxy,
                 UseProxy = _configuration.UseProxy,
-                MaxConnectionsPerServer = _configuration.Parts,
+                MaxConnectionsPerServer = Math.Max(1, _configuration.Parts),
                 UseCookies = false,
                 ServerCertificateCustomValidationCallback = (_, _, _, _) => true
             };
@@ -99,7 +112,7 @@ public class EngineBuilder
             // Create HTTP client
             _client = new HttpClient(retryHandler)
             {
-                MaxResponseContentBufferSize = _configuration.BufferSize,
+                MaxResponseContentBufferSize = Math.Max(1, _configuration.BufferSize),
             };
         }
 
