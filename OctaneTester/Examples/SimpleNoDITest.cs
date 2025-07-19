@@ -38,9 +38,21 @@ public class SimpleNoDITest
             
             Console.WriteLine("Download completed successfully!");
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex)
         {
-            Console.WriteLine($"Error during download: {ex.Message}");
+            Console.WriteLine($"Network error during download: {ex.Message}");
+        }
+        catch (IOException ex)
+        {
+            Console.WriteLine($"File I/O error during download: {ex.Message}");
+        }
+        catch (OperationCanceledException ex)
+        {
+            Console.WriteLine($"Download was canceled: {ex.Message}");
+        }
+        catch (Exception ex) when (!(ex is OutOfMemoryException || ex is StackOverflowException || ex is ThreadAbortException))
+        {
+            Console.WriteLine($"Unexpected error during download: {ex.Message}");
         }
     }
 } 
