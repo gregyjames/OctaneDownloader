@@ -12,7 +12,7 @@
         <RepositoryUrl>https://github.com/gregyjames/OctaneDownloader</RepositoryUrl>
         <PackageTags>c-sharp download parallel downloader multithreading threading networking</PackageTags>
         <SignAssembly>true</SignAssembly>
-        <AssemblyOriginatorKeyFile>../build/key.snk</AssemblyOriginatorKeyFile>
+        <AssemblyOriginatorKeyFile>../signing-key.snk</AssemblyOriginatorKeyFile>
         <AssemblyVersion>4.0.0</AssemblyVersion>
         <AssemblyName>OctaneEngineCore</AssemblyName>
         <RootNamespace>OctaneEngineCore</RootNamespace>

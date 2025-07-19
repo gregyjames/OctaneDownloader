@@ -34,9 +34,16 @@ jobs:
     - name: Restore NuGet
       if: steps.cacheStep.outputs.cache-hit != 'true'
       run: nuget restore Octane.sln
+    - name: Decode SNK and save
+      shell: powershell
+      run: |
+        [IO.File]::WriteAllBytes("signing-key.snk", [Convert]::FromBase64String("${{ secrets.SIGNING_KEY_BASE64 }}"))    
     - name: Build
       run: dotnet build OctaneEngine/OctaneEngine.csproj --no-restore --configuration Release /p:Version=$Env:VERSION /p:AssemblyVersion=$Env:VERSION
     - name: Publish NuGet package
       run: dotnet nuget push **/*.nupkg --source https://api.nuget.org/v3/index.json --api-key $Env:NUGET_API_KEY
       env:
         NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+    - name: Delete SNK after build
+      run: Remove-Item signing-key.snk
+      shell: powershell

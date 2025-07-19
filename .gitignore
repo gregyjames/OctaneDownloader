@@ -32,3 +32,5 @@ OctaneTester/.DS_Store
 OctaneTester/OctaneLog.txt
 
 *.zip
+
+*.snk
