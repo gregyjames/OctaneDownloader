@@ -1,3 +1,5 @@
+using System;
+using System.Net;
 using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -10,24 +12,27 @@ public static class HTTPClientModule
 {
     internal static void AddHTTPClient(this IServiceCollection services)
     {
-        services.AddTransient<HttpClientHandler>(provider =>
+        services.AddTransient<SocketsHttpHandler>(provider =>
         {
             var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
-            return new HttpClientHandler()
+            return new SocketsHttpHandler()
             {
                 PreAuthenticate = true,
-                UseDefaultCredentials = true,
                 Proxy = cfg.Proxy,
                 UseProxy = cfg.UseProxy,
-                MaxConnectionsPerServer = cfg.Parts,
+                MaxConnectionsPerServer = cfg.Parts * 2,
                 UseCookies = false,
-                ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+                PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5),
+                EnableMultipleHttp2Connections = true,
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+                ConnectTimeout = TimeSpan.FromSeconds(15), // faster failure on bad endpoints
             };
         });
 
         services.AddTransient<RetryHandler>(provider =>
         {
-            var handler = provider.GetRequiredService<HttpClientHandler>();
+            var handler = provider.GetRequiredService<SocketsHttpHandler>();
             var factory = provider.GetRequiredService<ILoggerFactory>();
             var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
             
