@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 namespace OctaneEngineCore.ShellProgressBar
@@ -6,6 +7,7 @@ namespace OctaneEngineCore.ShellProgressBar
 	/// <summary>
 	/// Control the behaviour of your progressbar
 	/// </summary>
+	[ExcludeFromCodeCoverage]
 	public class ProgressBarOptions
 	{
 		private bool _enableTaskBarProgress;

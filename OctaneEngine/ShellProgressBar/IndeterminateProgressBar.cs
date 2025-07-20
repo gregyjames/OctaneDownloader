@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 
 namespace OctaneEngineCore.ShellProgressBar
 {
+	[ExcludeFromCodeCoverage]
 	public class IndeterminateProgressBar : ProgressBar
 	{
 		private const int MaxTicksForIndeterminate = 20;

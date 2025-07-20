@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Threading;
 
 namespace OctaneEngineCore.ShellProgressBar
 {
+	[ExcludeFromCodeCoverage]
 	public abstract class ProgressBarBase
 	{
 		static ProgressBarBase()

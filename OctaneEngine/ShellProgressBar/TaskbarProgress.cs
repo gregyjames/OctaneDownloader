@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 namespace OctaneEngineCore.ShellProgressBar
 {
+	[ExcludeFromCodeCoverage]
 	public static class TaskbarProgress
 	{
 		public enum TaskbarStates

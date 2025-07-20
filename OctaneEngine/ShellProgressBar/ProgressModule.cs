@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -5,6 +6,7 @@ namespace OctaneEngineCore.ShellProgressBar;
 
 public static class ProgressModule
 {
+    [ExcludeFromCodeCoverage]
     internal static void AddProgressBar(this IServiceCollection services)
     {
         services.AddTransient<ProgressBar>(provider =>

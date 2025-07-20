@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -9,6 +10,7 @@ using Cysharp.Text;
 
 namespace OctaneEngineCore.ShellProgressBar
 {
+	[ExcludeFromCodeCoverage]
 	public class ProgressBar : ProgressBarBase, IProgressBar
 	{
 		private static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);

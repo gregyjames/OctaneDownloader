@@ -1,7 +1,9 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace OctaneEngineCore.ShellProgressBar
 {
+	[ExcludeFromCodeCoverage]
 	internal class Progress<T> : IProgress<T>, IDisposable
 	{
 		private readonly WeakReference<IProgressBar> _progressBar;

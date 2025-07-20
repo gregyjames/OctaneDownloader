@@ -1,5 +1,8 @@
-﻿namespace OctaneEngineCore.ShellProgressBar
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace OctaneEngineCore.ShellProgressBar
 {
+    [ExcludeFromCodeCoverage]
     internal static class StringExtensions
     {
         public static string Excerpt(string phrase, int length = 60)
