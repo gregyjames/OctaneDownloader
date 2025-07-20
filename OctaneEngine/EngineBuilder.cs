@@ -92,40 +92,13 @@ public class EngineBuilder
         
         if (_configuration.BytesPerSecond <= 0)
             _configuration.BytesPerSecond = 1;
-
-        if (_client == null)
-        {
-            // Create HTTP client handler
-            var httpClientHandler = new SocketsHttpHandler()
-            {
-                PreAuthenticate = true,
-                Proxy = _configuration.Proxy,
-                UseProxy = _configuration.UseProxy,
-                MaxConnectionsPerServer = _configuration.Parts * 2,
-                UseCookies = false,
-                PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5),
-                EnableMultipleHttp2Connections = true,
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
-                ConnectTimeout = TimeSpan.FromSeconds(15), // faster failure on bad endpoints
-            };
-
-            // Create retry handler
-            var retryHandler = new RetryHandler(httpClientHandler, _loggerFactory, _configuration.NumRetries, _configuration.RetryCap);
-
-            // Create HTTP client
-            _client = new HttpClient(retryHandler)
-            {
-                MaxResponseContentBufferSize = Math.Max(1, _configuration.BufferSize),
-            };
-        }
-
+        
         // Create clients
         var octaneClient = new OctaneClient(_configuration, _client, _loggerFactory, _progressBar);
-        var defaultClient = new DefaultClient(_client, _configuration, _progressBar);
+        var defaultClient = new DefaultClient(_client, _configuration);
 
         // Create engine
-        return new Engine(_configuration, octaneClient, defaultClient, _loggerFactory);
+        return new Engine(_configuration, _loggerFactory);
     }
 
     /// <summary>

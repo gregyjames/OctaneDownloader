@@ -1,3 +1,5 @@
+using System;
+using System.Net;
 using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,24 +15,11 @@ public static class ClientModule
 {
     public static void AddClient(this IServiceCollection services)
     {
-        services.AddHTTPClient();
-
-        services.AddKeyedTransient<IClient>(ClientTypes.Octane, (provider, o) =>
+        services.AddSingleton<OctaneClientFactory>(provider =>
         {
-            var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
-            var client = provider.GetRequiredService<HttpClient>();
-            var factory = provider.GetRequiredService<ILoggerFactory>();
-            var progress = provider.GetService<ProgressBar>();
-            
-            return new OctaneClient(cfg, client, factory, progress);
-        });
-        services.AddKeyedTransient<IClient>(ClientTypes.Normal, (provider, o) =>
-        {
-            var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
-            var client = provider.GetRequiredService<HttpClient>();
-            var progress = provider.GetService<ProgressBar>();
-
-            return new DefaultClient(client, cfg, progress);
+            var config = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
+            var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+            return new OctaneClientFactory(config, loggerFactory);
         });
     }
 }

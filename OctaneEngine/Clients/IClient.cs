@@ -32,13 +32,11 @@ using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngineCore.Clients;
 
-public interface IClient : IDisposable
+public interface IClient
 {
     public bool IsRangeSupported();
-    public void SetBaseAddress(string url);
-    public void SetHeaders(Dictionary<string, string>? headers);
     public void SetMmf(MemoryMappedFile file);
     public void SetProgressbar(ProgressBar bar);
     public void SetArrayPool(ArrayPool<Byte> pool);
-    public Task Download(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken);
+    internal Task Download(string url, (long, long) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken);
 }

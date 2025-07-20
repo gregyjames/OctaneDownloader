@@ -44,33 +44,31 @@ using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngine
 {
-    public class Engine: IEngine
+    public class Engine: IEngine, IDisposable
     {
         private readonly ILoggerFactory _factory;
         private readonly OctaneConfiguration _config;
-        private readonly IClient _client;
-        private readonly IClient _normalClient;
         private readonly ILogger<Engine> _logger;
-
-        public Engine(IOptions<OctaneConfiguration> config, [FromKeyedServices(ClientTypes.Octane)] IClient client, [FromKeyedServices(ClientTypes.Normal)] IClient normalClient, ILoggerFactory? factory = null)
+        private readonly OctaneClientFactory _clientFactory;
+        private const string OCTANEHTTPCLIENT = "octane";
+        private const string SIZEANDRANGEHTTPCLIENT = "getFileSizeAndRangeSupport";
+        public Engine(IOptions<OctaneConfiguration> config, OctaneClientFactory clientFactory, ILoggerFactory factory)
         {
+            _clientFactory = clientFactory;
             _factory = factory ?? NullLoggerFactory.Instance;
             _logger = _factory.CreateLogger<Engine>();
             _config = config.Value;
-            _client = client;
-            _normalClient = normalClient;
         }
 
         /// <summary>
         /// Creates a new Engine instance without dependency injection
         /// </summary>
-        public Engine(OctaneConfiguration config, IClient client, IClient normalClient, ILoggerFactory? factory = null)
+        public Engine(OctaneConfiguration config, ILoggerFactory? factory = null)
         {
             _factory = factory ?? NullLoggerFactory.Instance;
             _logger = _factory.CreateLogger<Engine>();
             _config = config ?? throw new ArgumentNullException(nameof(config));
-            _client = client ?? throw new ArgumentNullException(nameof(client));
-            _normalClient = normalClient ?? throw new ArgumentNullException(nameof(normalClient));
+            _clientFactory = new OctaneClientFactory(_config, _factory);
         }
         
         #region Helpers
@@ -109,10 +107,11 @@ namespace OctaneEngine
         
         private async Task<(long, bool)> getFileSizeAndRangeSupport(string url)
         {
-            using var client = new HttpClient();
+            var client = _clientFactory.CreateClient(SIZEANDRANGEHTTPCLIENT);
             var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
             var responseLength = response.Content.Headers.ContentLength ?? 0;
             var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
+            _clientFactory.ReturnClient(SIZEANDRANGEHTTPCLIENT, client);
             return (responseLength, rangeSupported);
         }
 
@@ -156,6 +155,9 @@ namespace OctaneEngine
             var success = false;
             var filename = string.Empty;
             var clientType = string.Empty;
+            var httpClient = _clientFactory.CreateClient(OCTANEHTTPCLIENT);
+            var octaneClient = new OctaneClient(_config, httpClient, _factory);
+            var normalClient = new DefaultClient(httpClient, _config);
             
             try
             {
@@ -184,18 +186,16 @@ namespace OctaneEngine
                 _logger.LogInformation("TOTAL SIZE: {length}", NetworkAnalyzer.PrettySize(_length));
                 
                 stopwatch.Start();
-                _client.SetBaseAddress(request.Url);
-                _client.SetHeaders(request.Headers);
             
                 using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, _length, MemoryMappedFileAccess.ReadWrite))
                 {
                     //Check if range is supported
-                    if (_client.IsRangeSupported())
+                    if (_range)
                     {
                         clientType = "Octane";
                         var pieces = Helpers.CreatePartsList(_length, _config.Parts, _logger);
-                        _client.SetMmf(mmf);
-                        _client.SetArrayPool(memPool);
+                        octaneClient.SetMmf(mmf);
+                        octaneClient.SetArrayPool(memPool);
                         _logger.LogDebug("Using Octane Client to download file.");
                         var options = new ParallelOptions()
                         {
@@ -207,14 +207,15 @@ namespace OctaneEngine
                         if (_config.ShowProgress)
                         {
                             pbar = new ProgressBar(pieces.Count * 2, "Downloading file...");
-                            _client.SetProgressbar(pbar);
+                            octaneClient.SetProgressbar(pbar);
+                            normalClient.SetProgressbar(pbar);
                         }
 
                         try
                         {
                             await Parallel.ForEachAsync(pieces, options, async (piece, token) =>
                             {
-                                await _client.Download(request.Url, piece, cancellation_token, pause_token.Token);
+                                await octaneClient.Download(request.Url, piece, request.Headers, cancellation_token, pause_token.Token);
 
                                 Interlocked.Increment(ref tasksDone);
                                 
@@ -239,9 +240,11 @@ namespace OctaneEngine
                     {
                         _logger.LogDebug("Using Default Client to download file.");
                         clientType = "Normal";
+                        normalClient.SetMmf(mmf);
+                        normalClient.SetArrayPool(memPool);
                         try
                         {
-                            await _normalClient.Download(request.Url, (0, 0), cancellation_token, pause_token.Token).ConfigureAwait(false);
+                            await normalClient.Download(request.Url, (0, 0), request.Headers, cancellation_token, pause_token.Token).ConfigureAwait(false);
                             success = true;
                         }
                         catch (Exception)
@@ -271,7 +274,14 @@ namespace OctaneEngine
                     File.Delete(filename);
                 }
                 Cleanup(stopwatch, _config, success);
+                _clientFactory.ReturnClient(OCTANEHTTPCLIENT, httpClient);
             }
+        }
+
+        public void Dispose()
+        {
+            _factory?.Dispose();
+            _clientFactory.Dispose();
         }
     }
 }

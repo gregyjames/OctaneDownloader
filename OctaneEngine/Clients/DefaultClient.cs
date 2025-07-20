@@ -34,38 +34,12 @@ using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngineCore.Clients;
 
-internal class DefaultClient : IClient
+internal class DefaultClient(HttpClient httpClient, OctaneConfiguration config)
+    : IClient
 {
-    private readonly HttpClient _httpClient;
     private MemoryMappedFile _mmf;
     private ArrayPool<byte> _memPool;
-    private readonly OctaneConfiguration _config;
-    private readonly ProgressBar _pbar;
-
-    public DefaultClient(HttpClient httpClient, OctaneConfiguration config, ProgressBar pbar = null)
-    {
-        _httpClient = httpClient;
-        _config = config;
-        _pbar = pbar;
-    }
-
-    public void SetBaseAddress(string url)
-    {
-        var basePart = new Uri(new Uri(url).GetLeftPart(UriPartial.Authority));
-        _httpClient.BaseAddress = basePart;
-    }
-
-    public void SetHeaders(Dictionary<string, string>? headers)
-    {
-        if (headers is not null)
-        {
-            _httpClient.DefaultRequestHeaders.Clear();
-            foreach (var header in headers)
-            {
-                _httpClient.DefaultRequestHeaders.Add(header.Key, header.Value);
-            }
-        }
-    }
+    private ProgressBar _pBar;
 
     public bool IsRangeSupported()
     {
@@ -79,7 +53,7 @@ internal class DefaultClient : IClient
 
     public void SetProgressbar(ProgressBar bar)
     {
-        throw new NotImplementedException();
+        _pBar = bar;
     }
 
     public void SetArrayPool(ArrayPool<byte> pool)
@@ -89,31 +63,29 @@ internal class DefaultClient : IClient
     
     private async Task CopyMessageContentToStreamWithProgressAsync(HttpResponseMessage message, Stream stream, IProgress<long> progress)
     {
-        byte[] buffer = _memPool.Rent(_config.BufferSize);
+        byte[] buffer = _memPool.Rent(config.BufferSize);
         long totalBytesWritten = 0;
 
-        using (MemoryStream memoryStream = new MemoryStream())
+        using MemoryStream memoryStream = new MemoryStream();
+        await message.Content.CopyToAsync(memoryStream);
+
+        memoryStream.Seek(0, SeekOrigin.Begin);
+
+        int bytesRead;
+        while ((bytesRead = await memoryStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
         {
-            await message.Content.CopyToAsync(memoryStream);
+            await stream.WriteAsync(buffer, 0, bytesRead);
 
-            memoryStream.Seek(0, SeekOrigin.Begin);
+            totalBytesWritten += bytesRead;
 
-            int bytesRead;
-            while ((bytesRead = await memoryStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            if (progress != null)
             {
-                await stream.WriteAsync(buffer, 0, bytesRead);
-
-                totalBytesWritten += bytesRead;
-
-                if (progress != null)
-                {
-                    progress.Report(totalBytesWritten);
-                }
+                progress.Report(totalBytesWritten);
             }
         }
     }
     
-    public async Task Download(string url, (long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
+    public async Task Download(string url, (long, long) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         if (pauseToken.IsPaused)
         {
@@ -121,7 +93,15 @@ internal class DefaultClient : IClient
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
-        var message = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+        if (headers != null)
+        {
+            foreach (var header in headers)
+            {
+                request.Headers.Add(header.Key, header.Value);
+            }
+        }
+
+        var message = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
         
         if (pauseToken.IsPaused)
@@ -136,9 +116,9 @@ internal class DefaultClient : IClient
             totalWritten += bytesWritten;
 
             // Only update progress bar if ShowProgress is enabled
-            if (_config.ShowProgress && totalWritten % ((piece.Item2-piece.Item1) / _config.BufferSize) == 0)
+            if (config.ShowProgress && totalWritten % ((piece.Item2-piece.Item1) / config.BufferSize) == 0)
             {
-                _pbar?.Tick();
+                _pBar?.Tick();
             }
         });
         await using var stream = _mmf.CreateViewStream();
@@ -147,8 +127,8 @@ internal class DefaultClient : IClient
 
     public void Dispose()
     {
-        _httpClient?.Dispose();
+        httpClient?.Dispose();
         _mmf?.Dispose();
-        _pbar?.Dispose();
+        _pBar?.Dispose();
     }
 }
