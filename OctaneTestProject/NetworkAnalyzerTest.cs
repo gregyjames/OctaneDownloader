@@ -35,14 +35,15 @@ namespace OctaneTestProject
         }
 
         [Test]
+        [Ignore("Does not work properly on CI.")]
         public async Task GetCurrentNetworkLatency_ShouldReturnStringWithMs()
         {
-            // This test will actually ping Google. Consider skipping in CI or mocking if needed.
             var result = await NetworkAnalyzer.GetCurrentNetworkLatency();
             Assert.That(result, Does.EndWith("ms"));
         }
 
         [Test]
+        [Ignore("Does not work properly on CI.")]
         public async Task GetCurrentNetworkSpeed_ShouldReturnStringWithMbPerSec()
         {
             // This test will actually download a file. Consider skipping in CI or mocking if needed.
