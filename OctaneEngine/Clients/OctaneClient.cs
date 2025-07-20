@@ -40,7 +40,8 @@ using OctaneEngineCore.Streams;
 // ReSharper disable TemplateIsNotCompileTimeConstantProblem
 
 namespace OctaneEngineCore.Clients;
-internal class OctaneClient : IClient
+
+public class OctaneClient : IClient
 {
     private readonly HttpClient _client;
     private readonly OctaneConfiguration _config;

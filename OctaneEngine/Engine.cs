@@ -32,7 +32,6 @@ using System.Net.Http;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -47,28 +46,36 @@ namespace OctaneEngine;
 public class Engine: IEngine, IDisposable
 {
     private readonly ILoggerFactory _factory;
-    private readonly OctaneConfiguration _config;
+    private OctaneClient _client;
+    private DefaultClient _defaultClient;
+    private OctaneConfiguration _config;
     private readonly ILogger<Engine> _logger;
     private readonly OctaneHTTPClientPool _clientFactory;
+    private readonly bool _usePooledClients;
     private const string OCTANEHTTPCLIENT = "octane";
     private const string SIZEANDRANGEHTTPCLIENT = "getFileSizeAndRangeSupport";
-    public Engine(IOptions<OctaneConfiguration> config, OctaneHTTPClientPool clientFactory, ILoggerFactory factory)
+    internal Engine(IOptions<OctaneConfiguration> config, OctaneHTTPClientPool clientFactory, ILoggerFactory factory)
     {
         _clientFactory = clientFactory;
         _factory = factory ?? NullLoggerFactory.Instance;
         _logger = _factory.CreateLogger<Engine>();
         _config = config.Value;
+        _clientFactory = new OctaneHTTPClientPool(_config, _factory);
+        _usePooledClients = true;
     }
 
     /// <summary>
     /// Creates a new Engine instance without dependency injection
     /// </summary>
-    public Engine(OctaneConfiguration config, ILoggerFactory? factory = null)
+    internal Engine(OctaneClient client, DefaultClient defaultClient, OctaneConfiguration config, ILoggerFactory? factory = null)
     {
         _factory = factory ?? NullLoggerFactory.Instance;
         _logger = _factory.CreateLogger<Engine>();
+        _client = client;
+        _defaultClient = defaultClient;
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _clientFactory = new OctaneHTTPClientPool(_config, _factory);
+        _usePooledClients = false;
     }
         
     #region Helpers
@@ -155,10 +162,14 @@ public class Engine: IEngine, IDisposable
         var success = false;
         var filename = string.Empty;
         var clientType = string.Empty;
-        var httpClient = _clientFactory.Rent(OCTANEHTTPCLIENT);
-        var octaneClient = new OctaneClient(_config, httpClient, _factory);
-        var normalClient = new DefaultClient(httpClient, _config);
-            
+        HttpClient? client = null;
+        if (_usePooledClients)
+        {
+            client = _clientFactory.Rent(OCTANEHTTPCLIENT);
+            _client = new OctaneClient(_config, client, _factory);
+            _defaultClient = new DefaultClient(client, _config);
+        }
+
         try
         {
             var (_length, _range) = await getFileSizeAndRangeSupport(request.Url);
@@ -194,8 +205,8 @@ public class Engine: IEngine, IDisposable
                 {
                     clientType = "Octane";
                     var pieces = Helpers.CreatePartsList(_length, _config.Parts, _logger);
-                    octaneClient.SetMmf(mmf);
-                    octaneClient.SetArrayPool(memPool);
+                    _client.SetMmf(mmf);
+                    _client.SetArrayPool(memPool);
                     _logger.LogDebug("Using Octane Client to download file.");
                     var options = new ParallelOptions()
                     {
@@ -204,18 +215,19 @@ public class Engine: IEngine, IDisposable
                         //TaskScheduler = TaskScheduler.Current
                     };
                     ProgressBar pbar = null;
+                    
                     if (_config.ShowProgress)
                     {
                         pbar = new ProgressBar(pieces.Count * 2, "Downloading file...");
-                        octaneClient.SetProgressbar(pbar);
-                        normalClient.SetProgressbar(pbar);
+                        _client.SetProgressbar(pbar);
+                        _defaultClient.SetProgressbar(pbar);
                     }
 
                     try
                     {
                         await Parallel.ForEachAsync(pieces, options, async (piece, token) =>
                         {
-                            await octaneClient.Download(request.Url, piece, request.Headers, cancellation_token, pause_token.Token);
+                            await _client.Download(request.Url, piece, request.Headers, cancellation_token, pause_token.Token);
 
                             Interlocked.Increment(ref tasksDone);
                                 
@@ -240,11 +252,11 @@ public class Engine: IEngine, IDisposable
                 {
                     _logger.LogDebug("Using Default Client to download file.");
                     clientType = "Normal";
-                    normalClient.SetMmf(mmf);
-                    normalClient.SetArrayPool(memPool);
+                    _defaultClient.SetMmf(mmf);
+                    _defaultClient.SetArrayPool(memPool);
                     try
                     {
-                        await normalClient.Download(request.Url, (0, 0), request.Headers, cancellation_token, pause_token.Token).ConfigureAwait(false);
+                        await _defaultClient.Download(request.Url, (0, 0), request.Headers, cancellation_token, pause_token.Token).ConfigureAwait(false);
                         success = true;
                     }
                     catch (Exception)
@@ -274,7 +286,10 @@ public class Engine: IEngine, IDisposable
                 File.Delete(filename);
             }
             Cleanup(stopwatch, _config, success);
-            _clientFactory.Return(OCTANEHTTPCLIENT, httpClient);
+            if (_usePooledClients)
+            {
+                _clientFactory.Return(OCTANEHTTPCLIENT, client);
+            }
         }
     }
 

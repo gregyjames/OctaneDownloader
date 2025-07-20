@@ -7,7 +7,6 @@ using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Loggers;
 using BenchmarkDotNet.Running;
 using Microsoft.Extensions.Logging;
-using OctaneEngine;
 using OctaneEngineCore;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
@@ -17,14 +16,13 @@ namespace BenchmarkOctaneProject
 {
     public class Program
     {
-        private HttpClient? _client = null;
-        private IEngine? _octaneEngine = null;
-        private IEngine? _octaneEngine2 = null;
+        private HttpClient? _client;
+        private IEngine? _octaneEngine;
+        private IEngine? _octaneEngine2;
         private PauseTokenSource? _pauseTokenSource;
         private CancellationTokenSource? _cancelTokenSource;
-        private OctaneConfiguration? _config = null;
         [Params("http://link.testfile.org/150MB", "https://link.testfile.org/250MB", "https://link.testfile.org/500MB")]
-        public string Url;
+        public string? Url;
 
         [GlobalSetup]
         public void GlobalSetup()
@@ -41,7 +39,7 @@ namespace BenchmarkOctaneProject
                 logging.AddSerilog(seriLog);
             });
             
-            _octaneEngine = EngineBuilder.Create().WithConfiguration(configuration =>
+            _octaneEngine = EngineBuilder.Create().WithConfiguration(_ =>
             {
                 
             }).WithLogger(factory).Build();
@@ -58,19 +56,19 @@ namespace BenchmarkOctaneProject
         [Benchmark]
         public async Task BenchmarkOctane()
         {
-            await _octaneEngine.DownloadFile(new OctaneRequest(Url, "output0.zip"), _pauseTokenSource, _cancelTokenSource.Token);
+            await _octaneEngine?.DownloadFile(new OctaneRequest(Url, "output0.zip"), _pauseTokenSource, _cancelTokenSource!.Token)!;
         }
 
         [Benchmark]
         public async Task BenchmarkOctaneLowMemory()
         {
-            await _octaneEngine2.DownloadFile(new OctaneRequest(Url, "output1.zip"), _pauseTokenSource, _cancelTokenSource.Token);
+            await _octaneEngine2?.DownloadFile(new OctaneRequest(Url, "output1.zip"), _pauseTokenSource, _cancelTokenSource!.Token)!;
         }
         [Benchmark]
         public async Task BenchmarkHttpClient()
         {
             //Write your code here   
-            var message = await _client.SendAsync(new HttpRequestMessage(HttpMethod.Get, Url));
+            var message = await _client?.SendAsync(new HttpRequestMessage(HttpMethod.Get, Url))!;
             var stream = await message.Content.ReadAsStreamAsync();
             var fileStream = new FileStream(@"output2.zip", FileMode.Create, FileAccess.Write);
             await stream.CopyToAsync(fileStream);
@@ -79,7 +77,7 @@ namespace BenchmarkOctaneProject
         public void GlobalCleanup()
         {
             //factory.Dispose();
-            _client.Dispose();
+            _client?.Dispose();
         }
         
         public static void Main()
@@ -93,7 +91,7 @@ namespace BenchmarkOctaneProject
                      .WithIterationCount(5)
                      .WithWarmupCount(0)
             );
-            var summary = BenchmarkRunner.Run<Program>(config);
+            BenchmarkRunner.Run<Program>(config);
         }
     }
 }
