@@ -35,8 +35,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using OctaneEngine.Clients;
-using OctaneEngine.ShellProgressBar;
+using OctaneEngineCore;
+using OctaneEngineCore.Clients;
+using OctaneEngineCore.ShellProgressBar;
 
 // ReSharper disable All
 

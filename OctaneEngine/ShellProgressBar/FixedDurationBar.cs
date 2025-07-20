@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 
-namespace OctaneEngine.ShellProgressBar
+namespace OctaneEngineCore.ShellProgressBar
 {
 	public class FixedDurationBar : ProgressBar
 	{

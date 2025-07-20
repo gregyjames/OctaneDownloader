@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace OctaneEngine.ShellProgressBar;
+namespace OctaneEngineCore.ShellProgressBar;
 
 public static class ProgressModule
 {

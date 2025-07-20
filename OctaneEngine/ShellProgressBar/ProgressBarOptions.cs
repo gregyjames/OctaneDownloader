@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace OctaneEngine.ShellProgressBar
+namespace OctaneEngineCore.ShellProgressBar
 {
 	/// <summary>
 	/// Control the behaviour of your progressbar

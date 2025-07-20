@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Text;
 using System.Threading;
 
-namespace OctaneEngine.ShellProgressBar
+namespace OctaneEngineCore.ShellProgressBar
 {
 	public abstract class ProgressBarBase
 	{

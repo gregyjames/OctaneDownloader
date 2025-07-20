@@ -2,10 +2,11 @@ using System;
 using System.Net.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using OctaneEngine.Clients;
-using OctaneEngine.ShellProgressBar;
+using OctaneEngine;
+using OctaneEngineCore.Clients;
+using OctaneEngineCore.ShellProgressBar;
 
-namespace OctaneEngine;
+namespace OctaneEngineCore;
 
 /// <summary>
 /// Builder class for creating Octane Engine instances without dependency injection

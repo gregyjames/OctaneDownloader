@@ -5,7 +5,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using OctaneEngine;
-using OctaneEngine.Clients;
+using OctaneEngineCore;
+using OctaneEngineCore.Clients;
 using Serilog;
 
 namespace OctaneTestProject

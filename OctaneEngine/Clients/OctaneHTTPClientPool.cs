@@ -5,7 +5,7 @@ using System.Net.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace OctaneEngine.Clients;
+namespace OctaneEngineCore.Clients;
 
 public class OctaneHTTPClientPool: IDisposable
 {

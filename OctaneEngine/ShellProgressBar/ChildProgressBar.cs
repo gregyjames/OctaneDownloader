@@ -1,6 +1,6 @@
 using System;
 
-namespace OctaneEngine.ShellProgressBar
+namespace OctaneEngineCore.ShellProgressBar
 {
 	public class ChildProgressBar : ProgressBarBase, IProgressBar
 	{
@@ -63,7 +63,7 @@ namespace OctaneEngine.ShellProgressBar
 
 		public IProgress<T> AsProgress<T>(Func<T, string> message = null, Func<T, double?> percentage = null)
 		{
-			return new global::OctaneEngine.ShellProgressBar.Progress<T>(this, message, percentage);
+			return new global::OctaneEngineCore.ShellProgressBar.Progress<T>(this, message, percentage);
 		}
 	}
 }

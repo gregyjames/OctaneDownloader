@@ -2,9 +2,9 @@ using System;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using OctaneEngine.Clients;
+using OctaneEngineCore.Clients;
 
-namespace OctaneEngine;
+namespace OctaneEngineCore;
 
 public interface IEngine
 {

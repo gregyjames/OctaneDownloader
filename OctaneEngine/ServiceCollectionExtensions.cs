@@ -3,10 +3,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using OctaneEngine.Clients;
-using OctaneEngine.ShellProgressBar;
+using OctaneEngine;
+using OctaneEngineCore.Clients;
+using OctaneEngineCore.ShellProgressBar;
 
-namespace OctaneEngine;
+namespace OctaneEngineCore;
 
 public static class ServiceCollectionExtensions
 {

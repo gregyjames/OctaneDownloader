@@ -5,7 +5,7 @@ using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using Cysharp.Text;
 
-namespace OctaneEngine;
+namespace OctaneEngineCore;
 
 public static class NetworkAnalyzer
 {

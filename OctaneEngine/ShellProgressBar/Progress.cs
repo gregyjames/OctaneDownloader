@@ -1,6 +1,6 @@
 using System;
 
-namespace OctaneEngine.ShellProgressBar
+namespace OctaneEngineCore.ShellProgressBar
 {
 	internal class Progress<T> : IProgress<T>, IDisposable
 	{

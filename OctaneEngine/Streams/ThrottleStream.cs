@@ -28,7 +28,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace OctaneEngine.Streams;
+namespace OctaneEngineCore.Streams;
 
 internal class ThrottleStream : Stream, IStream
 {

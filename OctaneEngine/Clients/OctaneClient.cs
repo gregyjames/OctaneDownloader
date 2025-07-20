@@ -33,12 +33,12 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using OctaneEngine.ShellProgressBar;
-using OctaneEngine.Streams;
+using OctaneEngineCore.ShellProgressBar;
+using OctaneEngineCore.Streams;
 
 // ReSharper disable TemplateIsNotCompileTimeConstantProblem
 
-namespace OctaneEngine.Clients;
+namespace OctaneEngineCore.Clients;
 
 public class OctaneClient : IClient
 {

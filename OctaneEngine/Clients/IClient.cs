@@ -27,9 +27,9 @@ using System.Collections.Generic;
 using System.IO.MemoryMappedFiles;
 using System.Threading;
 using System.Threading.Tasks;
-using OctaneEngine.ShellProgressBar;
+using OctaneEngineCore.ShellProgressBar;
 
-namespace OctaneEngine.Clients;
+namespace OctaneEngineCore.Clients;
 
 public interface IClient
 {

@@ -21,6 +21,8 @@
         <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <TargetFramework>net8.0</TargetFramework>
+        <AssemblyName>OctaneEngineCore</AssemblyName>
+        <RootNamespace>OctaneEngineCore</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>

@@ -26,7 +26,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace OctaneEngine;
+namespace OctaneEngineCore;
 
 public class PauseTokenSource
 {

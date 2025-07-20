@@ -2,7 +2,8 @@ using System;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using OctaneEngine;
-using OctaneEngine.Clients;
+using OctaneEngineCore;
+using OctaneEngineCore.Clients;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 

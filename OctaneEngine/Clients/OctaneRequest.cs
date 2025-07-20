@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace OctaneEngine.Clients;
+namespace OctaneEngineCore.Clients;
 
 public class OctaneRequest
 {
