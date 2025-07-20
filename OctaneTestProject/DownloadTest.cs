@@ -4,7 +4,7 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngine;
-using OctaneEngineCore;
+using OctaneEngine.Clients;
 using Serilog;
 using ILogger = Serilog.ILogger;
 

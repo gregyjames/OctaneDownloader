@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Cysharp.Text;
 
-namespace OctaneEngineCore.ShellProgressBar
+namespace OctaneEngine.ShellProgressBar
 {
 	public class ProgressBar : ProgressBarBase, IProgressBar
 	{
@@ -510,7 +510,7 @@ namespace OctaneEngineCore.ShellProgressBar
 
 		public IProgress<T> AsProgress<T>(Func<T, string> message = null, Func<T, double?> percentage = null)
 		{
-			return new global::OctaneEngineCore.ShellProgressBar.Progress<T>(this, message, percentage);
+			return new global::OctaneEngine.ShellProgressBar.Progress<T>(this, message, percentage);
 		}
 	}
 }

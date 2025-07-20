@@ -33,7 +33,13 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
     - name: Run Tests
-      run: dotnet test
+      run: dotnet test --collect:"XPlat Code Coverage"
+    - name: Upload coverage
+      uses: codecov/codecov-action@v5
+      with:
+        files: '**/coverage.cobertura.xml'
+        fail_ci_if_error: true
+        token: ${{ secrets.CODECOV_TOKEN }}
     - name: Delete SNK after build
       run: Remove-Item signing-key.snk
       shell: powershell

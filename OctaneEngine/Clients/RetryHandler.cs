@@ -29,7 +29,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace OctaneEngine;
+namespace OctaneEngine.Clients;
 
 internal class RetryHandler : DelegatingHandler
 {

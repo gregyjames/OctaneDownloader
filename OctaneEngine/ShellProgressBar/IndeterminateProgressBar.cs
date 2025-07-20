@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 
-namespace OctaneEngineCore.ShellProgressBar
+namespace OctaneEngine.ShellProgressBar
 {
 	public class IndeterminateProgressBar : ProgressBar
 	{

@@ -1,10 +1,6 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 
-namespace OctaneEngineCore;
+namespace OctaneEngine.Clients;
 
 public class OctaneRequest
 {

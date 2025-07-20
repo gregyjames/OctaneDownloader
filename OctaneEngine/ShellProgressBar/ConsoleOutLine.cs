@@ -1,4 +1,4 @@
-namespace OctaneEngineCore.ShellProgressBar
+namespace OctaneEngine.ShellProgressBar
 {
 	public struct ConsoleOutLine
 	{

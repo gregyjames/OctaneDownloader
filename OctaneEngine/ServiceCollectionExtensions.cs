@@ -1,14 +1,12 @@
 using System;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using OctaneEngine;
-using OctaneEngineCore.Clients;
-using OctaneEngineCore.ShellProgressBar;
 using Microsoft.Extensions.Options;
+using OctaneEngine.Clients;
+using OctaneEngine.ShellProgressBar;
 
-namespace OctaneEngineCore;
+namespace OctaneEngine;
 
 public static class ServiceCollectionExtensions
 {

@@ -1,6 +1,6 @@
 using System;
 
-namespace OctaneEngineCore.ShellProgressBar
+namespace OctaneEngine.ShellProgressBar
 {
 	public interface IProgressBar : IDisposable
 	{

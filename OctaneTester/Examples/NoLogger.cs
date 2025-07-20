@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OctaneEngine;
-using OctaneEngineCore;
+using OctaneEngine.Clients;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 

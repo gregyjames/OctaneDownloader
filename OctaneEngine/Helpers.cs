@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using Microsoft.Extensions.Logging;
 
-namespace OctaneEngineCore;
+namespace OctaneEngine;
 
 public static class Helpers
 {

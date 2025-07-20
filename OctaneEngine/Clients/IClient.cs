@@ -25,12 +25,11 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO.MemoryMappedFiles;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using OctaneEngineCore.ShellProgressBar;
+using OctaneEngine.ShellProgressBar;
 
-namespace OctaneEngineCore.Clients;
+namespace OctaneEngine.Clients;
 
 public interface IClient
 {

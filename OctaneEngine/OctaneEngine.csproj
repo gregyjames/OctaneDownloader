@@ -14,8 +14,6 @@
         <SignAssembly>true</SignAssembly>
         <AssemblyOriginatorKeyFile>../signing-key.snk</AssemblyOriginatorKeyFile>
         <AssemblyVersion>4.0.0</AssemblyVersion>
-        <AssemblyName>OctaneEngineCore</AssemblyName>
-        <RootNamespace>OctaneEngineCore</RootNamespace>
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
@@ -30,11 +28,11 @@
     </ItemGroup>
     
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
-        <Optimize>true</Optimize>
-        <DebugSymbols>false</DebugSymbols>
+        <Optimize>false</Optimize>
         <PlatformTarget>AnyCPU</PlatformTarget>
-        <WarningLevel>0</WarningLevel>
+        <WarningLevel>1</WarningLevel>
         <DebugType>none</DebugType>
+        <DebugType>portable</DebugType>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">

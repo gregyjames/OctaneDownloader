@@ -4,6 +4,7 @@
 [![codebeat badge](https://codebeat.co/badges/9154fd6f-ac4b-4f00-8910-66488582efcd)](https://codebeat.co/projects/github-com-gregyjames-octanedownloader-master)
 [![NuGet latest version](https://badgen.net/nuget/v/OctaneEngineCore)](https://www.nuget.org/packages/OctaneEngineCore)
 ![NuGet Downloads](https://img.shields.io/nuget/dt/OctaneEngineCore)
+[![codecov](https://codecov.io/github/gregyjames/OctaneDownloader/branch/master/graph/badge.svg?token=u05rFcLMde)](https://codecov.io/github/gregyjames/OctaneDownloader)
 
 ![alt tag](https://image.ibb.co/h2tK8v/Untitled_1.png)
 

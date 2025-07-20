@@ -1,12 +1,12 @@
+using System;
+using System.Diagnostics;
 using System.Net.Http;
+using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using Cysharp.Text;
 
-namespace OctaneEngineCore;
+namespace OctaneEngine;
 
-using System;
-using System.Diagnostics;
-using System.Net.NetworkInformation;
 public static class NetworkAnalyzer
 {
     private static readonly string[] Sizes = { "B", "KB", "MB", "GB", "TB" };

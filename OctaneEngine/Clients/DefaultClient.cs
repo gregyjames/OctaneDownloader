@@ -29,10 +29,9 @@ using System.IO.MemoryMappedFiles;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using OctaneEngine;
-using OctaneEngineCore.ShellProgressBar;
+using OctaneEngine.ShellProgressBar;
 
-namespace OctaneEngineCore.Clients;
+namespace OctaneEngine.Clients;
 
 public class DefaultClient(HttpClient httpClient, OctaneConfiguration config)
     : IClient

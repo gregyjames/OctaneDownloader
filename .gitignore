@@ -34,3 +34,7 @@ OctaneTester/OctaneLog.txt
 *.zip
 
 *.snk
+
+OctaneTestProject/TestResults/
+
+OctaneTestProject/coverage.cobertura.xml

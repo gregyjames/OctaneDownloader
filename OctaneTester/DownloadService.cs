@@ -1,7 +1,8 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
-using OctaneEngineCore;
+using OctaneEngine;
+using OctaneEngine.Clients;
 
 namespace OctaneTester;
 

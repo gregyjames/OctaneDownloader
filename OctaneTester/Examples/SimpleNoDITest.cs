@@ -3,9 +3,9 @@ using System.IO;
 using System.Net.Http;
 using System.Threading;
 using OctaneEngine;
-using OctaneEngineCore;
+using OctaneEngine.Clients;
 
-namespace OctaneTester;
+namespace OctaneTester.Examples;
 
 public class SimpleNoDITest
 {
