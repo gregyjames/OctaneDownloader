@@ -26,8 +26,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="docs\README.md" Pack="true" PackagePath="\" />
-        <None Include="docs\LICENSE.md" Pack="true" PackagePath="\" />
         <None Include="docs\Itzikgur-My-Seven-Downloads-1.256.png" Pack="true" PackagePath="\" />
     </ItemGroup>
     
@@ -60,6 +58,15 @@
         <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.1" Condition="'$(TargetFramework)' == 'net461' OR '$(TargetFramework)' == 'net472'" />
         <PackageReference Include="System.ValueTuple" Version="4.5.0" Condition="'$(TargetFramework)' == 'net461' OR '$(TargetFramework)' == 'net472'" />
         <PackageReference Include="ZString" Version="2.6.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="../LICENSE.md" Pack="true" PackagePath="\">
+        <Link>LICENSE</Link>
+      </Content>
+      <Content Include="../README.md" Pack="true" PackagePath="\">
+        <Link>README.md</Link>
+      </Content>
     </ItemGroup>
 
 </Project>
