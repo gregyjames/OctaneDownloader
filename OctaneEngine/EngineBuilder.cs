@@ -94,11 +94,12 @@ public class EngineBuilder
             _configuration.BytesPerSecond = 1;
         
         // Create clients
-        var octaneClient = new OctaneClient(_configuration, _client, _loggerFactory, _progressBar);
-        var defaultClient = new DefaultClient(_client, _configuration);
+        var clientToUse = _client ?? new HttpClient();
+        var octaneClient = new OctaneClient(_configuration, clientToUse, _loggerFactory, _progressBar);
+        var defaultClient = new DefaultClient(clientToUse, _configuration);
 
         // Create engine
-        return new Engine(_configuration, _loggerFactory);
+        return new Engine(octaneClient, defaultClient, _configuration, _loggerFactory);
     }
 
     /// <summary>
