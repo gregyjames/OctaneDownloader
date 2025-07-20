@@ -25,6 +25,12 @@ public class OctaneHTTPClientPool: IDisposable
         _logger = _loggerFactory.CreateLogger<OctaneHTTPClientPool>();
     }
 
+    internal void AddClientToPool(HttpClient client)
+    {
+        _logger.LogDebug("Adding default client to pool");
+        _items.TryAdd(DEFAULT_CLIENT_NAME, client);
+    }
+    
     public HttpClient Rent(string key = null)
     {
         string clientName = string.IsNullOrEmpty(key) ? DEFAULT_CLIENT_NAME : key;
