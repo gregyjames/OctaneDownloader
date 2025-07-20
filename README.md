@@ -40,6 +40,7 @@ var engine = EngineBuilder.Create().WithConfiguration(config => {
         config.BytesPerSecond = 1;
         config.UseProxy = false;
         config.LowMemoryMode = false;
+        config.RetryCap = 30;
 }).Build();
         
 // Setup download
@@ -96,6 +97,7 @@ public class DownloadService(IEngine engine, IHostApplicationLifetime lifetime) 
     "BufferSize": 8196,
     "ShowProgress": true,
     "NumRetries": 10,
+    "RetryCap": 30,
     "BytesPerSecond": 1,
     "UseProxy": false,
     "LowMemoryMode": false

@@ -60,6 +60,7 @@ public class NoDI
             config.BytesPerSecond = 1;
             config.UseProxy = false;
             config.LowMemoryMode = true;
+            config.RetryCap = 30;
         }, factory).Build();
         
         // Setup download
