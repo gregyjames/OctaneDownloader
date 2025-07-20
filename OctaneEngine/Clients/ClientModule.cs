@@ -15,11 +15,11 @@ public static class ClientModule
 {
     public static void AddClient(this IServiceCollection services)
     {
-        services.AddSingleton<OctaneClientFactory>(provider =>
+        services.AddSingleton<OctaneHTTPClientPool>(provider =>
         {
             var config = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-            return new OctaneClientFactory(config, loggerFactory);
+            return new OctaneHTTPClientPool(config, loggerFactory);
         });
     }
 }

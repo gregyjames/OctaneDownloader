@@ -12,7 +12,9 @@ public class DownloadService(IEngine engine, IHostApplicationLifetime lifetime) 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var pauseTokenSource = new PauseTokenSource();
-        await engine.DownloadFile(new OctaneRequest(Url, null), pauseTokenSource, stoppingToken);
+        var task1 = engine.DownloadFile(new OctaneRequest(Url, "test1.zip"), pauseTokenSource, stoppingToken);
+        var task2 = engine.DownloadFile(new OctaneRequest(Url, "test2.zip"), pauseTokenSource, stoppingToken);
+        await Task.WhenAll(task1, task2);
         lifetime.StopApplication();
     }
 }

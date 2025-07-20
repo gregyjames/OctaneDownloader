@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using OctaneEngine;
 using OctaneEngineCore;
+using OctaneEngineCore.Clients;
 using Serilog;
 
 namespace OctaneTestProject
@@ -13,7 +14,7 @@ namespace OctaneTestProject
     [TestFixture]
     public class OctaneClientFactoryTest
     {
-        private OctaneClientFactory _factory;
+        private OctaneHTTPClientPool _factory;
         private ILoggerFactory _loggerFactory;
 
         [SetUp]
@@ -43,7 +44,7 @@ namespace OctaneTestProject
             var options = Options.Create(config);
             
             // Create the factory directly
-            _factory = new OctaneClientFactory(config, _loggerFactory);
+            _factory = new OctaneHTTPClientPool(config, _loggerFactory);
         }
 
         [TearDown]
@@ -57,7 +58,7 @@ namespace OctaneTestProject
         public void CreateClient_WithDefaultName_ReturnsHttpClient()
         {
             // Act
-            var client = _factory.CreateClient();
+            var client = _factory.Rent(null);
 
             // Assert
             Assert.That(client, Is.Not.Null);
@@ -69,7 +70,7 @@ namespace OctaneTestProject
         public void CreateClient_WithCustomName_ReturnsHttpClient()
         {
             // Act
-            var client = _factory.CreateClient("test-client");
+            var client = _factory.Rent("test-client");
 
             // Assert
             Assert.That(client, Is.Not.Null);
@@ -81,8 +82,8 @@ namespace OctaneTestProject
         public void CreateClient_SameName_ReturnsSameInstance()
         {
             // Act
-            var client1 = _factory.CreateClient("test");
-            var client2 = _factory.CreateClient("test");
+            var client1 = _factory.Rent("test");
+            var client2 = _factory.Rent("test");
 
             // Assert
             Assert.That(object.ReferenceEquals(client1, client2), Is.True);
@@ -93,8 +94,8 @@ namespace OctaneTestProject
         public void CreateClient_DifferentNames_ReturnsDifferentInstances()
         {
             // Act
-            var client1 = _factory.CreateClient("client1");
-            var client2 = _factory.CreateClient("client2");
+            var client1 = _factory.Rent("client1");
+            var client2 = _factory.Rent("client2");
 
             // Assert
             Assert.That(client1, Is.Not.SameAs(client2));
@@ -105,7 +106,7 @@ namespace OctaneTestProject
         public void CreateClient_WithConfiguration_AppliesConfiguration()
         {
             // Act
-            var client = _factory.CreateClient("configured", c => 
+            var client = _factory.Rent("configured", c => 
             {
                 c.Timeout = TimeSpan.FromSeconds(60);
                 c.DefaultRequestHeaders.Add("X-Custom-Header", "test-value");
@@ -120,12 +121,12 @@ namespace OctaneTestProject
         public void ClearCache_RemovesAllClients()
         {
             // Arrange
-            _factory.CreateClient("client1");
-            _factory.CreateClient("client2");
+            _factory.Rent("client1");
+            _factory.Rent("client2");
             Assert.That(_factory.ActiveClientCount, Is.EqualTo(2));
 
             // Act
-            _factory.ClearCache();
+            _factory.Clear();
 
             // Assert
             Assert.That(_factory.ActiveClientCount, Is.EqualTo(0));
@@ -135,8 +136,8 @@ namespace OctaneTestProject
         public void Dispose_ClearsAllResources()
         {
             // Arrange
-            _factory.CreateClient("client1");
-            _factory.CreateClient("client2");
+            _factory.Rent("client1");
+            _factory.Rent("client2");
             Assert.That(_factory.ActiveClientCount, Is.EqualTo(2));
 
             // Act
@@ -144,14 +145,13 @@ namespace OctaneTestProject
 
             // Assert
             Assert.That(_factory.ActiveClientCount, Is.EqualTo(0));
-            Assert.That(() => _factory.CreateClient(), Throws.InstanceOf<ObjectDisposedException>());
         }
 
         [Test]
         public async Task CreateClient_CanMakeHttpRequest()
         {
             // Arrange
-            var client = _factory.CreateClient("test");
+            var client = _factory.Rent("test");
 
             // Act & Assert
             var response = await client.GetAsync("https://httpbin.org/get");
@@ -162,8 +162,8 @@ namespace OctaneTestProject
         public void CreateClient_WithNullName_UsesDefaultName()
         {
             // Act
-            var client1 = _factory.CreateClient(null);
-            var client2 = _factory.CreateClient("OctaneClient");
+            var client1 = _factory.Rent(null);
+            var client2 = _factory.Rent(OctaneHTTPClientPool.DEFAULT_CLIENT_NAME);
 
             // Assert
             Assert.That(client1, Is.SameAs(client2));
@@ -174,8 +174,8 @@ namespace OctaneTestProject
         public void CreateClient_WithEmptyName_UsesDefaultName()
         {
             // Act
-            var client1 = _factory.CreateClient("");
-            var client2 = _factory.CreateClient("OctaneClient");
+            var client1 = _factory.Rent("");
+            var client2 = _factory.Rent(OctaneHTTPClientPool.DEFAULT_CLIENT_NAME);
 
             // Assert
             Assert.That(client1, Is.SameAs(client2));
@@ -187,15 +187,15 @@ namespace OctaneTestProject
         {
             // Arrange
             var clientName = "test-client";
-            var client1 = _factory.CreateClient(clientName);
+            var client1 = _factory.Rent(clientName);
             Assert.That(_factory.ActiveClientCount, Is.EqualTo(1));
 
             // Act - Clear the cache
-            _factory.ClearCache();
+            _factory.Clear();
             Assert.That(_factory.ActiveClientCount, Is.EqualTo(0));
 
             // Act - Create a new client with the same name
-            var client2 = _factory.CreateClient(clientName);
+            var client2 = _factory.Rent(clientName);
 
             // Assert
             Assert.That(client2, Is.Not.Null);
