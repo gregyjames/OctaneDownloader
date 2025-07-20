@@ -1,60 +1,71 @@
 using System;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using OctaneEngine;
-using OctaneEngineCore.Clients;
 
-namespace OctaneEngineCore;
+namespace OctaneEngineCore.Clients;
 
-
-/// <summary>
-/// A factory for creating and managing HttpClient instances with efficient connection pooling
-/// and lifecycle management, similar to Microsoft's IHttpClientFactory.
-/// </summary>
-public class OctaneClientFactory : IHttpClientFactory, IDisposable
+public class OctaneHTTPClientPool: IDisposable
 {
-    private readonly ILogger<OctaneClientFactory> _logger;
     private readonly OctaneConfiguration _configuration;
     private readonly ILoggerFactory _loggerFactory;
-    readonly KeyedObjectPool<HttpClient> _httpClientPool;
+    private readonly ConcurrentDictionary<string, HttpClient> _items = new();
+    private readonly ILogger<OctaneHTTPClientPool> _logger;
     private readonly object _lockObject = new();
     private bool _disposed;
-
-    public OctaneClientFactory(OctaneConfiguration configuration, ILoggerFactory loggerFactory)
+    
+    public static readonly string DEFAULT_CLIENT_NAME = "DEFAULT";
+    public OctaneHTTPClientPool(OctaneConfiguration configuration, ILoggerFactory loggerFactory)
     {
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-        _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-        _logger = loggerFactory.CreateLogger<OctaneClientFactory>();
-        _httpClientPool = new KeyedObjectPool<HttpClient>(CreateNewClient);
-        _logger.LogDebug("OctaneClientFactory initialized");
+        _configuration = configuration;
+        _loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
+        _logger = _loggerFactory.CreateLogger<OctaneHTTPClientPool>();
     }
 
-    /// <summary>
-    /// Creates an HttpClient with the specified name, reusing existing instances when possible.
-    /// </summary>
-    /// <param name="name">The name of the client to create. If null or empty, uses "default".</param>
-    /// <returns>An HttpClient instance</returns>
-    public HttpClient CreateClient(string name = null)
+    public HttpClient Rent(string key = null)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(OctaneClientFactory));
-
-        var clientName = string.IsNullOrEmpty(name) ? "OctaneClient" : name;
-        var client = _httpClientPool.Rent(clientName);
+        string clientName = string.IsNullOrEmpty(key) ? DEFAULT_CLIENT_NAME : key;
+        var client = _items.GetOrAdd(clientName, CreateNewClient);
         return client;
     }
-
-    public void ReturnClient(string name, HttpClient httpClient)
+    
+    public HttpClient Rent(string key, Action<HttpClient> configuration)
     {
-        _httpClientPool.Return(name, httpClient);
+        string clientName = string.IsNullOrEmpty(key) ? DEFAULT_CLIENT_NAME : key;
+        var client = _items.GetOrAdd(clientName, CreateNewClient);
+        configuration?.Invoke(client);
+        return client;
     }
+    
+    public void Return(string name, HttpClient item)
+    {
+        _items.AddOrUpdate(name, item, (_, existing) => existing ?? item);
+    }
+
+    public int Count => _items.Count;
+
+    public void Clear()
+    {
+        foreach (var key in _items.Keys)
+        {
+            if (_items.TryRemove(key, out var item))
+            {
+                item.Dispose();
+            }
+        }
+
+        _items.Clear();
+    }
+    
     /// <summary>
     /// Creates a new HttpClient instance with optimized configuration for the Octane engine.
     /// </summary>
     /// <param name="clientName">The name of the client</param>
     /// <returns>A configured HttpClient</returns>
-    private HttpClient CreateNewClient()
+    private HttpClient CreateNewClient(string key)
     {
         _logger.LogDebug("Creating new HttpClient");
         
@@ -75,7 +86,7 @@ public class OctaneClientFactory : IHttpClientFactory, IDisposable
         _logger.LogDebug("HttpClient created successfully");
         return client;
     }
-
+    
     /// <summary>
     /// Creates an optimized HttpMessageHandler with connection pooling and retry logic.
     /// </summary>
@@ -106,48 +117,12 @@ public class OctaneClientFactory : IHttpClientFactory, IDisposable
         return retryHandler;
     }
 
-    /// <summary>
-    /// Gets or creates a named HttpClient with specific configuration.
-    /// </summary>
-    /// <param name="name">The name of the client</param>
-    /// <param name="configureClient">Optional action to configure the client</param>
-    /// <returns>An HttpClient instance</returns>
-    public HttpClient CreateClient(string name, Action<HttpClient> configureClient)
-    {
-        var client = CreateClient(name);
-        configureClient?.Invoke(client);
-        return client;
-    }
-
-    /// <summary>
-    /// Gets the current number of active clients.
-    /// </summary>
-    public int ActiveClientCount => _httpClientPool.Count;
-
-    /// <summary>
-    /// Clears all cached clients and handlers.
-    /// </summary>
-    public void ClearCache()
-    {
-        _logger.LogInformation("Clearing HttpClient cache");
-
-        _httpClientPool.Clear();
-    }
-
-    public void TryRemoveClient(string name)
-    {
-        _httpClientPool.Remove(name);
-    }
-    
-    /// <summary>
-    /// Disposes the factory and all managed resources.
-    /// </summary>
+    public int ActiveClientCount => _items.Count;
     public void Dispose()
     {
         if (_disposed) return;
         
         _logger.LogDebug("Disposing OctaneClientFactory");
-        _httpClientPool.Clear();
         
         lock (_lockObject)
         {
@@ -155,7 +130,7 @@ public class OctaneClientFactory : IHttpClientFactory, IDisposable
             _disposed = true;
         }
 
-        ClearCache();
+        Clear();
         
         _logger.LogDebug("OctaneClientFactory disposed successfully");
     }
