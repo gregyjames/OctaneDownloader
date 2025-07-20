@@ -10,7 +10,8 @@ namespace OctaneEngineCore;
 public static class NetworkAnalyzer
 {
     private static readonly string[] Sizes = { "B", "KB", "MB", "GB", "TB" };
-    internal static string PrettySize(long len)
+
+    public static string PrettySize(long len)
     {
         int order = 0;
         while (len >= 1024 && order < Sizes.Length - 1)
