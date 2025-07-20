@@ -20,7 +20,6 @@ public class NoAutofac
         var seriLog = new LoggerConfiguration()
             .Enrich.FromLogContext()
             .MinimumLevel.Error()
-            .WriteTo.Async(a => a.File("./OctaneLog.txt"))
             .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen))
             .CreateLogger();
         var factory = LoggerFactory.Create(logging =>

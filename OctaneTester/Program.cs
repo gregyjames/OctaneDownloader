@@ -22,7 +22,6 @@ namespace OctaneTester
                 configuration
                     .Enrich.FromLogContext()
                     .MinimumLevel.Information()
-                    .WriteTo.Async(a => a.File("./OctaneLog.txt"))
                     .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen));
             }).ConfigureAppConfiguration(configurationBuilder =>
             {
