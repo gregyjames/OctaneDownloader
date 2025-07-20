@@ -36,7 +36,7 @@ public static class HTTPClientModule
             var factory = provider.GetRequiredService<ILoggerFactory>();
             var cfg = provider.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
             
-            return new RetryHandler(handler, factory, cfg.NumRetries);
+            return new RetryHandler(handler, factory, cfg.NumRetries, cfg.RetryCap);
         });
 
         services.AddTransient<HttpClient>(provider =>

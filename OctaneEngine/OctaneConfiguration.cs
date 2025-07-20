@@ -53,7 +53,12 @@ public class OctaneConfiguration
     /// <summary>
     ///     Number of times to retry if the connection fails.
     /// </summary>
-    public int NumRetries { get; set; } = 10;
+    public int NumRetries { get; set; } = 3;
+
+    /// <summary>
+    /// Maximum time to wait (in seconds) to wait for transient HTTP errors. Use -1 for unlimited.
+    /// </summary>
+    public int RetryCap { get; set; } = -1;
 
     /// <summary>
     ///     Use this option to throttle the download of the file. Use 1 to disable throttling.
