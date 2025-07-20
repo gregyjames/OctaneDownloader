@@ -6,7 +6,7 @@
 ![NuGet Downloads](https://img.shields.io/nuget/dt/OctaneEngineCore)
 [![codecov](https://codecov.io/github/gregyjames/OctaneDownloader/branch/master/graph/badge.svg?token=u05rFcLMde)](https://codecov.io/github/gregyjames/OctaneDownloader)
 
-![alt tag](https://image.ibb.co/h2tK8v/Untitled_1.png)
+![](https://image.ibb.co/h2tK8v/Untitled_1.png)
 
 
 Experience a powerful, piecewise file downloader for C#, designed to asynchronously fetch files in segments. It’s built to outperform Microsoft’s WebClient with greater speed and efficiency. Curious to see it in action? Check out the [Octane YouTube Extractor](https://github.com/gregyjames/OCTANE-YoutubeExtractor).
@@ -79,13 +79,15 @@ using OctaneEngineCore;
 
 namespace OctaneTester;
 
-public class DownloadService(IEngine engine, IHostApplicationLifetime lifetime) : BackgroundService
+public class DownloadService(IEngine engine, IHostApplicationLifetime lifetime, ILogger<DownloadService> logger) : BackgroundService
 {
     private const string Url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var pauseTokenSource = new PauseTokenSource();
+        logger.LogInformation("Current Latency: {latency}", await engine.GetCurrentNetworkLatency());
+        logger.LogInformation("Current Network speed: {speed}", await engine.GetCurrentNetworkSpeed());
         await engine.DownloadFile(new OctaneRequest(Url, null), pauseTokenSource, stoppingToken);
         lifetime.StopApplication();
     }
