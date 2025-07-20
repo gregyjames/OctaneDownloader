@@ -21,7 +21,6 @@ public class NoHostBuilder
         var seriLog = new LoggerConfiguration()
             .Enrich.FromLogContext()
             .MinimumLevel.Information()
-            .WriteTo.Async(a => a.File("./OctaneLog.txt"))
             .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen))
             .CreateLogger();
         var factory = LoggerFactory.Create(logging =>
@@ -69,7 +68,6 @@ public class NoHostBuilder
         var seriLog = new LoggerConfiguration()
             .Enrich.FromLogContext()
             .MinimumLevel.Information()
-            .WriteTo.Async(a => a.File("./OctaneLog.txt"))
             .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen))
             .CreateLogger();
         var factory = LoggerFactory.Create(logging =>
@@ -123,7 +121,6 @@ public class NoHostBuilder
         var seriLog = new LoggerConfiguration()
             .Enrich.FromLogContext()
             .MinimumLevel.Information()
-            .WriteTo.Async(a => a.File("./OctaneLog.txt"))
             .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen))
             .CreateLogger();
         var factory = LoggerFactory.Create(logging =>
