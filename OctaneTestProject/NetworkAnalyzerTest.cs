@@ -1,7 +1,11 @@
 using System;
+using System.Net.NetworkInformation;
 using System.Threading.Tasks;
+using Moq;
 using NUnit.Framework;
 using OctaneEngineCore;
+using OctaneEngineCore.Implementations;
+using OctaneEngineCore.Interfaces;
 
 namespace OctaneTestProject
 {
@@ -21,33 +25,39 @@ namespace OctaneTestProject
         [Test]
         public void GetTestFile_ShouldReturnCorrectUrlAndSize()
         {
-            var (urlSmall, sizeSmall) = NetworkAnalyzer.GetTestFile(NetworkAnalyzer.TestFileSize.Small);
+            var (urlSmall, sizeSmall) = NetworkAnalyzer.GetTestFile(TestFileSize.Small);
             Assert.That(urlSmall, Does.Contain("1MB"));
             Assert.That(sizeSmall, Is.EqualTo(1000000));
 
-            var (urlMedium, sizeMedium) = NetworkAnalyzer.GetTestFile(NetworkAnalyzer.TestFileSize.Medium);
+            var (urlMedium, sizeMedium) = NetworkAnalyzer.GetTestFile(TestFileSize.Medium);
             Assert.That(urlMedium, Does.Contain("7MB"));
             Assert.That(sizeMedium, Is.EqualTo(7000000));
 
-            var (urlLarge, sizeLarge) = NetworkAnalyzer.GetTestFile(NetworkAnalyzer.TestFileSize.Large);
+            var (urlLarge, sizeLarge) = NetworkAnalyzer.GetTestFile(TestFileSize.Large);
             Assert.That(urlLarge, Does.Contain("15MB"));
             Assert.That(sizeLarge, Is.EqualTo(15000000));
         }
 
         [Test]
-        [Ignore("Does not work properly on CI.")]
         public async Task GetCurrentNetworkLatency_ShouldReturnStringWithMs()
         {
-            var result = await NetworkAnalyzer.GetCurrentNetworkLatency();
+            var mockPingService = new Mock<IPingService>();
+            mockPingService.Setup(p => p.SendPingAsync(It.IsAny<string>()))
+                .ReturnsAsync(new PingReplyMock(IPStatus.Success, 42)); // You may need to create a PingReply mock
+
+            var result = await NetworkAnalyzer.GetCurrentNetworkLatency(mockPingService.Object);
             Assert.That(result, Does.EndWith("ms"));
         }
 
         [Test]
-        [Ignore("Does not work properly on CI.")]
         public async Task GetCurrentNetworkSpeed_ShouldReturnStringWithMbPerSec()
         {
+            var mockDownloader = new Mock<IHttpDownloader>();
+            mockDownloader.Setup(d => d.GetByteArrayAsync(It.IsAny<string>()))
+                .ReturnsAsync(new byte[100]); // Simulate a 100-byte download
+            
             // This test will actually download a file. Consider skipping in CI or mocking if needed.
-            var result = await NetworkAnalyzer.GetCurrentNetworkSpeed();
+            var result = await NetworkAnalyzer.GetCurrentNetworkSpeed(mockDownloader.Object);
             Assert.That(result, Does.Contain("Mb/s").Or.Contain("GB/s"));
         }
     }

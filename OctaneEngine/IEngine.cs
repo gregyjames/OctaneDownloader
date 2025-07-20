@@ -12,4 +12,7 @@ public interface IEngine
     public void SetProgressCallback(Action<double> callback);
     public void SetDoneCallback(Action<bool> callback);
     public void SetProxy(IWebProxy proxy);
+
+    public Task<string> GetCurrentNetworkLatency();
+    public Task<string> GetCurrentNetworkSpeed();
 }

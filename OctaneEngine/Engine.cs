@@ -37,6 +37,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
+using OctaneEngineCore.Implementations;
 using OctaneEngineCore.ShellProgressBar;
 
 // ReSharper disable All
@@ -91,22 +92,32 @@ public class Engine: IEngine, IDisposable
     /// <param name="url">The url of the file you are planning to download.</param>
     /// <param name="sizeToUse">The size of the test file to use.</param>
     /// <returns>A Task that returns the optimal number of parts to use to download a file.</returns>
-    public async static Task<int> GetOptimalNumberOfParts(string url, NetworkAnalyzer.TestFileSize sizeToUse = NetworkAnalyzer.TestFileSize.Small)
+    public async static Task<int> GetOptimalNumberOfParts(string url, TestFileSize sizeToUse = TestFileSize.Small)
     {
-        if (!Enum.IsDefined(typeof(NetworkAnalyzer.TestFileSize), sizeToUse))
+        if (!Enum.IsDefined(typeof(TestFileSize), sizeToUse))
             throw new InvalidEnumArgumentException(nameof(sizeToUse), (int)sizeToUse,
-                typeof(NetworkAnalyzer.TestFileSize));
+                typeof(TestFileSize));
         using var client = new HttpClient();
         var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         var size_of_file = response.Content.Headers.ContentLength ?? 0;
-        var networkSpeed = await NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.GetTestFile(sizeToUse));
-        var networkLatency = await NetworkAnalyzer.GetNetworkLatency();
+        var networkSpeed = await NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.GetTestFile(sizeToUse), new HttpDownloader());
+        var networkLatency = await NetworkAnalyzer.GetNetworkLatency(new PingService());
         int chunkSize = (int)Math.Ceiling(Math.Sqrt((double)networkSpeed * networkLatency));
         int numParts = (int)Math.Ceiling((double)size_of_file / chunkSize);
         numParts = Math.Min(numParts, Environment.ProcessorCount);
         return numParts;
     }
         
+    public async Task<string> GetCurrentNetworkLatency()
+    {
+        return $"{await NetworkAnalyzer.GetNetworkLatency(new PingService())}ms";
+    }
+    public async Task<string> GetCurrentNetworkSpeed()
+    {
+        var speed = await NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.GetTestFile(TestFileSize.Medium), new HttpDownloader());
+        return $"{ Convert.ToInt32((speed) / 1000000)} Mb/s";
+    }
+    
     private async Task<(long, bool)> getFileSizeAndRangeSupport(string url)
     {
         var client = _clientFactory.Rent(OctaneHTTPClientPool.DEFAULT_CLIENT_NAME);
