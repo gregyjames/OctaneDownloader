@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using System.Net.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -95,19 +96,22 @@ public class EngineBuilder
         if (_client == null)
         {
             // Create HTTP client handler
-            var httpClientHandler = new HttpClientHandler
+            var httpClientHandler = new SocketsHttpHandler()
             {
                 PreAuthenticate = true,
-                UseDefaultCredentials = true,
                 Proxy = _configuration.Proxy,
                 UseProxy = _configuration.UseProxy,
-                MaxConnectionsPerServer = Math.Max(1, _configuration.Parts),
+                MaxConnectionsPerServer = _configuration.Parts * 2,
                 UseCookies = false,
-                ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+                PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5),
+                EnableMultipleHttp2Connections = true,
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+                ConnectTimeout = TimeSpan.FromSeconds(15), // faster failure on bad endpoints
             };
 
             // Create retry handler
-            var retryHandler = new RetryHandler(httpClientHandler, _loggerFactory, _configuration.NumRetries);
+            var retryHandler = new RetryHandler(httpClientHandler, _loggerFactory, _configuration.NumRetries, _configuration.RetryCap);
 
             // Create HTTP client
             _client = new HttpClient(retryHandler)

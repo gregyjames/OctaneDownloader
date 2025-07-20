@@ -22,6 +22,7 @@
  */
 
 #nullable enable
+using System;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Threading;
@@ -33,18 +34,15 @@ namespace OctaneEngine;
 internal class RetryHandler : DelegatingHandler
 {
     private readonly ILogger<RetryHandler> _log;
-
-    // Strongly consider limiting the number of retries - "retry forever" is
-    // probably not the most user friendly way you could respond to "the
-    // network cable got pulled out."
     private readonly int _maxRetries;
+    private readonly int _retryCap;
 
-    public RetryHandler(HttpMessageHandler innerHandler, ILoggerFactory loggerFactory, int maxRetries = 3) :
-        base(innerHandler)
+    public RetryHandler(HttpMessageHandler innerHandler, ILoggerFactory loggerFactory, int maxRetries = 3, int retryCap = -1) : base(innerHandler)
     {
         _maxRetries = maxRetries;
+        _retryCap = retryCap;
         _log = loggerFactory.CreateLogger<RetryHandler>();
-        _log.LogInformation("Retry handler created with {MaxRetries} retries", _maxRetries);
+        _log.LogDebug("Retry handler created with {MaxRetries} retries, with a max cap of {RetryCap}.", _maxRetries, _retryCap <= -1 ? "[DISABLED]" : _retryCap + "s");
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
@@ -56,7 +54,21 @@ internal class RetryHandler : DelegatingHandler
             response = await base.SendAsync(request, cancellationToken);
             if (response.IsSuccessStatusCode)
                 return response;
-            _log.LogWarning("Client failed sending request. Retrying attempt: {I}/{MaxRetries}", i, _maxRetries);
+            
+            var status = (int)response.StatusCode;
+
+            // I consider these transient HTTP error codes
+            bool shouldRetryWithBackoff = status is 408 or 429 or 500 or 502 or 503 or 504;
+            
+            _log.LogWarning("Client failed sending request. Retrying attempt: {Attempt}/{MaxRetries} (Status: {StatusCode})", i + 1, _maxRetries, response.StatusCode);
+
+            if (shouldRetryWithBackoff)
+            {
+                var delayTime = _retryCap <= -1 ? Math.Pow(2, i) : Math.Min(Math.Pow(2, i), _retryCap);
+                _log.LogDebug("Transient status of {StatusCode} waiting {delay}s before trying again.", status, delayTime);
+                var delay = TimeSpan.FromSeconds(delayTime);
+                await Task.Delay(delay, cancellationToken);
+            }
         }
 
         Debug.Assert(response != null, nameof(response) + " != null");
