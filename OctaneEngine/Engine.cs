@@ -51,17 +51,13 @@ public class Engine: IEngine, IDisposable
     private OctaneConfiguration _config;
     private readonly ILogger<Engine> _logger;
     private readonly OctaneHTTPClientPool _clientFactory;
-    private readonly bool _usePooledClients;
-    private const string OCTANEHTTPCLIENT = "octane";
-    private const string SIZEANDRANGEHTTPCLIENT = "getFileSizeAndRangeSupport";
-    internal Engine(IOptions<OctaneConfiguration> config, OctaneHTTPClientPool clientFactory, ILoggerFactory factory)
+    public Engine(IOptions<OctaneConfiguration> config, OctaneHTTPClientPool clientFactory, ILoggerFactory factory)
     {
         _clientFactory = clientFactory;
         _factory = factory ?? NullLoggerFactory.Instance;
         _logger = _factory.CreateLogger<Engine>();
         _config = config.Value;
         _clientFactory = new OctaneHTTPClientPool(_config, _factory);
-        _usePooledClients = true;
     }
 
     /// <summary>
@@ -75,7 +71,6 @@ public class Engine: IEngine, IDisposable
         _defaultClient = defaultClient;
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _clientFactory = new OctaneHTTPClientPool(_config, _factory);
-        _usePooledClients = false;
     }
         
     #region Helpers
@@ -114,11 +109,11 @@ public class Engine: IEngine, IDisposable
         
     private async Task<(long, bool)> getFileSizeAndRangeSupport(string url)
     {
-        var client = _clientFactory.Rent(SIZEANDRANGEHTTPCLIENT);
+        var client = _clientFactory.Rent(OctaneHTTPClientPool.DEFAULT_CLIENT_NAME);
         var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         var responseLength = response.Content.Headers.ContentLength ?? 0;
         var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
-        _clientFactory.Return(SIZEANDRANGEHTTPCLIENT, client);
+        _clientFactory.Return(OctaneHTTPClientPool.DEFAULT_CLIENT_NAME, client);
         return (responseLength, rangeSupported);
     }
 
@@ -163,12 +158,9 @@ public class Engine: IEngine, IDisposable
         var filename = string.Empty;
         var clientType = string.Empty;
         HttpClient? client = null;
-        if (_usePooledClients)
-        {
-            client = _clientFactory.Rent(OCTANEHTTPCLIENT);
-            _client = new OctaneClient(_config, client, _factory);
-            _defaultClient = new DefaultClient(client, _config);
-        }
+        client = _clientFactory.Rent(OctaneHTTPClientPool.DEFAULT_CLIENT_NAME);
+        _client = new OctaneClient(_config, client, _factory);
+        _defaultClient = new DefaultClient(client, _config);
 
         try
         {
@@ -286,10 +278,7 @@ public class Engine: IEngine, IDisposable
                 File.Delete(filename);
             }
             Cleanup(stopwatch, _config, success);
-            if (_usePooledClients)
-            {
-                _clientFactory.Return(OCTANEHTTPCLIENT, client);
-            }
+            _clientFactory.Return(OctaneHTTPClientPool.DEFAULT_CLIENT_NAME, client);
         }
     }
 
