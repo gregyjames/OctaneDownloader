@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace OctaneEngineCore.Streams;
 
-internal class NormalStream: Stream, IStream
+public class NormalStream: Stream, IStream
 {
     protected override void Dispose(bool disposing)
     {
