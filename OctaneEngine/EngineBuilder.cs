@@ -2,8 +2,9 @@ using System;
 using System.Net.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using OctaneEngine;
+using OctaneEngineCore.Implementations;
 using OctaneEngineCore.Clients;
+using OctaneEngineCore.Interfaces;
 using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngineCore;
@@ -102,7 +103,7 @@ public class EngineBuilder
         var defaultClient = new DefaultClient(clientToUse, _configuration);
 
         // Create engine
-        return new Engine(octaneClient, defaultClient, _configuration, _loggerFactory);
+        return new Engine(octaneClient, defaultClient, _clientFactory, _configuration, _loggerFactory);
     }
 
     /// <summary>

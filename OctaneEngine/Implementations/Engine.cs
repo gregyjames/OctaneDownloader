@@ -38,11 +38,13 @@ using Microsoft.Extensions.Options;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
 using OctaneEngineCore.Implementations;
+using OctaneEngineCore.Implementations.NetworkAnalyzer;
+using OctaneEngineCore.Interfaces;
 using OctaneEngineCore.ShellProgressBar;
 
 // ReSharper disable All
 
-namespace OctaneEngine;
+namespace OctaneEngineCore.Implementations;
 
 public class Engine: IEngine, IDisposable
 {
@@ -58,13 +60,14 @@ public class Engine: IEngine, IDisposable
         _factory = factory ?? NullLoggerFactory.Instance;
         _logger = _factory.CreateLogger<Engine>();
         _config = config.Value;
-        _clientFactory = new OctaneHTTPClientPool(_config, _factory);
+        _clientFactory = clientFactory;
     }
 
     /// <summary>
     /// Creates a new Engine instance without dependency injection
     /// </summary>
-    internal Engine(OctaneClient client, DefaultClient defaultClient, OctaneConfiguration config, ILoggerFactory? factory = null)
+    internal Engine(OctaneClient client, DefaultClient defaultClient, OctaneHTTPClientPool clientFactory,
+        OctaneConfiguration config, ILoggerFactory factory = null)
     {
         _factory = factory ?? NullLoggerFactory.Instance;
         _logger = _factory.CreateLogger<Engine>();
@@ -100,8 +103,8 @@ public class Engine: IEngine, IDisposable
         using var client = new HttpClient();
         var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         var size_of_file = response.Content.Headers.ContentLength ?? 0;
-        var networkSpeed = await NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.GetTestFile(sizeToUse), new HttpDownloader());
-        var networkLatency = await NetworkAnalyzer.GetNetworkLatency(new PingService());
+        var networkSpeed = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.NetworkAnalyzer.GetTestFile(sizeToUse), new HttpDownloader());
+        var networkLatency = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkLatency(new PingService());
         int chunkSize = (int)Math.Ceiling(Math.Sqrt((double)networkSpeed * networkLatency));
         int numParts = (int)Math.Ceiling((double)size_of_file / chunkSize);
         numParts = Math.Min(numParts, Environment.ProcessorCount);
@@ -110,11 +113,11 @@ public class Engine: IEngine, IDisposable
         
     public async Task<string> GetCurrentNetworkLatency()
     {
-        return $"{await NetworkAnalyzer.GetNetworkLatency(new PingService())}ms";
+        return $"{await NetworkAnalyzer.NetworkAnalyzer.GetNetworkLatency(new PingService())}ms";
     }
     public async Task<string> GetCurrentNetworkSpeed()
     {
-        var speed = await NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.GetTestFile(TestFileSize.Medium), new HttpDownloader());
+        var speed = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.NetworkAnalyzer.GetTestFile(TestFileSize.Medium), new HttpDownloader());
         return $"{ Convert.ToInt32((speed) / 1000000)} Mb/s";
     }
     
@@ -197,7 +200,7 @@ public class Engine: IEngine, IDisposable
 #endif
             #endregion
             
-            _logger.LogInformation("TOTAL SIZE: {length}", NetworkAnalyzer.PrettySize(_length));
+            _logger.LogInformation("TOTAL SIZE: {length}", NetworkAnalyzer.NetworkAnalyzer.PrettySize(_length));
                 
             stopwatch.Start();
             

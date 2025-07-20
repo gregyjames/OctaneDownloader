@@ -33,6 +33,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using OctaneEngineCore.Implementations.NetworkAnalyzer;
 using OctaneEngineCore.ShellProgressBar;
 using OctaneEngineCore.Streams;
 
@@ -200,7 +201,7 @@ public class OctaneClient : IClient
             _progressBar?.Tick();
         }
         stopwatch.Stop();
-        _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds}ms.", NetworkAnalyzer.PrettySize(piece.Item1), NetworkAnalyzer.PrettySize(piece.Item2), stopwatch.ElapsedMilliseconds);
+        _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds:N0}ms.", NetworkAnalyzer.PrettySize(piece.Item1), NetworkAnalyzer.PrettySize(piece.Item2), stopwatch.ElapsedMilliseconds);
     }
 
     private async Task FillPipeAsync(IStream stream, PipeWriter writer, CancellationToken token)

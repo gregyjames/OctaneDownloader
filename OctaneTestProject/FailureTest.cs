@@ -3,7 +3,6 @@ using System.IO;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
-using OctaneEngine;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
 using Serilog;

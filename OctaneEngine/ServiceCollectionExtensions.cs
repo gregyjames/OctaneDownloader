@@ -3,8 +3,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using OctaneEngine;
 using OctaneEngineCore.Clients;
+using OctaneEngineCore.Implementations;
+using OctaneEngineCore.Interfaces;
 using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngineCore;

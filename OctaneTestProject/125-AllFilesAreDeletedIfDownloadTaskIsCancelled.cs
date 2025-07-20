@@ -1,13 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using NUnit.Framework;
-using OctaneEngine;
-using Serilog;
-using ILogger = Serilog.ILogger;
+﻿
 
 /*
 namespace OctaneTestProject

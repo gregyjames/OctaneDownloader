@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using OctaneEngineCore.Clients;
 
-namespace OctaneEngineCore;
+namespace OctaneEngineCore.Interfaces;
 
 public interface IEngine
 {

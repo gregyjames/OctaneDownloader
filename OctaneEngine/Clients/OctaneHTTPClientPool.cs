@@ -26,13 +26,14 @@ public class OctaneHTTPClientPool: IDisposable
 
     internal void AddClientToPool(HttpClient client)
     {
-        _logger.LogDebug("Adding default client to pool");
+        _logger.LogTrace("Adding default client to pool");
         _items.TryAdd(DEFAULT_CLIENT_NAME, client);
     }
     
     public HttpClient Rent(string key = null)
     {
         string clientName = string.IsNullOrEmpty(key) ? DEFAULT_CLIENT_NAME : key;
+        _logger.LogTrace("Renting client with name {clientName}", clientName);
         var client = _items.GetOrAdd(clientName, CreateNewClient);
         return client;
     }
@@ -40,6 +41,7 @@ public class OctaneHTTPClientPool: IDisposable
     public HttpClient Rent(string key, Action<HttpClient> configuration)
     {
         string clientName = string.IsNullOrEmpty(key) ? DEFAULT_CLIENT_NAME : key;
+        _logger.LogTrace("Renting client with name {clientName}", clientName);
         var client = _items.GetOrAdd(clientName, CreateNewClient);
         configuration?.Invoke(client);
         return client;
@@ -47,6 +49,7 @@ public class OctaneHTTPClientPool: IDisposable
     
     public void Return(string name, HttpClient item)
     {
+        _logger.LogTrace("Returning client with name {clientName}", name);
         _items.AddOrUpdate(name, item, (_, existing) => existing ?? item);
     }
 
@@ -56,6 +59,7 @@ public class OctaneHTTPClientPool: IDisposable
     {
         foreach (var key in _items.Keys)
         {
+            _logger.LogTrace("Removing and disposing client with name {clientName}", key);
             if (_items.TryRemove(key, out var item))
             {
                 item.Dispose();

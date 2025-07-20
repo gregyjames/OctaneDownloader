@@ -1,7 +1,8 @@
 using System.Net.NetworkInformation;
 using OctaneEngineCore.Interfaces;
+using OctaneEngineCore.Interfaces.NetworkAnalyzer;
 
-namespace OctaneEngineCore.Implementations;
+namespace OctaneEngineCore.Implementations.NetworkAnalyzer;
 
 public class PingReplyMock : IPingReply
 {

@@ -7,12 +7,11 @@ using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Loggers;
 using BenchmarkDotNet.Running;
 using Microsoft.Extensions.Logging;
-using OctaneEngine;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
-using IEngine = OctaneEngineCore.IEngine;
+using IEngine = OctaneEngineCore.Interfaces.IEngine;
 
 namespace BenchmarkOctaneProject
 {

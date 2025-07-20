@@ -2,12 +2,9 @@ using System.IO;
 using System.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using OctaneEngine;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
-using Serilog;
-using Serilog.Sinks.SystemConsole.Themes;
+using OctaneEngineCore.Interfaces;
 
 namespace OctaneTester.Examples;
 

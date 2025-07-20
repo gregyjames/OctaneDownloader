@@ -2,8 +2,9 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using OctaneEngineCore.Interfaces;
+using OctaneEngineCore.Interfaces.NetworkAnalyzer;
 
-namespace OctaneEngineCore.Implementations;
+namespace OctaneEngineCore.Implementations.NetworkAnalyzer;
 
 [ExcludeFromCodeCoverage]
 public class PingService : IPingService

@@ -3,15 +3,13 @@ using System.Diagnostics;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using Cysharp.Text;
-using OctaneEngineCore.Implementations;
-using OctaneEngineCore.Interfaces;
+using OctaneEngineCore.Interfaces.NetworkAnalyzer;
 
 [assembly: InternalsVisibleTo("OctaneTestProject, PublicKey=0024000004800000940000000602000000240000525341310004000001000100714997d77c6a386e69a9d7a09bfdce9a5fb18bc3a5f0771d8102819aa00689d635299e27f1ec7a9838e51160cae5b38035f995737386d0367745a9a0bb68e8f31e43d6448a980402f8452787b56c7bcefe556ddd048e0eb59c919521ac2ae0b05e9a2ddbf2dc10b8e02e3f70d969055597ddef49e5e2d1ad8e9ee4f7226fd5ca", AllInternalsVisible = true)]
 
-namespace OctaneEngineCore;
+namespace OctaneEngineCore.Implementations.NetworkAnalyzer;
 
 public enum TestFileSize
 {

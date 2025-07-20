@@ -1,6 +1,6 @@
 using System.Net.NetworkInformation;
 
-namespace OctaneEngineCore.Interfaces;
+namespace OctaneEngineCore.Interfaces.NetworkAnalyzer;
 
 public interface IPingReply
 {

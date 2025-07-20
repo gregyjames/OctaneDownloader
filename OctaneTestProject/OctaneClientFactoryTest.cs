@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
-using OctaneEngine;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
 using Serilog;

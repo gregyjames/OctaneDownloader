@@ -1,11 +1,9 @@
-using System;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using Moq;
 using NUnit.Framework;
-using OctaneEngineCore;
-using OctaneEngineCore.Implementations;
-using OctaneEngineCore.Interfaces;
+using OctaneEngineCore.Implementations.NetworkAnalyzer;
+using OctaneEngineCore.Interfaces.NetworkAnalyzer;
 
 namespace OctaneTestProject
 {

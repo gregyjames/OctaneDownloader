@@ -1,7 +1,6 @@
-using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 
-namespace OctaneEngineCore.Interfaces;
+namespace OctaneEngineCore.Interfaces.NetworkAnalyzer;
 
 public interface IPingService
 {

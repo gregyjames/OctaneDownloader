@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using Microsoft.Extensions.Logging;
-using OctaneEngine;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
 using Serilog;
