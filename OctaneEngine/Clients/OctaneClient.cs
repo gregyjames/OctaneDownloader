@@ -58,24 +58,6 @@ internal class OctaneClient : IClient
         _progressBar = progressBar;
         _log = loggerFactory.CreateLogger<IClient>();
     }
-
-    public void SetBaseAddress(string url)
-    {
-        var basePart = new Uri(new Uri(url).GetLeftPart(UriPartial.Authority));
-        _client.BaseAddress = basePart;
-    }
-    
-    public void SetHeaders(Dictionary<string, string>? headers)
-    {
-        if (headers is not null)
-        {
-            _client.DefaultRequestHeaders.Clear();
-            foreach (var header in headers)
-            {
-                _client.DefaultRequestHeaders.Add(header.Key, header.Value);
-            }
-        }
-    }
     
     public bool IsRangeSupported()
     {
@@ -96,13 +78,20 @@ internal class OctaneClient : IClient
         _memPool = pool;
     }
     
-    public async Task Download(string url,(long, long) piece, CancellationToken cancellationToken, PauseToken pauseToken)
+    public async Task Download(string url,(long, long) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         _log.LogTrace("Sending request for range ({PieceItem1},{PieceItem2})...", piece.Item1, piece.Item2);
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
         request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
-        var message = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
-            .ConfigureAwait(false);
+        if (headers != null)
+        {
+            foreach (var header in headers)
+            {
+                request.Headers.Add(header.Key, header.Value);
+            }
+        }
+
+        var message = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         
         #region Variable Declaration
         var stopwatch = new Stopwatch();
@@ -214,7 +203,7 @@ internal class OctaneClient : IClient
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds}ms.", NetworkAnalyzer.PrettySize(piece.Item1), NetworkAnalyzer.PrettySize(piece.Item2), stopwatch.ElapsedMilliseconds);
     }
 
-    public async Task FillPipeAsync(IStream stream, PipeWriter writer, CancellationToken token)
+    private async Task FillPipeAsync(IStream stream, PipeWriter writer, CancellationToken token)
     {
         while (true)
         {
@@ -323,13 +312,5 @@ internal class OctaneClient : IClient
         {
             accessor.SafeMemoryMappedViewHandle.ReleasePointer();
         }
-    }
-    
-    public void Dispose()
-    {
-        _client?.Dispose();
-        _loggerFactory?.Dispose();
-        _mmf?.Dispose();
-        _progressBar?.Dispose();
     }
 }
