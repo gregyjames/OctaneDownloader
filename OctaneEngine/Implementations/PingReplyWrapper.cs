@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net.NetworkInformation;
 using OctaneEngineCore.Interfaces;
 
 namespace OctaneEngineCore.Implementations;
 
+[ExcludeFromCodeCoverage]
 public class PingReplyWrapper : IPingReply
 {
     private readonly PingReply _reply;
