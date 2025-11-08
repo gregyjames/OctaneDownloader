@@ -8,7 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="BenchmarkDotNet" Version="0.15.5" />
+      <PackageReference Include="BenchmarkDotNet" Version="0.15.6" />
       <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.10" />
       <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.10" />
       <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.10" />
