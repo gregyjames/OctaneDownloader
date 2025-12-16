@@ -4,8 +4,8 @@
 	    <IsPackable>false</IsPackable>
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
         <TargetFramework>net8.0</TargetFramework>
-        <SignAssembly>true</SignAssembly>
-        <AssemblyOriginatorKeyFile>../signing-key.snk</AssemblyOriginatorKeyFile>
+        <SignAssembly Condition="'$(SIGN_ASSEMBLY)' == 'true'">true</SignAssembly>
+        <AssemblyOriginatorKeyFile Condition="'$(SIGN_ASSEMBLY)' == 'true'">../signing-key.snk</AssemblyOriginatorKeyFile>
     </PropertyGroup>
 
     <ItemGroup>

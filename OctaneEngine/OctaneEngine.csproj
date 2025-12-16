@@ -11,8 +11,8 @@
         <PackageProjectUrl>https://github.com/gregyjames/OctaneDownloader</PackageProjectUrl>
         <RepositoryUrl>https://github.com/gregyjames/OctaneDownloader</RepositoryUrl>
         <PackageTags>c-sharp download parallel downloader multithreading threading networking</PackageTags>
-        <SignAssembly>true</SignAssembly>
-        <AssemblyOriginatorKeyFile>../signing-key.snk</AssemblyOriginatorKeyFile>
+        <SignAssembly Condition="'$(SIGN_ASSEMBLY)' == 'true'">true</SignAssembly>
+        <AssemblyOriginatorKeyFile Condition="'$(SIGN_ASSEMBLY)' == 'true'">../signing-key.snk</AssemblyOriginatorKeyFile>
         <AssemblyVersion>4.0.0</AssemblyVersion>
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
         <PackageReadmeFile>README.md</PackageReadmeFile>

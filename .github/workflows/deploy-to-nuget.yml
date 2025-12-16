@@ -40,6 +40,8 @@ jobs:
         [IO.File]::WriteAllBytes("signing-key.snk", [Convert]::FromBase64String("${{ secrets.SIGNING_KEY_BASE64 }}"))    
     - name: Build
       run: dotnet build OctaneEngine/OctaneEngine.csproj --no-restore --configuration Release /p:Version=$Env:VERSION /p:AssemblyVersion=$Env:VERSION
+      env:
+        SIGN_ASSEMBLY: true
     - name: Publish NuGet package
       run: dotnet nuget push **/*.nupkg --source https://api.nuget.org/v3/index.json --api-key $Env:NUGET_API_KEY
       env:
