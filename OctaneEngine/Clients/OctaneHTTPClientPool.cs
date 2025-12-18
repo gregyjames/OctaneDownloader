@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -92,6 +93,9 @@ public class OctaneHTTPClientPool: IDisposable
         client.DefaultRequestHeaders.Add("Accept", "*/*");
         client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate, br");
         
+        client.DefaultRequestVersion = System.Net.HttpVersion.Version20;
+        client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+        
         _logger.LogDebug("HttpClient created successfully");
         return client;
     }
@@ -119,7 +123,16 @@ public class OctaneHTTPClientPool: IDisposable
             KeepAlivePingDelay = TimeSpan.FromSeconds(20),
             KeepAlivePingPolicy = HttpKeepAlivePingPolicy.WithActiveRequests,
             AllowAutoRedirect = true,
-            MaxAutomaticRedirections = 5
+            MaxAutomaticRedirections = 5,
+            ConnectCallback = async (context, cancellationToken) =>
+            {
+                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp)
+                {
+                    NoDelay = true,
+                };
+                await socket.ConnectAsync(context.DnsEndPoint, cancellationToken).ConfigureAwait(false);
+                return new NetworkStream(socket, ownsSocket: true);
+            }
         };
 
         // Wrap with retry handler for resilience
