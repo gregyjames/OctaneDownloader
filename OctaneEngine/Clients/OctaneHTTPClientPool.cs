@@ -123,17 +123,57 @@ public class OctaneHTTPClientPool: IDisposable
             KeepAlivePingDelay = TimeSpan.FromSeconds(20),
             KeepAlivePingPolicy = HttpKeepAlivePingPolicy.WithActiveRequests,
             AllowAutoRedirect = true,
-            MaxAutomaticRedirections = 5,
-            ConnectCallback = async (context, cancellationToken) =>
-            {
-                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp)
-                {
-                    NoDelay = true,
-                };
-                await socket.ConnectAsync(context.DnsEndPoint, cancellationToken).ConfigureAwait(false);
-                return new NetworkStream(socket, ownsSocket: true);
-            }
+            MaxAutomaticRedirections = 5
         };
+
+        if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsIOS())
+        {
+            socketsHandler.ConnectCallback = async (context, cancellationToken) =>
+            {
+                Socket? socket = null;
+
+                try
+                {
+                    socket = new Socket(SocketType.Stream, ProtocolType.Tcp)
+                    {
+                        NoDelay = true,
+                        ReceiveBufferSize = config.BufferSize,
+                        LingerState = new LingerOption(false, 0)
+                    };
+
+                    socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+
+                    if (OperatingSystem.IsWindows())
+                    {
+                        byte[] keepAliveSettings = new byte[12];
+                        BitConverter.GetBytes((uint)1).CopyTo(keepAliveSettings, 0); // Enable
+                        BitConverter.GetBytes((uint)30000).CopyTo(keepAliveSettings, 4); // Time (ms)
+                        BitConverter.GetBytes((uint)1000).CopyTo(keepAliveSettings, 8); // Interval (ms)
+                        socket.IOControl(IOControlCode.KeepAliveValues, keepAliveSettings, null);
+                    }
+
+                    await socket.ConnectAsync(context.DnsEndPoint, cancellationToken).ConfigureAwait(false);
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch
+                {
+                    try
+                    {
+                        socket?.Dispose();
+                    }
+                    catch
+                    {
+                        // Ignore
+                    }
+
+                    throw;
+                }
+            };
+        }
+        else
+        {
+            _logger.LogDebug("Skipping custom socket options on macOS/iOS due to platform socket reuse restrictions.");
+        }
 
         // Wrap with retry handler for resilience
         var retryHandler = new RetryHandler(socketsHandler, _loggerFactory, config.NumRetries, config.RetryCap);
