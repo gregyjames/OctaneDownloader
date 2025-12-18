@@ -32,7 +32,7 @@
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
         <Optimize>false</Optimize>
         <PlatformTarget>AnyCPU</PlatformTarget>
-        <WarningLevel>1</WarningLevel>
+        <WarningLevel>2</WarningLevel>
         <DebugType>none</DebugType>
         <DebugType>portable</DebugType>
     </PropertyGroup>

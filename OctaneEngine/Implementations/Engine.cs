@@ -21,6 +21,7 @@
  * SOFTWARE.
  */
 
+#nullable enable
 using System;
 using System.Buffers;
 using System.ComponentModel;
@@ -35,9 +36,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using OctaneEngineCore;
 using OctaneEngineCore.Clients;
-using OctaneEngineCore.Implementations;
 using OctaneEngineCore.Implementations.NetworkAnalyzer;
 using OctaneEngineCore.Interfaces;
 using OctaneEngineCore.ShellProgressBar;
@@ -49,8 +48,8 @@ namespace OctaneEngineCore.Implementations;
 public class Engine: IEngine, IDisposable
 {
     private readonly ILoggerFactory _factory;
-    private OctaneClient _client;
-    private DefaultClient _defaultClient;
+    private OctaneClient? _client;
+    private DefaultClient? _defaultClient;
     private OctaneConfiguration _config;
     private readonly ILogger<Engine> _logger;
     private readonly OctaneHTTPClientPool _clientFactory;
@@ -66,8 +65,8 @@ public class Engine: IEngine, IDisposable
     /// <summary>
     /// Creates a new Engine instance without dependency injection
     /// </summary>
-    internal Engine(OctaneClient client, DefaultClient defaultClient, OctaneHTTPClientPool clientFactory,
-        OctaneConfiguration config, ILoggerFactory factory = null)
+    internal Engine(OctaneClient? client, DefaultClient? defaultClient, OctaneHTTPClientPool clientFactory,
+        OctaneConfiguration config, ILoggerFactory? factory = null)
     {
         _factory = factory ?? NullLoggerFactory.Instance;
         _logger = _factory.CreateLogger<Engine>();
@@ -152,20 +151,19 @@ public class Engine: IEngine, IDisposable
     /// <summary>
     /// Sets the proxy server to use when downloading the file.
     /// </summary>
-    /// <param name="proxy"></param>
+    /// <param name="proxy">The IWebProxy to use.</param>
     public void SetProxy(IWebProxy proxy)
     {
         _config.Proxy = proxy;
     }
-        
+
     /// <summary>
     ///     The core octane download function. 
     /// </summary>
-    /// <param name="url">The string url of the file to be downloaded.</param>
-    /// <param name="outFile">The output file name of the download. Use 'null' to get file name from url.</param>
+    /// <param name="request">The OctaneRequest Object for the request.</param>
     /// <param name="pauseTokenSource">The pause token source to use for pausing and resuming.</param>
-    /// <param name="cancelTokenSource">The cancellation token for canceling the task.</param>
-    public async Task DownloadFile(OctaneRequest request, PauseTokenSource pauseTokenSource = null, CancellationToken token = default)
+    /// <param name="token">The cancellation token to use for the download.</param>
+    public async Task DownloadFile(OctaneRequest request, PauseTokenSource? pauseTokenSource = null, CancellationToken token = default)
     {
         var stopwatch = new Stopwatch();
         var success = false;
@@ -220,7 +218,7 @@ public class Engine: IEngine, IDisposable
                         CancellationToken = cancellation_token,
                         //TaskScheduler = TaskScheduler.Current
                     };
-                    ProgressBar pbar = null;
+                    ProgressBar? pbar = null;
                     
                     if (_config.ShowProgress)
                     {

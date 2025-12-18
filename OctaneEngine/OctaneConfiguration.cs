@@ -21,6 +21,7 @@
  * SOFTWARE.
  */
 
+#nullable enable
 using System;
 using System.Net;
 
@@ -46,7 +47,7 @@ public class OctaneConfiguration
     /// <summary>
     ///     Show a progress bar
     /// </summary>
-    public bool ShowProgress { get; set; } = false;
+    public bool ShowProgress { get; set; }
 
     /// <summary>
     ///     Number of times to retry if the connection fails.
@@ -66,22 +67,22 @@ public class OctaneConfiguration
     /// <summary>
     ///     Enable if you want to use a proxy
     /// </summary>
-    public bool UseProxy { get; set; } = false;
+    public bool UseProxy { get; set; }
 
     /// <summary>
     ///     The Proxy settings to use.
     /// </summary>
-    public IWebProxy? Proxy { get; set; } = null;
+    public IWebProxy? Proxy { get; set; }
     
     /// <summary>
-    ///     The Action<bool> function to call when the download is finished.
+    ///     The Callback function to call when the download is finished.
     /// </summary>
-    public Action<bool> DoneCallback { get; set; }
+    public Action<bool>? DoneCallback { get; set; }
 
     /// <summary>
-    ///     The Action<double> function to call to report download progress.
+    ///     The Callback function to call to report download progress.
     /// </summary>
-    public Action<double> ProgressCallback { get; set; }
+    public Action<double>? ProgressCallback { get; set; }
     
     public override string ToString()
     {
