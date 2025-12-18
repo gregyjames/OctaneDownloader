@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  * Copyright (c) 2015 Greg James
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
@@ -50,10 +50,20 @@ public class OctaneClient : IClient
     private ArrayPool<byte> _memPool;
     private MemoryMappedFile _mmf;
     private ProgressBar _progressBar;
+    private readonly PipeOptions _pipeOptions;
 
     public OctaneClient(OctaneConfiguration config, HttpClient httpClient, ILoggerFactory loggerFactory, ProgressBar progressBar = null)
     {
         _config = config;
+        _pipeOptions = new PipeOptions(
+            pool: null, // use default
+            readerScheduler: PipeScheduler.ThreadPool,
+            writerScheduler: PipeScheduler.ThreadPool,
+            pauseWriterThreshold: _config.BufferSize * 4,
+            resumeWriterThreshold: _config.BufferSize,
+            minimumSegmentSize: _config.BufferSize,
+            useSynchronizationContext: false
+        );
         _client = httpClient;
         _loggerFactory = loggerFactory;
         _progressBar = progressBar;
@@ -98,7 +108,7 @@ public class OctaneClient : IClient
         var stopwatch = new Stopwatch();
         var programBps = _config.BytesPerSecond / _config.Parts;
         long bytesReadOverall = 0;
-        var childOptions = new ProgressBarOptions()
+        var childOptions = new ProgressBarOptions
         {
             CollapseWhenFinished = true,
             DisplayTimeInRealTime = false,
@@ -138,16 +148,7 @@ public class OctaneClient : IClient
                     
                     try
                     {
-                        var pipeOptions = new PipeOptions(
-                            pool: null, // use default
-                            readerScheduler: PipeScheduler.ThreadPool,
-                            writerScheduler: PipeScheduler.ThreadPool,
-                            pauseWriterThreshold: _config.BufferSize * 4,
-                            resumeWriterThreshold: _config.BufferSize,
-                            minimumSegmentSize: _config.BufferSize,
-                            useSynchronizationContext: false
-                        );
-                        var pipe = new Pipe(pipeOptions);
+                        var pipe = new Pipe(_pipeOptions);
                         var writing = FillPipeAsync(wrappedStream, pipe.Writer, cancellationToken);
                         var reading = ReadPipeToFileAsync(pipe.Reader, piece, child, cancellationToken);
                         await Task.WhenAll(reading, writing);
@@ -226,92 +227,103 @@ public class OctaneClient : IClient
     {
         long accessorLength = piece.Item2 - piece.Item1 + 1;
         using var accessor = _mmf.CreateViewAccessor(piece.Item1, accessorLength);
+        IntPtr accessorPtr = IntPtr.Zero;
+        IntPtr basePtr = IntPtr.Zero;
         long writeOffset = 0;
-
-        int tickStep = _config.BufferSize * 2;
-        int lastTick = 0;
-
-        while (true)
+        
+        try
         {
-            ReadResult result = await reader.ReadAsync(token);
-            ReadOnlySequence<byte> buffer = result.Buffer;
-
-            foreach (var segment in buffer)
+            unsafe
             {
-                var span = segment.Span;
-                int bytesToWrite = span.Length;
+                byte* ptr = null;
+                accessor.SafeMemoryMappedViewHandle.AcquirePointer(ref ptr);
+                accessorPtr = (IntPtr)ptr;
+                byte* accessorBasePtr = (byte*)accessorPtr + accessor.PointerOffset;
+                basePtr = (IntPtr)accessorBasePtr;
+            }
+            
+            int tickStep = _config.BufferSize * 2;
+            int lastTick = 0;
 
-                // Ensure we don't write past the accessor's capacity
-                long remaining = accessorLength - writeOffset;
-                if (remaining <= 0)
-                    break;
+            while (true)
+            {
+                ReadResult result = await reader.ReadAsync(token);
+                ReadOnlySequence<byte> buffer = result.Buffer;
 
-                int safeBytesToWrite = (int)Math.Min(bytesToWrite, remaining);
-
-                WriteToAccessor(accessor, span[..safeBytesToWrite], writeOffset);
-
-                writeOffset += safeBytesToWrite;
-
-                if (writeOffset - lastTick >= tickStep || writeOffset == accessorLength)
+                foreach (var segment in buffer)
                 {
-                    child?.Tick((int)writeOffset);
-                    lastTick = (int)writeOffset;
-                }
+                    var span = segment.Span;
+                    int bytesToWrite = span.Length;
 
-                if (writeOffset >= accessorLength)
+                    // Ensure we don't write past the accessor's capacity
+                    long remaining = accessorLength - writeOffset;
+                    if (remaining <= 0)
+                    {
+                        break;
+                    }
+
+                    int safeBytesToWrite = (int)Math.Min(bytesToWrite, remaining);
+
+                    WriteToAccessor(basePtr, accessorLength, span[..safeBytesToWrite], writeOffset);
+                    
+                    writeOffset += safeBytesToWrite;
+
+                    if (writeOffset - lastTick >= tickStep || writeOffset == accessorLength)
+                    {
+                        child?.Tick((int)writeOffset);
+                        lastTick = (int)writeOffset;
+                    }
+
+                    if (writeOffset >= accessorLength)
+                    {
+                        break;
+                    }
+                }
+                    
+                reader.AdvanceTo(buffer.End);
+
+                if (result.IsCompleted || result.IsCanceled || writeOffset >= accessorLength)
+                {
                     break;
+                }
             }
 
-            reader.AdvanceTo(buffer.End);
-
-            if (result.IsCompleted || result.IsCanceled || writeOffset >= accessorLength)
-            {
-                break;
+            accessor.Flush();
+        }
+        catch (AccessViolationException ex)
+        {
+            _log.LogError(ex, "Memory access error while writing to accessor with offset {offset}.", writeOffset);
+        }
+        catch (ArgumentException ex)
+        {
+            _log.LogError(ex, "Invalid argument error while writing to accessor with offset {offset}.", writeOffset);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _log.LogError(ex, "Invalid operation error while writing to accessor with offset {offset}.", writeOffset);
+        }
+        finally{
+            if (accessorPtr != IntPtr.Zero){
+                accessor.SafeMemoryMappedViewHandle.ReleasePointer();
             }
         }
-        
-        accessor.Flush();
     }
     
-    //todo: find a way to acquire the pointer outside of the loop
-    private unsafe void WriteToAccessor(MemoryMappedViewAccessor accessor, ReadOnlySpan<byte> buffer, long offset)
+    private unsafe void WriteToAccessor(IntPtr basePtr, long accessorLength, ReadOnlySpan<byte> buffer, long offset)
     {
-        var accessorLength = accessor.Capacity;
         long remaining = accessorLength - offset;
         int safeBytesToWrite = (int)Math.Min(buffer.Length, remaining);
 
         if (safeBytesToWrite <= 0)
+        {
             return;
-
-        byte* accessorPtr = null;
-
-        try
-        {
-            accessor.SafeMemoryMappedViewHandle.AcquirePointer(ref accessorPtr);
-
-            byte* dest = accessorPtr + accessor.PointerOffset + offset;
-
-            fixed (byte* src = buffer)
-            {
-                //Buffer.MemoryCopy(src, dest, remaining, safeBytesToWrite);
-                Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
-            }
         }
-        catch (AccessViolationException ex)
+
+        byte* dest = (byte*)basePtr + offset;
+
+        fixed (byte* src = buffer)
         {
-            _log.LogError(ex, "Memory access error while writing to accessor with offset {offset}.", offset);
-        }
-        catch (ArgumentException ex)
-        {
-            _log.LogError(ex, "Invalid argument error while writing to accessor with offset {offset}.", offset);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _log.LogError(ex, "Invalid operation error while writing to accessor with offset {offset}.", offset);
-        }
-        finally
-        {
-            accessor.SafeMemoryMappedViewHandle.ReleasePointer();
+            Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
         }
     }
 }
