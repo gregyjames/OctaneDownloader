@@ -64,6 +64,9 @@ internal class RetryHandler : DelegatingHandler
 
             if (shouldRetryWithBackoff)
             {
+                response.Dispose();
+                response = null;
+                
                 var delayTime = _retryCap <= -1 ? Math.Pow(2, i) : Math.Min(Math.Pow(2, i), _retryCap);
                 _log.LogDebug("Transient status of {StatusCode} waiting {delay}s before trying again.", status, delayTime);
                 var delay = TimeSpan.FromSeconds(delayTime);
