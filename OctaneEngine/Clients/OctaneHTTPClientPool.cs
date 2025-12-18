@@ -80,17 +80,17 @@ public class OctaneHTTPClientPool: IDisposable
         
         var handler = CreateOptimizedHandler(_configuration);
         
-        
         var client = new HttpClient(handler)
         {
             Timeout = TimeSpan.FromMinutes(30), // Reasonable timeout for large downloads
-            MaxResponseContentBufferSize = Math.Max(1, _configuration.BufferSize)
+            // do not buffer the response content
+            //MaxResponseContentBufferSize = Math.Max(1, _configuration.BufferSize)
         };
 
         // Configure default headers for better performance
         client.DefaultRequestHeaders.Add("User-Agent", "OctaneEngine/1.0");
         client.DefaultRequestHeaders.Add("Accept", "*/*");
-        client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate");
+        client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate, br");
         
         _logger.LogDebug("HttpClient created successfully");
         return client;
@@ -108,16 +108,18 @@ public class OctaneHTTPClientPool: IDisposable
             PreAuthenticate = true,
             Proxy = config.Proxy,
             UseProxy = config.UseProxy,
-            MaxConnectionsPerServer = config.Parts * 2,
+            MaxConnectionsPerServer = Math.Min(Math.Max(config.Parts * 4, 100), 1000),
             UseCookies = false,
-            PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(30),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(10),
             EnableMultipleHttp2Connections = true,
-            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
             ConnectTimeout = TimeSpan.FromSeconds(15),
-            KeepAlivePingTimeout = TimeSpan.FromSeconds(20),
-            KeepAlivePingDelay = TimeSpan.FromSeconds(10),
-            KeepAlivePingPolicy = HttpKeepAlivePingPolicy.WithActiveRequests
+            KeepAlivePingTimeout = TimeSpan.FromSeconds(30),
+            KeepAlivePingDelay = TimeSpan.FromSeconds(20),
+            KeepAlivePingPolicy = HttpKeepAlivePingPolicy.WithActiveRequests,
+            AllowAutoRedirect = true,
+            MaxAutomaticRedirections = 5
         };
 
         // Wrap with retry handler for resilience
