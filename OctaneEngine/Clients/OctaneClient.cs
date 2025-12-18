@@ -50,10 +50,20 @@ public class OctaneClient : IClient
     private ArrayPool<byte> _memPool;
     private MemoryMappedFile _mmf;
     private ProgressBar _progressBar;
+    private readonly PipeOptions _pipeOptions;
 
     public OctaneClient(OctaneConfiguration config, HttpClient httpClient, ILoggerFactory loggerFactory, ProgressBar progressBar = null)
     {
         _config = config;
+        _pipeOptions = new PipeOptions(
+            pool: null, // use default
+            readerScheduler: PipeScheduler.ThreadPool,
+            writerScheduler: PipeScheduler.ThreadPool,
+            pauseWriterThreshold: _config.BufferSize * 4,
+            resumeWriterThreshold: _config.BufferSize,
+            minimumSegmentSize: _config.BufferSize,
+            useSynchronizationContext: false
+        );
         _client = httpClient;
         _loggerFactory = loggerFactory;
         _progressBar = progressBar;
@@ -138,16 +148,7 @@ public class OctaneClient : IClient
                     
                     try
                     {
-                        var pipeOptions = new PipeOptions(
-                            pool: null, // use default
-                            readerScheduler: PipeScheduler.ThreadPool,
-                            writerScheduler: PipeScheduler.ThreadPool,
-                            pauseWriterThreshold: _config.BufferSize * 4,
-                            resumeWriterThreshold: _config.BufferSize,
-                            minimumSegmentSize: _config.BufferSize,
-                            useSynchronizationContext: false
-                        );
-                        var pipe = new Pipe(pipeOptions);
+                        var pipe = new Pipe(_pipeOptions);
                         var writing = FillPipeAsync(wrappedStream, pipe.Writer, cancellationToken);
                         var reading = ReadPipeToFileAsync(pipe.Reader, piece, child, cancellationToken);
                         await Task.WhenAll(reading, writing);
@@ -227,6 +228,8 @@ public class OctaneClient : IClient
         long accessorLength = piece.Item2 - piece.Item1 + 1;
         using var accessor = _mmf.CreateViewAccessor(piece.Item1, accessorLength);
         IntPtr accessorPtr = IntPtr.Zero;
+        IntPtr basePtr = IntPtr.Zero;
+        long writeOffset = 0;
         
         try
         {
@@ -235,9 +238,10 @@ public class OctaneClient : IClient
                 byte* ptr = null;
                 accessor.SafeMemoryMappedViewHandle.AcquirePointer(ref ptr);
                 accessorPtr = (IntPtr)ptr;
+                byte* accessorBasePtr = (byte*)accessorPtr + accessor.PointerOffset;
+                basePtr = (IntPtr)accessorBasePtr;
             }
-
-            long writeOffset = 0;
+            
             int tickStep = _config.BufferSize * 2;
             int lastTick = 0;
 
@@ -260,11 +264,7 @@ public class OctaneClient : IClient
 
                     int safeBytesToWrite = (int)Math.Min(bytesToWrite, remaining);
 
-                    unsafe
-                    {
-                        byte* basePtr = (byte*)accessorPtr + accessor.PointerOffset;
-                        WriteToAccessor(basePtr, accessorLength, span[..safeBytesToWrite], writeOffset);
-                    }
+                    WriteToAccessor(basePtr, accessorLength, span[..safeBytesToWrite], writeOffset);
                     
                     writeOffset += safeBytesToWrite;
 
@@ -290,6 +290,18 @@ public class OctaneClient : IClient
 
             accessor.Flush();
         }
+        catch (AccessViolationException ex)
+        {
+            _log.LogError(ex, "Memory access error while writing to accessor with offset {offset}.", writeOffset);
+        }
+        catch (ArgumentException ex)
+        {
+            _log.LogError(ex, "Invalid argument error while writing to accessor with offset {offset}.", writeOffset);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _log.LogError(ex, "Invalid operation error while writing to accessor with offset {offset}.", writeOffset);
+        }
         finally{
             if (accessorPtr != IntPtr.Zero){
                 accessor.SafeMemoryMappedViewHandle.ReleasePointer();
@@ -297,36 +309,21 @@ public class OctaneClient : IClient
         }
     }
     
-    private unsafe void WriteToAccessor(byte* basePtr, long accessorLength, ReadOnlySpan<byte> buffer, long offset)
+    private unsafe void WriteToAccessor(IntPtr basePtr, long accessorLength, ReadOnlySpan<byte> buffer, long offset)
     {
-        try
-        {
-            long remaining = accessorLength - offset;
-            int safeBytesToWrite = (int)Math.Min(buffer.Length, remaining);
+        long remaining = accessorLength - offset;
+        int safeBytesToWrite = (int)Math.Min(buffer.Length, remaining);
 
-            if (safeBytesToWrite <= 0)
-            {
-                return;
-            }
+        if (safeBytesToWrite <= 0)
+        {
+            return;
+        }
 
-            byte* dest = basePtr + offset;
+        byte* dest = (byte*)basePtr + offset;
 
-            fixed (byte* src = buffer)
-            {
-                Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
-            }
-        }
-        catch (AccessViolationException ex)
+        fixed (byte* src = buffer)
         {
-            _log.LogError(ex, "Memory access error while writing to accessor with offset {offset}.", offset);
-        }
-        catch (ArgumentException ex)
-        {
-            _log.LogError(ex, "Invalid argument error while writing to accessor with offset {offset}.", offset);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _log.LogError(ex, "Invalid operation error while writing to accessor with offset {offset}.", offset);
+            Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
         }
     }
 }
