@@ -125,7 +125,10 @@ public class ThrottleStream : Stream, IStream
 
     public async Task<int> ReadAsync(Memory<byte> buffer, CancellationToken token)
     {
-        throw new NotImplementedException();
+        _log.LogTrace("Throttle stream read");
+        var read = await _parentStream.ReadAsync(buffer, token);
+        Throttle(read);
+        return read;
     }
 
     public override void Write(byte[] buffer, int offset, int count)
