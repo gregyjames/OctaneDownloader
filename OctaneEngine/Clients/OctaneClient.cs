@@ -228,7 +228,6 @@ public class OctaneClient : IClient
         long accessorLength = piece.Item2 - piece.Item1 + 1;
         using var accessor = _mmf.CreateViewAccessor(piece.Item1, accessorLength);
         IntPtr accessorPtr = IntPtr.Zero;
-        IntPtr basePtr = IntPtr.Zero;
         long writeOffset = 0;
         
         try
@@ -237,9 +236,8 @@ public class OctaneClient : IClient
             {
                 byte* ptr = null;
                 accessor.SafeMemoryMappedViewHandle.AcquirePointer(ref ptr);
-                accessorPtr = (IntPtr)ptr;
-                byte* accessorBasePtr = (byte*)accessorPtr + accessor.PointerOffset;
-                basePtr = (IntPtr)accessorBasePtr;
+                byte* accessorBasePtr = ptr + accessor.PointerOffset;
+                accessorPtr = (IntPtr)accessorBasePtr;
             }
             
             int tickStep = _config.BufferSize * 2;
@@ -264,7 +262,7 @@ public class OctaneClient : IClient
 
                     int safeBytesToWrite = (int)Math.Min(bytesToWrite, remaining);
 
-                    WriteToAccessor(basePtr, accessorLength, span[..safeBytesToWrite], writeOffset);
+                    WriteToAccessor(accessorPtr, accessorLength, span[..safeBytesToWrite], writeOffset);
                     
                     writeOffset += safeBytesToWrite;
 
