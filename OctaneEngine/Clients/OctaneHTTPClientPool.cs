@@ -19,12 +19,21 @@ public class OctaneHTTPClientPool: IDisposable
     private readonly int _receiveBufferSize;
 
     public static readonly string DEFAULT_CLIENT_NAME = "DEFAULT";
+    private readonly byte[]? _windowsKeepAliveSettings;
     public OctaneHTTPClientPool(OctaneConfiguration configuration, ILoggerFactory loggerFactory)
     {
         _configuration = configuration;
         _loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
         _logger = _loggerFactory.CreateLogger<OctaneHTTPClientPool>();
         _receiveBufferSize = Math.Max(1024 * 1024, _configuration.BufferSize * 128); // 1MB minimum
+        
+        if (OperatingSystem.IsWindows())
+        {
+            _windowsKeepAliveSettings = new byte[12];
+            BitConverter.GetBytes((uint)1).CopyTo(_windowsKeepAliveSettings, 0); // Enable
+            BitConverter.GetBytes((uint)30000).CopyTo(_windowsKeepAliveSettings, 4); // Time (ms)
+            BitConverter.GetBytes((uint)1000).CopyTo(_windowsKeepAliveSettings, 8); // Interval (ms)
+        }
     }
 
     internal void AddClientToPool(HttpClient client)
@@ -148,24 +157,14 @@ public class OctaneHTTPClientPool: IDisposable
                         socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseUnicastPort, true);
                         socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                     }
-                    catch (SocketException ex)
-                    {
-                        _logger.LogDebug(ex, "SO_REUSE_UNICASTPORT or SO_REUSE_ADDRESS not supported on this Windows version");
-                    }
-                    catch (PlatformNotSupportedException ex)
-                    {
-                        _logger.LogDebug(ex, "SO_REUSE_UNICASTPORT or SO_REUSE_ADDRESS not supported on this platform");
-                    }
+                    catch (SocketException ex) {}
+                    catch (PlatformNotSupportedException ex) {}
                     
                     socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
 
                     if (OperatingSystem.IsWindows())
                     {
-                        byte[] keepAliveSettings = new byte[12];
-                        BitConverter.GetBytes((uint)1).CopyTo(keepAliveSettings, 0); // Enable
-                        BitConverter.GetBytes((uint)30000).CopyTo(keepAliveSettings, 4); // Time (ms)
-                        BitConverter.GetBytes((uint)1000).CopyTo(keepAliveSettings, 8); // Interval (ms)
-                        socket.IOControl(IOControlCode.KeepAliveValues, keepAliveSettings, null);
+                        socket.IOControl(IOControlCode.KeepAliveValues, _windowsKeepAliveSettings, null);
                     }
 
                     await socket.ConnectAsync(context.DnsEndPoint, cancellationToken).ConfigureAwait(false);
