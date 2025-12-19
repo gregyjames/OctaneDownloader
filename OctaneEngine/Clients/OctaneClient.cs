@@ -227,26 +227,6 @@ public class OctaneClient : IClient
                 break; // The reader is done or cancelled
         }
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-
-    private (int bytesWritten, bool done) Write(ReadOnlyMemory<byte> segment, long accessorLength, nint accessorPtr, long writeOffset)
-    {
-        var span = segment.Span;
-        int bytesToWrite = span.Length;
-        
-        long remaining = accessorLength - writeOffset;
-        if (remaining <= 0)
-        {
-            return (0, false);
-        }
-        
-        int safeBytesToWrite = (int)Math.Min(bytesToWrite, remaining);
-        
-        WriteToAccessor(accessorPtr, accessorLength, span[..safeBytesToWrite], writeOffset);
-        
-        return (safeBytesToWrite, false);
-    }
     
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private async Task ReadPipeToFileAsync(PipeReader reader, (long, long) piece, ChildProgressBar child, CancellationToken token)
@@ -276,11 +256,24 @@ public class OctaneClient : IClient
 
                 foreach (var segment in buffer)
                 {
-                    (int safeBytesToWrite, bool isDone) = Write(segment, accessorLength, accessorPtr, writeOffset);
+                    var span = segment.Span;
+                    int bytesToWrite = span.Length;
                     
-                    if (isDone)
+                    long remaining = accessorLength - writeOffset;
+                    if (remaining <= 0)
                     {
                         break;
+                    }
+                    
+                    int safeBytesToWrite = (int)Math.Min(bytesToWrite, remaining);
+                    
+                    unsafe
+                    {
+                        byte* dest = (byte*)accessorPtr + writeOffset;
+                        fixed (byte* src = span)
+                        {
+                            Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
+                        }
                     }
                     
                     writeOffset += safeBytesToWrite;
@@ -323,26 +316,6 @@ public class OctaneClient : IClient
             if (accessorPtr != IntPtr.Zero){
                 accessor.SafeMemoryMappedViewHandle.ReleasePointer();
             }
-        }
-    }
-    
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-
-    private unsafe void WriteToAccessor(IntPtr basePtr, long accessorLength, ReadOnlySpan<byte> buffer, long offset)
-    {
-        long remaining = accessorLength - offset;
-        int safeBytesToWrite = (int)Math.Min(buffer.Length, remaining);
-
-        if (safeBytesToWrite <= 0)
-        {
-            return;
-        }
-
-        byte* dest = (byte*)basePtr + offset;
-
-        fixed (byte* src = buffer)
-        {
-            Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
         }
     }
 }
