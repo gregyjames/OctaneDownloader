@@ -222,6 +222,24 @@ public class OctaneClient : IClient
                 break; // The reader is done or cancelled
         }
     }
+
+    private (int bytesWritten, bool done) Write(ReadOnlyMemory<byte> segment, long accessorLength, nint accessorPtr, long writeOffset)
+    {
+        var span = segment.Span;
+        int bytesToWrite = span.Length;
+        
+        long remaining = accessorLength - writeOffset;
+        if (remaining <= 0)
+        {
+            return (0, false);
+        }
+        
+        int safeBytesToWrite = (int)Math.Min(bytesToWrite, remaining);
+        
+        WriteToAccessor(accessorPtr, accessorLength, span[..safeBytesToWrite], writeOffset);
+        
+        return (safeBytesToWrite, false);
+    }
     
     private async Task ReadPipeToFileAsync(PipeReader reader, (long, long) piece, ChildProgressBar child, CancellationToken token)
     {
@@ -250,19 +268,12 @@ public class OctaneClient : IClient
 
                 foreach (var segment in buffer)
                 {
-                    var span = segment.Span;
-                    int bytesToWrite = span.Length;
-
-                    // Ensure we don't write past the accessor's capacity
-                    long remaining = accessorLength - writeOffset;
-                    if (remaining <= 0)
+                    (int safeBytesToWrite, bool isDone) = Write(segment, accessorLength, accessorPtr, writeOffset);
+                    
+                    if (isDone)
                     {
                         break;
                     }
-
-                    int safeBytesToWrite = (int)Math.Min(bytesToWrite, remaining);
-
-                    WriteToAccessor(accessorPtr, accessorLength, span[..safeBytesToWrite], writeOffset);
                     
                     writeOffset += safeBytesToWrite;
 
