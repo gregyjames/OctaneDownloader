@@ -102,6 +102,9 @@ public class OctaneClient : IClient
             }
         }
 
+        request.Version = System.Net.HttpVersion.Version20;
+        request.VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+        
         var message = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         
         #region Variable Declaration
