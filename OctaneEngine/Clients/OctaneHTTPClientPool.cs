@@ -16,13 +16,15 @@ public class OctaneHTTPClientPool: IDisposable
     private readonly ILogger<OctaneHTTPClientPool> _logger;
     private readonly object _lockObject = new();
     private bool _disposed;
-    
+    private readonly int _receiveBufferSize;
+
     public static readonly string DEFAULT_CLIENT_NAME = "DEFAULT";
     public OctaneHTTPClientPool(OctaneConfiguration configuration, ILoggerFactory loggerFactory)
     {
         _configuration = configuration;
         _loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
         _logger = _loggerFactory.CreateLogger<OctaneHTTPClientPool>();
+        _receiveBufferSize = Math.Max(1024 * 1024, _configuration.BufferSize * 128); // 1MB minimum
     }
 
     internal void AddClientToPool(HttpClient client)
@@ -137,10 +139,24 @@ public class OctaneHTTPClientPool: IDisposable
                     socket = new Socket(SocketType.Stream, ProtocolType.Tcp)
                     {
                         NoDelay = true,
-                        ReceiveBufferSize = config.BufferSize,
+                        ReceiveBufferSize = _receiveBufferSize,
                         LingerState = new LingerOption(false, 0)
                     };
 
+                    try
+                    {
+                        socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseUnicastPort, true);
+                        socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                    }
+                    catch (SocketException ex)
+                    {
+                        _logger.LogDebug(ex, "SO_REUSE_UNICASTPORT or SO_REUSE_ADDRESS not supported on this Windows version");
+                    }
+                    catch (PlatformNotSupportedException ex)
+                    {
+                        _logger.LogDebug(ex, "SO_REUSE_UNICASTPORT or SO_REUSE_ADDRESS not supported on this platform");
+                    }
+                    
                     socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
 
                     if (OperatingSystem.IsWindows())
@@ -180,7 +196,7 @@ public class OctaneHTTPClientPool: IDisposable
         
         return retryHandler;
     }
-
+    
     public int ActiveClientCount => _items.Count;
     public void Dispose()
     {
