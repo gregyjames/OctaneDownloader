@@ -52,6 +52,16 @@ public class OctaneClient : IClient
     private ProgressBar _progressBar;
     private readonly PipeOptions _pipeOptions;
 
+    private static readonly ProgressBarOptions ChildProgressBarOptions = new()
+    {
+        CollapseWhenFinished = true,
+        DisplayTimeInRealTime = false,
+        BackgroundColor = ConsoleColor.Magenta,
+        DenseProgressBar = true,
+        DisableBottomPercentage = true,
+        ShowEstimatedDuration = true
+    };
+    
     public OctaneClient(OctaneConfiguration config, HttpClient httpClient, ILoggerFactory loggerFactory, ProgressBar progressBar = null)
     {
         _config = config;
@@ -111,15 +121,6 @@ public class OctaneClient : IClient
         var stopwatch = new Stopwatch();
         var programBps = _config.BytesPerSecond / _config.Parts;
         long bytesReadOverall = 0;
-        var childOptions = new ProgressBarOptions
-        {
-            CollapseWhenFinished = true,
-            DisplayTimeInRealTime = false,
-            BackgroundColor = ConsoleColor.Magenta,
-            DenseProgressBar = true,
-            DisableBottomPercentage = true,
-            ShowEstimatedDuration = true
-        };
         #endregion
         
         if (pauseToken.IsPaused)
@@ -139,7 +140,7 @@ public class OctaneClient : IClient
 
                 // Only create child progress bar if ShowProgress is enabled and we have a progress bar
                 using var child = (_config.ShowProgress && _progressBar != null) 
-                    ? _progressBar.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", childOptions)
+                    ? _progressBar.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", ChildProgressBarOptions)
                     : null;
 
                 if (_config.LowMemoryMode)
