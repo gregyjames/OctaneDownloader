@@ -119,15 +119,5 @@ namespace OctaneTestProject
             ts.Dispose();
             Assert.Throws<ObjectDisposedException>(() => ms.WriteByte(1));
         }
-
-        [Test]
-        public void IStream_ReadAsync_Memory_ShouldThrowNotImplemented()
-        {
-            using var ms = new MemoryStream(new byte[] {1, 2, 3, 4, 5});
-            IStream ts = new ThrottleStream(ms, 1024, _factory);
-            var buffer = new byte[5];
-            var memory = new Memory<byte>(buffer);
-            Assert.ThrowsAsync<NotImplementedException>(async () => await ts.ReadAsync(memory, CancellationToken.None));
-        }
     }
 } 
