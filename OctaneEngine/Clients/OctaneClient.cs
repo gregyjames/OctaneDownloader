@@ -209,6 +209,7 @@ public class OctaneClient : IClient
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds:N0}ms.", NetworkAnalyzer.PrettySize(piece.Item1), NetworkAnalyzer.PrettySize(piece.Item2), stopwatch.ElapsedMilliseconds);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
     private async Task FillPipeAsync(IStream stream, PipeWriter writer, CancellationToken token)
     {
         while (true)
@@ -226,6 +227,8 @@ public class OctaneClient : IClient
                 break; // The reader is done or cancelled
         }
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
 
     private (int bytesWritten, bool done) Write(ReadOnlyMemory<byte> segment, long accessorLength, nint accessorPtr, long writeOffset)
     {
@@ -245,6 +248,7 @@ public class OctaneClient : IClient
         return (safeBytesToWrite, false);
     }
     
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private async Task ReadPipeToFileAsync(PipeReader reader, (long, long) piece, ChildProgressBar child, CancellationToken token)
     {
         long accessorLength = piece.Item2 - piece.Item1 + 1;
@@ -322,6 +326,8 @@ public class OctaneClient : IClient
         }
     }
     
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+
     private unsafe void WriteToAccessor(IntPtr basePtr, long accessorLength, ReadOnlySpan<byte> buffer, long offset)
     {
         long remaining = accessorLength - offset;

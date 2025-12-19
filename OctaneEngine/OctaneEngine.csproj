@@ -23,6 +23,8 @@
         <TargetFramework>net8.0</TargetFramework>
         <AssemblyName>OctaneEngineCore</AssemblyName>
         <RootNamespace>OctaneEngineCore</RootNamespace>
+        <TieredCompilation>true</TieredCompilation>
+        <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
     </PropertyGroup>
 
     <ItemGroup>
