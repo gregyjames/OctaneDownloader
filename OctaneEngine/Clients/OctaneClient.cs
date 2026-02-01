@@ -27,12 +27,14 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
 using System.IO.Pipelines;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 using OctaneEngineCore.Implementations.NetworkAnalyzer;
 using OctaneEngineCore.ShellProgressBar;
 using OctaneEngineCore.Streams;
@@ -99,23 +101,45 @@ public class OctaneClient : IClient
         _memPool = pool;
     }
     
+    private static readonly ObjectPool<HttpRequestMessage> RequestPool = ObjectPool.Create(new HTTPRequestMessagePoolPolicy());
+    
+    private async ValueTask<HttpResponseMessage> SendRangeRequestAsync(
+        string url, 
+        (long, long) piece, 
+        Dictionary<string, string> headers, 
+        CancellationToken cancellationToken)
+    {
+        var request = RequestPool.Get();
+        try
+        {
+            request.RequestUri = new Uri(url, UriKind.Absolute);
+            request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
+        
+            if (headers != null)
+            {
+                foreach (var (key, value) in headers)
+                {
+                    request.Headers.TryAddWithoutValidation(key, value);
+                }
+            }
+            
+            var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                .ConfigureAwait(false);
+        
+            return response;
+        }
+        finally
+        {
+            request.Headers.Clear();
+            RequestPool.Return(request);
+        }
+    }
+    
     public async Task Download(string url,(long, long) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         _log.LogTrace("Sending request for range ({PieceItem1},{PieceItem2})...", piece.Item1, piece.Item2);
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
-        request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
-        if (headers != null)
-        {
-            foreach (var header in headers)
-            {
-                request.Headers.Add(header.Key, header.Value);
-            }
-        }
-
-        request.Version = System.Net.HttpVersion.Version20;
-        request.VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
         
-        var message = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        using var message = await SendRangeRequestAsync(url, piece, headers, cancellationToken).ConfigureAwait(false);
         
         #region Variable Declaration
         var stopwatch = new Stopwatch();
@@ -132,67 +156,64 @@ public class OctaneClient : IClient
         if (message.IsSuccessStatusCode)
         {
             _log.LogDebug("HTTP request returned success status code {code} for piece ({PieceItem1:N0}, {PieceItem2:N0})", (int)message.StatusCode , piece.Item1, piece.Item2);
-            await using (var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
+            await using var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            IStream wrappedStream = _config.BytesPerSecond <= 1 ? new NormalStream() : new ThrottleStream(_loggerFactory);
+            wrappedStream.SetStreamParent(networkStream);
+            wrappedStream.SetBps(programBps);
+
+            // Only create child progress bar if ShowProgress is enabled, and we have a progress bar
+            using var child = (_config.ShowProgress && _progressBar != null) 
+                ? _progressBar.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", ChildProgressBarOptions)
+                : null;
+
+            if (_config.LowMemoryMode)
             {
-                IStream wrappedStream = _config.BytesPerSecond <= 1 ? new NormalStream() : new ThrottleStream(_loggerFactory);
-                wrappedStream.SetStreamParent(networkStream);
-                wrappedStream.SetBps(programBps);
-
-                // Only create child progress bar if ShowProgress is enabled and we have a progress bar
-                using var child = (_config.ShowProgress && _progressBar != null) 
-                    ? _progressBar.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", ChildProgressBarOptions)
-                    : null;
-
-                if (_config.LowMemoryMode)
+                if (_config.BytesPerSecond > 1)
                 {
-                    if (_config.BytesPerSecond > 1)
-                    {
-                        throw new ArgumentException("Low memory mode cannot be used while bytes per second is enabled (greater than 1).");
-                    }
+                    throw new ArgumentException("Low memory mode cannot be used while bytes per second is enabled (greater than 1).");
+                }
                     
-                    try
-                    {
-                        var pipe = new Pipe(_pipeOptions);
-                        var writing = FillPipeAsync(wrappedStream, pipe.Writer, cancellationToken);
-                        var reading = ReadPipeToFileAsync(pipe.Reader, piece, child, cancellationToken);
-                        await Task.WhenAll(reading, writing);
-                    }
-                    catch (Exception ex)
-                    {
-                        _log.LogError(ex, "Error: {ex}", ex);
-                        throw;
-                    }
-                }
-                else
+                try
                 {
-                    var readBuffer = _memPool.Rent(_config.BufferSize);
-                    _log.LogDebug("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
-                    var stream = _mmf.CreateViewStream(piece.Item1, 0);
-                    try
-                    {
-                        while (true)
-                        {
-                            var bytesRead = await wrappedStream.ReadAsync(readBuffer.AsMemory(), cancellationToken);
-                            if (bytesRead == 0)
-                            {
-                                break;
-                            }
-                            await stream.WriteAsync(readBuffer.AsMemory().Slice(0, bytesRead), cancellationToken);
-                            bytesReadOverall += bytesRead;
-                            child?.Tick((int)bytesReadOverall);
-                        }
-                    }
-                    finally
-                    {
-                        // Flush and dispose of the MemoryMappedViewStream
-                        await stream.FlushAsync(cancellationToken);
-                        await stream.DisposeAsync();
-                        await wrappedStream.DisposeAsync();
-                    }
-                    _memPool.Return(readBuffer);
-                    _log.LogInformation("Buffer returned to memory pool");
+                    var pipe = new Pipe(_pipeOptions);
+                    var writing = FillPipeAsync(wrappedStream, pipe.Writer, cancellationToken);
+                    var reading = ReadPipeToFileAsync(pipe.Reader, piece, child, cancellationToken);
+                    await Task.WhenAll(reading, writing);
                 }
-
+                catch (Exception ex)
+                {
+                    _log.LogError(ex, "Error: {ex}", ex);
+                    throw;
+                }
+            }
+            else
+            {
+                var readBuffer = _memPool.Rent(_config.BufferSize);
+                _log.LogDebug("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
+                var stream = _mmf.CreateViewStream(piece.Item1, 0);
+                try
+                {
+                    while (true)
+                    {
+                        var bytesRead = await wrappedStream.ReadAsync(readBuffer.AsMemory(), cancellationToken);
+                        if (bytesRead == 0)
+                        {
+                            break;
+                        }
+                        await stream.WriteAsync(readBuffer.AsMemory().Slice(0, bytesRead), cancellationToken);
+                        bytesReadOverall += bytesRead;
+                        child?.Tick((int)bytesReadOverall);
+                    }
+                }
+                finally
+                {
+                    // Flush and dispose of the MemoryMappedViewStream
+                    await stream.FlushAsync(cancellationToken);
+                    await stream.DisposeAsync();
+                    await wrappedStream.DisposeAsync();
+                }
+                _memPool.Return(readBuffer);
+                _log.LogInformation("Buffer returned to memory pool");
             }
         }
         else
