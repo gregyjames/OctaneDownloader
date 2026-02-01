@@ -29,7 +29,6 @@ using System.IO.MemoryMappedFiles;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.IO;
 using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngineCore.Clients;
@@ -61,28 +60,29 @@ public class DefaultClient(HttpClient httpClient, OctaneConfiguration config)
         _memPool = pool;
     }
     
-    private static readonly RecyclableMemoryStreamManager _streamManager = new();
-    private async Task CopyMessageContentToStreamWithProgressAsync(HttpResponseMessage message, Stream stream, IProgress<long> progress)
+    private async Task CopyMessageContentToStreamWithProgressAsync(
+        HttpResponseMessage message, 
+        Stream stream, 
+        IProgress<long> progress)
     {
-        byte[] buffer = _memPool.Rent(config.BufferSize);
-        long totalBytesWritten = 0;
-
-        using MemoryStream memoryStream = _streamManager.GetStream("OctaneEngineCore-DefaultClient-CopyMessageContentToStreamWithProgressAsync");
-        await message.Content.CopyToAsync(memoryStream);
-
-        memoryStream.Seek(0, SeekOrigin.Begin);
-
-        int bytesRead;
-        while ((bytesRead = await memoryStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        var buffer = _memPool.Rent(config.BufferSize);
+        try
         {
-            await stream.WriteAsync(buffer, 0, bytesRead);
-
-            totalBytesWritten += bytesRead;
-
-            if (progress != null)
+            long totalBytesWritten = 0;
+            
+            await using var contentStream = await message.Content.ReadAsStreamAsync();
+        
+            int bytesRead;
+            while ((bytesRead = await contentStream.ReadAsync(buffer)) > 0)
             {
-                progress.Report(totalBytesWritten);
+                await stream.WriteAsync(buffer.AsMemory(0, bytesRead));
+                totalBytesWritten += bytesRead;
+                progress?.Report(totalBytesWritten);
             }
+        }
+        finally
+        {
+            _memPool.Return(buffer);
         }
     }
     
