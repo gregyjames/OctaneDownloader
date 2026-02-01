@@ -8,7 +8,7 @@ public class HTTPRequestMessagePoolPolicy: IPooledObjectPolicy<HttpRequestMessag
 {
     public HttpRequestMessage Create()
     {
-        return new HttpRequestMessage()
+        return new()
         {
             Method = HttpMethod.Get,
             VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher,

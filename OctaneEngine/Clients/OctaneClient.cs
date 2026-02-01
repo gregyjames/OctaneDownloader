@@ -82,24 +82,11 @@ public class OctaneClient : IClient
         _log = loggerFactory.CreateLogger<IClient>();
     }
     
-    public bool IsRangeSupported()
-    {
-        return true;
-    }
+    public bool IsRangeSupported() => true;
 
-    public void SetMmf(MemoryMappedFile file)
-    {
-        _mmf = file;
-    }
-
-    public void SetProgressbar(ProgressBar bar)
-    {
-        _progressBar = bar;
-    }
-    public void SetArrayPool(ArrayPool<byte> pool)
-    {
-        _memPool = pool;
-    }
+    public void SetMmf(MemoryMappedFile file) => _mmf = file;
+    public void SetProgressbar(ProgressBar bar) => _progressBar = bar;
+    public void SetArrayPool(ArrayPool<byte> pool) => _memPool = pool;
     
     private static readonly ObjectPool<HttpRequestMessage> RequestPool = ObjectPool.Create(new HTTPRequestMessagePoolPolicy());
     
@@ -188,11 +175,20 @@ public class OctaneClient : IClient
             }
             else
             {
-                var readBuffer = _memPool.Rent(_config.BufferSize);
-                _log.LogDebug("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
+                int readBufferSize = Math.Max(_config.BufferSize, 256 * 1024);
+                var readBuffer = _memPool.Rent(readBufferSize);
+
+                if(_log.IsEnabled(LogLevel.Debug))
+                {
+                    _log.LogDebug("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
+                }
+
                 var stream = _mmf.CreateViewStream(piece.Item1, 0);
                 try
                 {
+                    int progressUpdateInterval = readBufferSize * 4;
+                    int lastProgressUpdate = 0;
+
                     while (true)
                     {
                         var bytesRead = await wrappedStream.ReadAsync(readBuffer.AsMemory(), cancellationToken);
@@ -200,9 +196,15 @@ public class OctaneClient : IClient
                         {
                             break;
                         }
+
                         await stream.WriteAsync(readBuffer.AsMemory().Slice(0, bytesRead), cancellationToken);
                         bytesReadOverall += bytesRead;
-                        child?.Tick((int)bytesReadOverall);
+                        
+                        if(child != null && (bytesReadOverall - lastProgressUpdate >= progressUpdateInterval))
+                        {
+                            child.Tick((int)bytesReadOverall);
+                            lastProgressUpdate = (int)bytesReadOverall;
+                        }
                     }
                 }
                 finally
