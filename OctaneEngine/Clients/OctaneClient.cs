@@ -87,44 +87,41 @@ public class OctaneClient : IClient
     public void SetMmf(MemoryMappedFile file) => _mmf = file;
     public void SetProgressbar(ProgressBar bar) => _progressBar = bar;
     public void SetArrayPool(ArrayPool<byte> pool) => _memPool = pool;
-    
-    private static readonly ObjectPool<HttpRequestMessage> RequestPool = ObjectPool.Create(new HTTPRequestMessagePoolPolicy());
-    
     private async ValueTask<HttpResponseMessage> SendRangeRequestAsync(
         string url, 
-        (long, long) piece, 
+        (long start, long end) piece, 
         Dictionary<string, string> headers, 
         CancellationToken cancellationToken)
     {
-        var request = RequestPool.Get();
-        try
+        HttpRequestMessage request = new()
         {
-            request.RequestUri = new Uri(url, UriKind.Absolute);
-            request.Headers.Range = new RangeHeaderValue(piece.Item1, piece.Item2);
-        
-            if (headers != null)
+            Method = HttpMethod.Get,
+            VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher,
+            Version = HttpVersion.Version20,
+            RequestUri = new Uri(url, UriKind.Absolute),
+            Headers =
             {
-                foreach (var (key, value) in headers)
-                {
-                    request.Headers.TryAddWithoutValidation(key, value);
-                }
+                Range = new(piece.start, piece.end)
             }
-            
-            var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
-                .ConfigureAwait(false);
+        };
         
-            return response;
-        }
-        finally
+        if (headers != null)
         {
-            request.Headers.Clear();
-            RequestPool.Return(request);
+            foreach (var (key, value) in headers)
+            {
+                request.Headers.TryAddWithoutValidation(key, value);
+            }
         }
+            
+        var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .ConfigureAwait(false);
+        
+        return response;
     }
     
-    public async Task Download(string url,(long, long) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken)
+    public async Task Download(string url,(long start, long end) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
-        _log.LogTrace("Sending request for range ({PieceItem1},{PieceItem2})...", piece.Item1, piece.Item2);
+        _log.LogTrace("Sending request for range ({PieceItem1},{PieceItem2})...", piece.start, piece.end);
         
         using var message = await SendRangeRequestAsync(url, piece, headers, cancellationToken).ConfigureAwait(false);
         
@@ -150,7 +147,7 @@ public class OctaneClient : IClient
 
             // Only create child progress bar if ShowProgress is enabled, and we have a progress bar
             using var child = (_config.ShowProgress && _progressBar != null) 
-                ? _progressBar.Spawn(Convert.ToInt32(piece.Item2 - piece.Item1), "Downloading part...", ChildProgressBarOptions)
+                ? _progressBar.Spawn(Convert.ToInt32(piece.end - piece.start), "Downloading part...", ChildProgressBarOptions)
                 : null;
 
             if (_config.LowMemoryMode)
@@ -180,10 +177,10 @@ public class OctaneClient : IClient
 
                 if(_log.IsEnabled(LogLevel.Debug))
                 {
-                    _log.LogDebug("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.Item1, piece.Item2);
+                    _log.LogDebug("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.start, piece.end);
                 }
 
-                var stream = _mmf.CreateViewStream(piece.Item1, 0);
+                var stream = _mmf.CreateViewStream(piece.start, 0);
                 try
                 {
                     int progressUpdateInterval = readBufferSize * 4;
@@ -197,7 +194,7 @@ public class OctaneClient : IClient
                             break;
                         }
 
-                        await stream.WriteAsync(readBuffer.AsMemory().Slice(0, bytesRead), cancellationToken);
+                        await stream.WriteAsync(readBuffer.AsMemory()[..bytesRead], cancellationToken);
                         bytesReadOverall += bytesRead;
                         
                         if(child != null && (bytesReadOverall - lastProgressUpdate >= progressUpdateInterval))
@@ -220,7 +217,7 @@ public class OctaneClient : IClient
         }
         else
         {
-            _log.LogError("HTTP request returned success status code {code} for piece ({PieceItem1},{PieceItem2})", (int)message.StatusCode , NetworkAnalyzer.PrettySize(piece.Item1), NetworkAnalyzer.PrettySize(piece.Item2));
+            _log.LogError("HTTP request returned success status code {code} for piece ({PieceItem1},{PieceItem2})", (int)message.StatusCode , NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end));
         }
         
         // Only tick the progress bar if ShowProgress is enabled
@@ -229,7 +226,7 @@ public class OctaneClient : IClient
             _progressBar?.Tick();
         }
         stopwatch.Stop();
-        _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds:N0}ms.", NetworkAnalyzer.PrettySize(piece.Item1), NetworkAnalyzer.PrettySize(piece.Item2), stopwatch.ElapsedMilliseconds);
+        _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds:N0}ms.", NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end), stopwatch.ElapsedMilliseconds);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
@@ -256,10 +253,10 @@ public class OctaneClient : IClient
     }
     
     [MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
-    private async Task ReadPipeToFileAsync(PipeReader reader, (long, long) piece, ChildProgressBar child, CancellationToken token)
+    private async Task ReadPipeToFileAsync(PipeReader reader, (long start, long end) piece, ChildProgressBar child, CancellationToken token)
     {
-        long accessorLength = piece.Item2 - piece.Item1 + 1;
-        using var accessor = _mmf.CreateViewAccessor(piece.Item1, accessorLength);
+        long accessorLength = piece.end - piece.start + 1;
+        using var accessor = _mmf.CreateViewAccessor(piece.start, accessorLength);
         IntPtr accessorPtr = IntPtr.Zero;
         long writeOffset = 0;
         

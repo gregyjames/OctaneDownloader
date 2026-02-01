@@ -37,5 +37,5 @@ public interface IClient
     public void SetMmf(MemoryMappedFile file);
     public void SetProgressbar(ProgressBar bar);
     public void SetArrayPool(ArrayPool<Byte> pool);
-    internal Task Download(string url, (long, long) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken);
+    internal Task Download(string url, (long start, long end) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken);
 }
