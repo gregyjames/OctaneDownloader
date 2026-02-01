@@ -71,9 +71,9 @@ public class OctaneClient : IClient
             pool: null, // use default
             readerScheduler: PipeScheduler.ThreadPool,
             writerScheduler: PipeScheduler.ThreadPool,
-            pauseWriterThreshold: _config.BufferSize * 4,
-            resumeWriterThreshold: _config.BufferSize,
-            minimumSegmentSize: _config.BufferSize,
+            pauseWriterThreshold: Math.Max(_config.BufferSize * 4, 512 * 1024),
+            resumeWriterThreshold: Math.Max(_config.BufferSize, 256 * 1024),
+            minimumSegmentSize: Math.Max(_config.BufferSize, 8196),
             useSynchronizationContext: false
         );
         _client = httpClient;
@@ -235,7 +235,7 @@ public class OctaneClient : IClient
     [MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
     private async Task FillPipeAsync(IStream stream, PipeWriter writer, CancellationToken token)
     {
-        int bufferSize = _config.BufferSize;
+        int bufferSize = Math.Max(_config.BufferSize, 512 * 1024);
         
         while (true)
         {
