@@ -212,13 +212,17 @@ public class OctaneClient : IClient
     [MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
     private async Task FillPipeAsync(IStream stream, PipeWriter writer, CancellationToken token)
     {
+        int bufferSize = _config.BufferSize;
+        
         while (true)
         {
-            var memory = writer.GetMemory(_config.BufferSize);
+            var memory = writer.GetMemory(bufferSize);
             int bytesRead = await stream.ReadAsync(memory, token);
 
             if (bytesRead == 0)
+            {
                 break; // End of stream
+            }
 
             writer.Advance(bytesRead);
 
@@ -228,7 +232,7 @@ public class OctaneClient : IClient
         }
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    [MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
     private async Task ReadPipeToFileAsync(PipeReader reader, (long, long) piece, ChildProgressBar child, CancellationToken token)
     {
         long accessorLength = piece.Item2 - piece.Item1 + 1;
