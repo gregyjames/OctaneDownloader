@@ -17,6 +17,7 @@ public class OctaneHTTPClientPool: IDisposable
     private readonly object _lockObject = new();
     private bool _disposed;
     private readonly int _receiveBufferSize;
+    private readonly int _sendBufferSize;
 
     public static readonly string DEFAULT_CLIENT_NAME = "DEFAULT";
     private readonly byte[]? _windowsKeepAliveSettings;
@@ -26,7 +27,8 @@ public class OctaneHTTPClientPool: IDisposable
         _loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
         _logger = _loggerFactory.CreateLogger<OctaneHTTPClientPool>();
         _receiveBufferSize = Math.Max(1024 * 1024, _configuration.BufferSize * 128); // 1MB minimum
-        
+        _sendBufferSize = 512 * 1024; // 512 KB for sends
+
         if (OperatingSystem.IsWindows())
         {
             _windowsKeepAliveSettings = new byte[12];
@@ -38,14 +40,20 @@ public class OctaneHTTPClientPool: IDisposable
 
     internal void AddClientToPool(HttpClient client)
     {
-        _logger.LogTrace("Adding default client to pool");
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace("Adding default client to pool");
+        }
         _items.TryAdd(DEFAULT_CLIENT_NAME, client);
     }
     
     public HttpClient Rent(string key = null)
     {
         string clientName = string.IsNullOrEmpty(key) ? DEFAULT_CLIENT_NAME : key;
-        _logger.LogTrace("Renting client with name {clientName}", clientName);
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace("Renting client with name {clientName}", clientName);
+        }
         var client = _items.GetOrAdd(clientName, CreateNewClient);
         return client;
     }
@@ -53,7 +61,10 @@ public class OctaneHTTPClientPool: IDisposable
     public HttpClient Rent(string key, Action<HttpClient> configuration)
     {
         string clientName = string.IsNullOrEmpty(key) ? DEFAULT_CLIENT_NAME : key;
-        _logger.LogTrace("Renting client with name {clientName}", clientName);
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace("Renting client with name {clientName}", clientName);
+        }
         var client = _items.GetOrAdd(clientName, CreateNewClient);
         configuration?.Invoke(client);
         return client;
@@ -61,7 +72,10 @@ public class OctaneHTTPClientPool: IDisposable
     
     public void Return(string name, HttpClient item)
     {
-        _logger.LogTrace("Returning client with name {clientName}", name);
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace("Returning client with name {clientName}", name);
+        }
         _items.AddOrUpdate(name, item, (_, existing) => existing ?? item);
     }
 
@@ -88,7 +102,10 @@ public class OctaneHTTPClientPool: IDisposable
     /// <returns>A configured HttpClient</returns>
     private HttpClient CreateNewClient(string key)
     {
-        _logger.LogDebug("Creating new HttpClient");
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug("Creating new HttpClient");
+        }
         
         var handler = CreateOptimizedHandler(_configuration);
         
@@ -107,7 +124,11 @@ public class OctaneHTTPClientPool: IDisposable
         client.DefaultRequestVersion = System.Net.HttpVersion.Version20;
         client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
         
-        _logger.LogDebug("HttpClient created successfully");
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace("HttpClient created successfully with send buffer size {SendBufferSize} and receive buffer size {ReceiveBufferSize}", _sendBufferSize, _receiveBufferSize);
+        }
+        
         return client;
     }
     
@@ -149,6 +170,7 @@ public class OctaneHTTPClientPool: IDisposable
                     {
                         NoDelay = true,
                         ReceiveBufferSize = _receiveBufferSize,
+                        SendBufferSize = _sendBufferSize,
                         LingerState = new LingerOption(false, 0)
                     };
 
@@ -187,7 +209,10 @@ public class OctaneHTTPClientPool: IDisposable
         }
         else
         {
-            _logger.LogDebug("Skipping custom socket options on macOS/iOS due to platform socket reuse restrictions.");
+            if (_logger.IsEnabled(LogLevel.Trace))
+            {
+                _logger.LogTrace("Skipping custom socket options on macOS/iOS due to platform socket reuse restrictions.");
+            }
         }
 
         // Wrap with retry handler for resilience
@@ -201,7 +226,10 @@ public class OctaneHTTPClientPool: IDisposable
     {
         if (_disposed) return;
         
-        _logger.LogDebug("Disposing OctaneClientFactory");
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug("Disposing OctaneClientFactory");
+        }
         
         lock (_lockObject)
         {
@@ -210,7 +238,10 @@ public class OctaneHTTPClientPool: IDisposable
         }
 
         Clear();
-        
-        _logger.LogDebug("OctaneClientFactory disposed successfully");
+
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug("OctaneClientFactory disposed successfully");
+        }
     }
 }
