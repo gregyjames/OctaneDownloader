@@ -26,6 +26,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.MemoryMappedFiles;
+using System.IO.Pipelines;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -33,12 +34,29 @@ using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngineCore.Clients;
 
-public class DefaultClient(HttpClient httpClient, OctaneConfiguration config)
-    : IClient
+public class DefaultClient : IClient
 {
     private MemoryMappedFile _mmf;
     private ArrayPool<byte> _memPool;
     private ProgressBar _pBar;
+    private readonly HttpClient _httpClient;
+    private readonly OctaneConfiguration _config;
+    private readonly PipeOptions _pipeOptions;
+
+    public DefaultClient(HttpClient httpClient, OctaneConfiguration config)
+    {
+        _httpClient = httpClient;
+        _config = config;
+        _pipeOptions = new PipeOptions(
+            pool: MemoryPool<byte>.Shared,           
+            readerScheduler: PipeScheduler.ThreadPool, 
+            writerScheduler: PipeScheduler.ThreadPool, 
+            pauseWriterThreshold: Math.Max(config.BufferSize * 4, 512 * 1024),
+            resumeWriterThreshold: Math.Max(config.BufferSize * 2, 256*1024),
+            minimumSegmentSize: Math.Max(config.BufferSize, 128*1024),
+            useSynchronizationContext: false
+        );
+    }
 
     public bool IsRangeSupported()
     {
@@ -60,26 +78,65 @@ public class DefaultClient(HttpClient httpClient, OctaneConfiguration config)
         _memPool = pool;
     }
     
-    private async Task CopyMessageContentToStreamWithProgressAsync(HttpResponseMessage message, Stream stream, IProgress<long> progress)
+    private async Task CopyMessageContentToStreamWithProgressAsync(
+        HttpResponseMessage message, 
+        Stream stream, 
+        IProgress<long> progress)
     {
-        byte[] buffer = _memPool.Rent(config.BufferSize);
+        await using var contentStream = await message.Content.ReadAsStreamAsync();
+
+        var pipe = new Pipe(_pipeOptions);
+        var fillTask = FillPipeAsync(contentStream, pipe.Writer);
+        var readTask = ReadPipeAsync(pipe.Reader, stream, progress);
+        
+        await Task.WhenAll(fillTask, readTask);
+    }
+
+    private async Task FillPipeAsync(Stream source, PipeWriter writer)
+    { 
+        int bufferSize = Math.Max(1024*512, _config.BufferSize);
+
+        while (true)
+        {
+            Memory<byte> memory = writer.GetMemory(bufferSize);
+            int bytesRead = await source.ReadAsync(memory);
+
+            if (bytesRead == 0)
+            {
+                break;
+            }
+            
+            writer.Advance(bytesRead);
+            
+            FlushResult flushResult = await writer.FlushAsync();
+            if (flushResult.IsCompleted)
+            {
+                break;
+            }
+        }
+    }
+
+    private async Task ReadPipeAsync(PipeReader reader, Stream destination, IProgress<long> progress)
+    {
         long totalBytesWritten = 0;
 
-        using MemoryStream memoryStream = new MemoryStream();
-        await message.Content.CopyToAsync(memoryStream);
-
-        memoryStream.Seek(0, SeekOrigin.Begin);
-
-        int bytesRead;
-        while ((bytesRead = await memoryStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        while (true)
         {
-            await stream.WriteAsync(buffer, 0, bytesRead);
+            ReadResult result = await reader.ReadAsync();
+            ReadOnlySequence<byte> buffer = result.Buffer;
 
-            totalBytesWritten += bytesRead;
-
-            if (progress != null)
+            foreach (var segment in buffer)
             {
-                progress.Report(totalBytesWritten);
+                await destination.WriteAsync(segment);
+                totalBytesWritten += segment.Length;
+            }
+            
+            progress?.Report(totalBytesWritten);
+            reader.AdvanceTo(buffer.End);
+
+            if (result.IsCompleted)
+            {
+                break;
             }
         }
     }
@@ -100,7 +157,7 @@ public class DefaultClient(HttpClient httpClient, OctaneConfiguration config)
             }
         }
 
-        var message = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+        var message = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
         
         if (pauseToken.IsPaused)
@@ -115,7 +172,7 @@ public class DefaultClient(HttpClient httpClient, OctaneConfiguration config)
             totalWritten += bytesWritten;
 
             // Only update progress bar if ShowProgress is enabled
-            if (config.ShowProgress && totalWritten % ((piece.Item2-piece.Item1) / config.BufferSize) == 0)
+            if (_config.ShowProgress && totalWritten % ((piece.Item2-piece.Item1) / _config.BufferSize) == 0)
             {
                 _pBar?.Tick();
             }
@@ -126,7 +183,7 @@ public class DefaultClient(HttpClient httpClient, OctaneConfiguration config)
 
     public void Dispose()
     {
-        httpClient?.Dispose();
+        _httpClient?.Dispose();
         _mmf?.Dispose();
         _pBar?.Dispose();
     }
