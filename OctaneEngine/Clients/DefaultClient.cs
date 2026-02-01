@@ -29,6 +29,7 @@ using System.IO.MemoryMappedFiles;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.IO;
 using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngineCore.Clients;
@@ -60,12 +61,13 @@ public class DefaultClient(HttpClient httpClient, OctaneConfiguration config)
         _memPool = pool;
     }
     
+    private static readonly RecyclableMemoryStreamManager _streamManager = new();
     private async Task CopyMessageContentToStreamWithProgressAsync(HttpResponseMessage message, Stream stream, IProgress<long> progress)
     {
         byte[] buffer = _memPool.Rent(config.BufferSize);
         long totalBytesWritten = 0;
 
-        using MemoryStream memoryStream = new MemoryStream();
+        using MemoryStream memoryStream = _streamManager.GetStream("OctaneEngineCore-DefaultClient-CopyMessageContentToStreamWithProgressAsync");
         await message.Content.CopyToAsync(memoryStream);
 
         memoryStream.Seek(0, SeekOrigin.Begin);
