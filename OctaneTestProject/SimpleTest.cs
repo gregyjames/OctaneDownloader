@@ -55,7 +55,7 @@ namespace OctaneTestProject
         [Test]
         public void SimpleDownload_ShouldWork()
         {
-            const string url = @"https://httpbin.org/bytes/512"; // Small file
+            const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png"; // Small file
 
             _log.Information("Testing simple download");
             
@@ -110,7 +110,7 @@ namespace OctaneTestProject
         [Test]
         public void EngineBuilder_WithLogger_ShouldWork()
         {
-            const string url = @"https://httpbin.org/bytes/256"; // Very small file
+            const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png"; // Very small file
 
             _log.Information("Testing EngineBuilder with logger");
             
@@ -185,7 +185,7 @@ namespace OctaneTestProject
         [Test]
         public void Configuration_ShowProgressDisabled_ShouldNotShowProgressBar()
         {
-            const string url = @"https://httpbin.org/bytes/256"; // Very small file
+            const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png"; // Very small file
 
             _log.Information("Testing configuration with ShowProgress disabled");
             
