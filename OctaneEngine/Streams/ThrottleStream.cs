@@ -30,7 +30,7 @@ using Microsoft.Extensions.Logging;
 
 namespace OctaneEngineCore.Streams;
 
-public class ThrottleStream : Stream, IStream
+public class ThrottleStream : Stream
 {
     protected override void Dispose(bool disposing)
     {
