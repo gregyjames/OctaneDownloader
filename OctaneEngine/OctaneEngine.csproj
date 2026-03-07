@@ -25,6 +25,7 @@
         <RootNamespace>OctaneEngineCore</RootNamespace>
         <TieredCompilation>true</TieredCompilation>
         <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+        <TieredPGO>true</TieredPGO>
     </PropertyGroup>
 
     <ItemGroup>
