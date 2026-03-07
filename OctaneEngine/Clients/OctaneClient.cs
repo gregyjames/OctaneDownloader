@@ -72,9 +72,9 @@ public class OctaneClient : IClient
             pool: null, // use default
             readerScheduler: PipeScheduler.ThreadPool,
             writerScheduler: PipeScheduler.ThreadPool,
-            pauseWriterThreshold: Math.Max(_config.BufferSize * 4, 512 * 1024),
-            resumeWriterThreshold: Math.Max(_config.BufferSize, 256 * 1024),
-            minimumSegmentSize: Math.Max(_config.BufferSize, 8196),
+            pauseWriterThreshold: Math.Max(_config.BufferSize * 4, 4 * 1024 * 1024),  // 4 MB min
+            resumeWriterThreshold: Math.Max(_config.BufferSize * 2, 2 * 1024 * 1024), // 2 MB min
+            minimumSegmentSize: Math.Max(_config.BufferSize, 256 * 1024),              // 256 KB min
             useSynchronizationContext: false
         );
         _client = httpClient;
@@ -89,7 +89,7 @@ public class OctaneClient : IClient
     public void SetProgressbar(ProgressBar bar) => _progressBar = bar;
     public void SetArrayPool(ArrayPool<byte> pool) => _memPool = pool;
     private async ValueTask<HttpResponseMessage> SendRangeRequestAsync(
-        string url, 
+        Uri uri, 
         (long start, long end) piece, 
         Dictionary<string, string> headers, 
         CancellationToken cancellationToken)
@@ -99,7 +99,7 @@ public class OctaneClient : IClient
             Method = HttpMethod.Get,
             VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher,
             Version = HttpVersion.Version20,
-            RequestUri = new Uri(url, UriKind.Absolute),
+            RequestUri = uri,
             Headers =
             {
                 Range = new(piece.start, piece.end)
@@ -124,7 +124,8 @@ public class OctaneClient : IClient
     {
         _log.LogTrace("Sending request for range ({PieceItem1},{PieceItem2})...", piece.start, piece.end);
         
-        using var message = await SendRangeRequestAsync(url, piece, headers, cancellationToken).ConfigureAwait(false);
+        var uri = new Uri(url, UriKind.Absolute);
+        using var message = await SendRangeRequestAsync(uri, piece, headers, cancellationToken).ConfigureAwait(false);
         
         #region Variable Declaration
         var stopwatch = new Stopwatch();
@@ -212,8 +213,6 @@ public class OctaneClient : IClient
                 }
                 finally
                 {
-                    // Flush and dispose of the MemoryMappedViewStream
-                    await stream.FlushAsync(cancellationToken);
                     await stream.DisposeAsync();
                     await wrappedStream.DisposeAsync();
                 }
@@ -327,8 +326,6 @@ public class OctaneClient : IClient
                     break;
                 }
             }
-
-            accessor.Flush();
         }
         catch (AccessViolationException ex)
         {

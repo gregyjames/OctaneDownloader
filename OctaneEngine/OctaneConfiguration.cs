@@ -32,7 +32,7 @@ public class OctaneConfiguration
     /// <summary>
     ///     The number of parts to download in parallel.
     /// </summary>
-    public int Parts { get; set; } = 8;
+    public int Parts { get; set; } = Environment.ProcessorCount;
 
     /// <summary>
     /// Determines whether to use a Stream (max performance/high memory) or accessor (lower memory use)
@@ -42,7 +42,7 @@ public class OctaneConfiguration
     /// <summary>
     ///     The memory buffer size to use, default 8192.
     /// </summary>
-    public int BufferSize { get; set; } = 8196;
+    public int BufferSize { get; set; } = 1048576; // 1 MB
 
     /// <summary>
     ///     Show a progress bar
