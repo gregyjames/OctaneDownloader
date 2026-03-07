@@ -180,7 +180,8 @@ public class OctaneClient : IClient
                     _log.LogDebug("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.start, piece.end);
                 }
 
-                var stream = _mmf.CreateViewStream(piece.start, 0);
+                var stream = _mmf.CreateViewStream(piece.start, piece.end - piece.start + 1);
+                
                 try
                 {
                     int progressUpdateInterval = readBufferSize * 4;

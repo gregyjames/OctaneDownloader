@@ -182,7 +182,7 @@ public class Engine: IEngine, IDisposable
             filename = request.OutFile ?? Path.GetFileName(new Uri(request.Url).LocalPath);
             var cancellation_token = token;
             var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
-            var memPool = ArrayPool<byte>.Create(_config.BufferSize, _config.Parts);
+            var memPool = ArrayPool<byte>.Shared;
             _logger.LogInformation("Range supported: {range}", _range);
             int tasksDone = 0;
             #endregion
