@@ -25,6 +25,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.IO.Pipelines;
 using System.Net;
@@ -141,9 +142,13 @@ public class OctaneClient : IClient
         {
             _log.LogDebug("HTTP request returned success status code {code} for piece ({PieceItem1:N0}, {PieceItem2:N0})", (int)message.StatusCode , piece.Item1, piece.Item2);
             await using var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            IStream wrappedStream = _config.BytesPerSecond <= 1 ? new NormalStream() : new ThrottleStream(_loggerFactory);
-            wrappedStream.SetStreamParent(networkStream);
-            wrappedStream.SetBps(programBps);
+            Stream wrappedStream = _config.BytesPerSecond <= 1 ? networkStream : new ThrottleStream(_loggerFactory);
+
+            if (wrappedStream is ThrottleStream throttleStream)
+            {
+                throttleStream.SetStreamParent(networkStream);
+                throttleStream.SetBps(programBps);
+            }
 
             // Only create child progress bar if ShowProgress is enabled, and we have a progress bar
             using var child = (_config.ShowProgress && _progressBar != null) 
@@ -231,7 +236,7 @@ public class OctaneClient : IClient
     }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
-    private async Task FillPipeAsync(IStream stream, PipeWriter writer, CancellationToken token)
+    private async Task FillPipeAsync(Stream stream, PipeWriter writer, CancellationToken token)
     {
         int bufferSize = Math.Max(_config.BufferSize, 512 * 1024);
         
