@@ -8,15 +8,15 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
-      <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.5" />
-      <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.5" />
-      <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.5" />
-      <PackageReference Include="Serilog" Version="4.3.1" />
-      <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
-      <PackageReference Include="Serilog.Sinks.Async" Version="2.1.0" />
-      <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
-      <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+      <PackageReference Include="BenchmarkDotNet" />
+      <PackageReference Include="Microsoft.Extensions.Logging" />
+      <PackageReference Include="Microsoft.Extensions.Configuration" />
+      <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+      <PackageReference Include="Serilog" />
+      <PackageReference Include="Serilog.Extensions.Logging" />
+      <PackageReference Include="Serilog.Sinks.Async" />
+      <PackageReference Include="Serilog.Sinks.Console" />
+      <PackageReference Include="Serilog.Sinks.File" />
     </ItemGroup>
 
     <ItemGroup>
