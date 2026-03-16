@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="examples/OctaneTester/OctaneTester.csproj" />
+  <Project Path="src/OctaneEngine/OctaneEngine.csproj" />
+  <Project Path="tests/OctaneTestProject/OctaneTestProject.csproj" />
+</Solution>
