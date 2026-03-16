@@ -59,12 +59,9 @@
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="System.Buffers" Condition="'$(TargetFramework)' == 'net461' OR '$(TargetFramework)' == 'net472' OR '$(TargetFramework)' == 'netstandard2.0'" />
-        <PackageReference Include="System.Net.Http" Condition="'$(TargetFramework)' == 'net461' OR '$(TargetFramework)' == 'net472' OR '$(TargetFramework)' == 'netstandard2.0'" />
+        <PackageReference Include="System.Buffers" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
         <PackageReference Include="System.Reactive" />
-        <PackageReference Include="System.Runtime.InteropServices.RuntimeInformation" Condition="'$(TargetFramework)' == 'net461' OR '$(TargetFramework)' == 'net472' OR '$(TargetFramework)' == 'netstandard2.0'" />
-        <PackageReference Include="System.Text.Encoding.CodePages" Condition="'$(TargetFramework)' == 'net461' OR '$(TargetFramework)' == 'net472' OR '$(TargetFramework)' == 'netstandard2.0' OR '$(TargetFramework)' == 'netstandard2.1'" />
-        <PackageReference Include="System.ValueTuple" Condition="'$(TargetFramework)' == 'net461' OR '$(TargetFramework)' == 'net472' OR '$(TargetFramework)' == 'netstandard2.0'" />
+        <PackageReference Include="System.Text.Encoding.CodePages" Condition="'$(TargetFramework)' == 'netstandard2.0' OR '$(TargetFramework)' == 'netstandard2.1'" />
         <PackageReference Include="ZString" />
     </ItemGroup>
 
