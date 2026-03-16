@@ -5,10 +5,10 @@
 ![NuGet Downloads](https://img.shields.io/nuget/dt/OctaneEngineCore)
 [![codecov](https://codecov.io/github/gregyjames/OctaneDownloader/branch/master/graph/badge.svg?token=u05rFcLMde)](https://codecov.io/github/gregyjames/OctaneDownloader)
 
-![](https://image.ibb.co/h2tK8v/Untitled_1.png)
+<img src="https://github.com/gregyjames/OctaneDownloader/blob/main/octane_logo.png?raw=true" height="100px"></img>
 
 
-Experience a powerful, piecewise file downloader for C#, designed to asynchronously fetch files in segments. It’s built to outperform Microsoft’s WebClient with greater speed and efficiency. Curious to see it in action? Check out the [Octane YouTube Extractor](https://github.com/gregyjames/OCTANE-YoutubeExtractor).
+Experience a powerful, piecewise file downloader for C#, designed to asynchronously fetch files in segments. It’s built to outperform Microsoft’s WebClient with greater speed and efficiency.
 
 # Installation
 ```sh
