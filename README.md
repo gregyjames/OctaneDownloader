@@ -5,7 +5,7 @@
 ![NuGet Downloads](https://img.shields.io/nuget/dt/OctaneEngineCore)
 [![codecov](https://codecov.io/github/gregyjames/OctaneDownloader/branch/master/graph/badge.svg?token=u05rFcLMde)](https://codecov.io/github/gregyjames/OctaneDownloader)
 
-<img src="https://github.com/gregyjames/OctaneDownloader/blob/main/octane_logo.png?raw=true" height="100px"></img>
+<img src="https://github.com/gregyjames/OctaneDownloader/blob/master/octane_logo.png" height="85px"></img>
 
 
 Experience a powerful, piecewise file downloader for C#, designed to asynchronously fetch files in segments. It’s built to outperform Microsoft’s WebClient with greater speed and efficiency.
