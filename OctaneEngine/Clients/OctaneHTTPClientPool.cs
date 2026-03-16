@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Net;
@@ -47,9 +48,9 @@ public class OctaneHTTPClientPool: IDisposable
         _items.TryAdd(DEFAULT_CLIENT_NAME, client);
     }
     
-    public HttpClient Rent(string key = null)
+    public HttpClient Rent(string? key = null)
     {
-        string clientName = string.IsNullOrEmpty(key) ? DEFAULT_CLIENT_NAME : key;
+        string clientName = string.IsNullOrEmpty(key) ? DEFAULT_CLIENT_NAME : key!;
         if (_logger.IsEnabled(LogLevel.Trace))
         {
             _logger.LogTrace("Renting client with name {clientName}", clientName);
@@ -58,9 +59,9 @@ public class OctaneHTTPClientPool: IDisposable
         return client;
     }
     
-    public HttpClient Rent(string key, Action<HttpClient> configuration)
+    public HttpClient Rent(string? key, Action<HttpClient> configuration)
     {
-        string clientName = string.IsNullOrEmpty(key) ? DEFAULT_CLIENT_NAME : key;
+        string clientName = string.IsNullOrEmpty(key) ? DEFAULT_CLIENT_NAME : key!;
         if (_logger.IsEnabled(LogLevel.Trace))
         {
             _logger.LogTrace("Renting client with name {clientName}", clientName);
@@ -120,9 +121,11 @@ public class OctaneHTTPClientPool: IDisposable
         client.DefaultRequestHeaders.Add("User-Agent", "OctaneEngine/1.0");
         client.DefaultRequestHeaders.Add("Accept", "*/*");
         client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate, br");
-        
-        client.DefaultRequestVersion = System.Net.HttpVersion.Version20;
-        client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+
+        #if NET6_0_OR_GREATER
+            client.DefaultRequestVersion = System.Net.HttpVersion.Version20;
+            client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+        #endif
         
         if (_logger.IsEnabled(LogLevel.Trace))
         {
@@ -139,6 +142,7 @@ public class OctaneHTTPClientPool: IDisposable
     /// <returns>An optimized HttpMessageHandler</returns>
     private HttpMessageHandler CreateOptimizedHandler(OctaneConfiguration config)
     {
+#if !NETSTANDARD
         var socketsHandler = new SocketsHttpHandler
         {
             PreAuthenticate = true,
@@ -149,11 +153,17 @@ public class OctaneHTTPClientPool: IDisposable
             PooledConnectionLifetime = TimeSpan.FromMinutes(30),
             PooledConnectionIdleTimeout = TimeSpan.FromMinutes(10),
             EnableMultipleHttp2Connections = true,
-            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
+            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+#if NETCOREAPP3_0_OR_GREATER || NET5_0_OR_GREATER
+                                     | DecompressionMethods.Brotli
+#endif
+            ,
             ConnectTimeout = TimeSpan.FromSeconds(15),
             KeepAlivePingTimeout = TimeSpan.FromSeconds(30),
             KeepAlivePingDelay = TimeSpan.FromSeconds(20),
+#if NET5_0_OR_GREATER
             KeepAlivePingPolicy = HttpKeepAlivePingPolicy.WithActiveRequests,
+#endif
             AllowAutoRedirect = true,
             MaxAutomaticRedirections = 5
         };
@@ -183,7 +193,7 @@ public class OctaneHTTPClientPool: IDisposable
                     catch (PlatformNotSupportedException ex) {}
                     
                     socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
-
+                    
                     if (OperatingSystem.IsWindows())
                     {
                         socket.IOControl(IOControlCode.KeepAliveValues, _windowsKeepAliveSettings, null);
@@ -214,9 +224,25 @@ public class OctaneHTTPClientPool: IDisposable
                 _logger.LogTrace("Skipping custom socket options on macOS/iOS due to platform socket reuse restrictions.");
             }
         }
+        
+        var primaryHandler = (HttpMessageHandler)socketsHandler;
+#else
+        var handler = new HttpClientHandler
+        {
+            PreAuthenticate = true,
+            Proxy = config.Proxy,
+            UseProxy = config.UseProxy,
+            MaxConnectionsPerServer = Math.Min(Math.Max(config.Parts * 4, 100), 1000),
+            UseCookies = false,
+            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+            AllowAutoRedirect = true,
+            MaxAutomaticRedirections = 5
+        };
+        var primaryHandler = (HttpMessageHandler)handler;
+#endif
 
         // Wrap with retry handler for resilience
-        var retryHandler = new RetryHandler(socketsHandler, _loggerFactory, config.NumRetries, config.RetryCap);
+        var retryHandler = new RetryHandler(primaryHandler, _loggerFactory, config.NumRetries, config.RetryCap);
         
         return retryHandler;
     }

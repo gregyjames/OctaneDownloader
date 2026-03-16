@@ -40,6 +40,7 @@ using OctaneEngineCore.Implementations.NetworkAnalyzer;
 using OctaneEngineCore.ShellProgressBar;
 using OctaneEngineCore.Streams;
 
+using OctaneEngineCore;
 // ReSharper disable TemplateIsNotCompileTimeConstantProblem
 
 namespace OctaneEngineCore.Clients;
@@ -97,8 +98,10 @@ public class OctaneClient : IClient
         HttpRequestMessage request = new()
         {
             Method = HttpMethod.Get,
-            VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher,
-            Version = HttpVersion.Version20,
+            #if NET6_0_OR_GREATER
+                VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher,
+            #endif
+            Version = Polyfills.HttpVersion20,
             RequestUri = uri,
             Headers =
             {
@@ -142,7 +145,7 @@ public class OctaneClient : IClient
         if (message.IsSuccessStatusCode)
         {
             _log.LogDebug("HTTP request returned success status code {code} for piece ({PieceItem1:N0}, {PieceItem2:N0})", (int)message.StatusCode , piece.Item1, piece.Item2);
-            await using var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            using var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             Stream wrappedStream = _config.BytesPerSecond <= 1 ? networkStream : new ThrottleStream(_loggerFactory);
 
             if (wrappedStream is ThrottleStream throttleStream)
@@ -234,7 +237,7 @@ public class OctaneClient : IClient
         _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds:N0}ms.", NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end), stopwatch.ElapsedMilliseconds);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private async Task FillPipeAsync(Stream stream, PipeWriter writer, CancellationToken token)
     {
         int bufferSize = Math.Max(_config.BufferSize, 512 * 1024);
@@ -257,7 +260,7 @@ public class OctaneClient : IClient
         }
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveOptimization | MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private async Task ReadPipeToFileAsync(PipeReader reader, (long start, long end) piece, ChildProgressBar child, CancellationToken token)
     {
         long accessorLength = piece.end - piece.start + 1;

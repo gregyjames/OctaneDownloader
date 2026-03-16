@@ -31,6 +31,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using OctaneEngineCore.ShellProgressBar;
+using OctaneEngineCore;
 
 namespace OctaneEngineCore.Clients;
 
@@ -83,7 +84,7 @@ public class DefaultClient : IClient
         Stream stream, 
         IProgress<long> progress)
     {
-        await using var contentStream = await message.Content.ReadAsStreamAsync();
+        using var contentStream = await message.Content.ReadAsStreamAsync();
 
         var pipe = new Pipe(_pipeOptions);
         var fillTask = FillPipeAsync(contentStream, pipe.Writer);
@@ -177,7 +178,7 @@ public class DefaultClient : IClient
                 _pBar?.Tick();
             }
         });
-        await using var stream = _mmf.CreateViewStream();
+        using var stream = _mmf.CreateViewStream();
         await CopyMessageContentToStreamWithProgressAsync(message, stream, progress);
     }
 
