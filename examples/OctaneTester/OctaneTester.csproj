@@ -12,7 +12,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\OctaneEngine\OctaneEngine.csproj" />
+        <ProjectReference Include="..\..\src\OctaneEngine\OctaneEngine.csproj" />
     </ItemGroup>
 
     <ItemGroup>

@@ -1,5 +1,20 @@
 <Project>
   <PropertyGroup>
     <UseArtifactsOutput>true</UseArtifactsOutput>
+    <!-- Define base paths for the new structure -->
+    <SrcDir>$(MSBuildThisFileDirectory)src\</SrcDir>
+    <TestsDir>$(MSBuildThisFileDirectory)tests\</TestsDir>
+    <ExamplesDir>$(MSBuildThisFileDirectory)examples\</ExamplesDir>
+  </PropertyGroup>
+
+  <!-- Common settings for all projects -->
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Specific settings for test projects -->
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('$(TestsDir)'))">
+    <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 </Project>
