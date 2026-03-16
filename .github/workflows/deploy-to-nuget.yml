@@ -10,14 +10,14 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v1
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: | 
           8.x
           10.x
-    - uses: actions/cache@v3
+    - uses: actions/cache@v5
       id: cacheStep
       with:
         path: ~/.nuget/packages
@@ -44,7 +44,7 @@ jobs:
       env:
         SIGN_ASSEMBLY: true
     - name: Publish NuGet package
-      run: dotnet nuget push **/*.nupkg --source https://api.nuget.org/v3/index.json --api-key $Env:NUGET_API_KEY
+      run: dotnet nuget push artifacts/package/release/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
       env:
         NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
     - name: Delete SNK after build
