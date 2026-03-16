@@ -82,7 +82,6 @@ public static class Polyfills
     }
 #endif
 
-
     public static readonly Version HttpVersion20 = 
 #if NETCOREAPP2_1_OR_GREATER || NET5_0_OR_GREATER || NETSTANDARD2_1_OR_GREATER
         HttpVersion.Version20;
