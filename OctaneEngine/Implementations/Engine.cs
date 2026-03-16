@@ -41,6 +41,7 @@ using OctaneEngineCore.Implementations.NetworkAnalyzer;
 using OctaneEngineCore.Interfaces;
 using OctaneEngineCore.ShellProgressBar;
 
+using OctaneEngineCore;
 // ReSharper disable All
 
 namespace OctaneEngineCore.Implementations;
@@ -230,7 +231,7 @@ public class Engine: IEngine, IDisposable
 
                     try
                     {
-                        await Parallel.ForEachAsync(pieces, options, async (piece, token) =>
+                        await pieces.ForEachAsync(options, async (piece, token) =>
                         {
                             await _client.Download(request.Url, piece, request.Headers, cancellation_token, pause_token.Token);
 
