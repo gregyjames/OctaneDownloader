@@ -1,4 +1,4 @@
-﻿/*
+/*
  * The MIT License (MIT)
  * Copyright (c) 2015 Greg James
  * 
@@ -123,13 +123,15 @@ public class ThrottleStream : Stream
         return read;
     }
 
-    public async Task<int> ReadAsync(Memory<byte> buffer, CancellationToken token)
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP || NET5_0_OR_GREATER
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
     {
         _log.LogTrace("Throttle stream read");
-        var read = await _parentStream.ReadAsync(buffer, token);
+        var read = await _parentStream.ReadAsync(buffer, token).ConfigureAwait(false);
         Throttle(read);
         return read;
     }
+#endif
 
     public override void Write(byte[] buffer, int offset, int count)
     {
@@ -138,10 +140,15 @@ public class ThrottleStream : Stream
         _parentStream.Write(buffer, offset, count);
     }
 
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP || NET5_0_OR_GREATER
     public override async ValueTask DisposeAsync()
     {
-        await _parentStream.DisposeAsync();
+        if (_parentStream != null)
+        {
+            await _parentStream.DisposeAsync().ConfigureAwait(false);
+        }
     }
+#endif
     
     public void SetStreamParent(Stream stream)
     {
