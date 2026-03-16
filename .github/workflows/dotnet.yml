@@ -11,7 +11,8 @@ jobs:
       uses: actions/setup-dotnet@v2
       with:
         dotnet-version: | 
-          10.x.x
+          8.x
+          10.x
     - uses: actions/cache@v3
       id: cacheStep
       with:
