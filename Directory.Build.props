@@ -1,5 +1,23 @@
 <Project>
   <PropertyGroup>
+    <!-- Store the repository root path -->
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
     <UseArtifactsOutput>true</UseArtifactsOutput>
+    
+    <!-- Define base paths for the new structure -->
+    <SrcDir>$(RepoRoot)src\</SrcDir>
+    <TestsDir>$(RepoRoot)tests\</TestsDir>
+    <ExamplesDir>$(RepoRoot)examples\</ExamplesDir>
+  </PropertyGroup>
+
+  <!-- Common settings for all projects -->
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Specific settings for test projects -->
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('$(TestsDir)'))">
+    <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 </Project>
