@@ -25,7 +25,7 @@ namespace OctaneTestProject
             _log = new LoggerConfiguration()
                 .Enrich.FromLogContext()
                 .MinimumLevel.Verbose()
-                .WriteTo.File("./OctaneLog.txt")
+                .WriteTo.File($"./{_outFile}.log")
                 .WriteTo.Console()
                 .CreateLogger();
 

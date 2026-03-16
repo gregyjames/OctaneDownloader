@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Threading;
 using Microsoft.Extensions.Logging;
@@ -26,7 +26,7 @@ namespace OctaneTestProject
             _log = new LoggerConfiguration()
                 .Enrich.FromLogContext()
                 .MinimumLevel.Verbose()
-                .WriteTo.File("./OctaneLog.txt")
+                .WriteTo.File($"./{_outFile}.log")
                 .WriteTo.Console()
                 .CreateLogger();
 
