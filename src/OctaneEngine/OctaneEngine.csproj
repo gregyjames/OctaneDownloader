@@ -12,7 +12,7 @@
         <RepositoryUrl>https://github.com/gregyjames/OctaneDownloader</RepositoryUrl>
         <PackageTags>c-sharp download parallel downloader multithreading threading networking</PackageTags>
         <SignAssembly Condition="'$(SIGN_ASSEMBLY)' == 'true'">true</SignAssembly>
-        <AssemblyOriginatorKeyFile Condition="'$(SIGN_ASSEMBLY)' == 'true'">../../signing-key.snk</AssemblyOriginatorKeyFile>
+        <AssemblyOriginatorKeyFile Condition="'$(SIGN_ASSEMBLY)' == 'true'">$(RepoRoot)signing-key.snk</AssemblyOriginatorKeyFile>
         <AssemblyVersion>4.0.0</AssemblyVersion>
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
         <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -25,7 +25,7 @@
         <TieredCompilation>true</TieredCompilation>
         <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
         <TieredPGO>true</TieredPGO>
-        <TargetFrameworks>net8.0;net10.0;netstandard2.0;netstandard2.1</TargetFrameworks>
+        <TargetFrameworks>net10.0;net8.0;netstandard2.0;netstandard2.1</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>
@@ -66,10 +66,10 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Content Include="../../LICENSE.md" Pack="true" PackagePath="\">
+      <Content Include="$(RepoRoot)LICENSE.md" Pack="true" PackagePath="\">
         <Link>LICENSE</Link>
       </Content>
-      <Content Include="../../README.md" Pack="true" PackagePath="\">
+      <Content Include="$(RepoRoot)README.md" Pack="true" PackagePath="\">
         <Link>README.md</Link>
       </Content>
     </ItemGroup>

@@ -1,10 +1,13 @@
 <Project>
   <PropertyGroup>
+    <!-- Store the repository root path -->
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
     <UseArtifactsOutput>true</UseArtifactsOutput>
+    
     <!-- Define base paths for the new structure -->
-    <SrcDir>$(MSBuildThisFileDirectory)src\</SrcDir>
-    <TestsDir>$(MSBuildThisFileDirectory)tests\</TestsDir>
-    <ExamplesDir>$(MSBuildThisFileDirectory)examples\</ExamplesDir>
+    <SrcDir>$(RepoRoot)src\</SrcDir>
+    <TestsDir>$(RepoRoot)tests\</TestsDir>
+    <ExamplesDir>$(RepoRoot)examples\</ExamplesDir>
   </PropertyGroup>
 
   <!-- Common settings for all projects -->
