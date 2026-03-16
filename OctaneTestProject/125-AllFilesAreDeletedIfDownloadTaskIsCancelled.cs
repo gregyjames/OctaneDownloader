@@ -1,4 +1,4 @@
-﻿
+
 
 /*
 namespace OctaneTestProject
@@ -23,7 +23,7 @@ namespace OctaneTestProject
             _log = new LoggerConfiguration()
                 .Enrich.FromLogContext()
                 .MinimumLevel.Verbose()
-                .WriteTo.File("./OctaneLog.txt")
+                .WriteTo.File($"./{_outFile}.log")
                 .WriteTo.Console()
                 .CreateLogger();
 
@@ -43,8 +43,11 @@ namespace OctaneTestProject
         {
             try
             {
-                //File.Delete(SmallLocalFile);
-                //File.Delete(BigLocalFile);
+                if (File.Exists(_outFile))
+                    File.Delete(_outFile);
+                
+                if (File.Exists($"{_outFile}.log"))
+                    File.Delete($"{_outFile}.log");
             }
             catch
             {
