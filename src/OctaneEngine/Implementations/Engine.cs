@@ -119,7 +119,13 @@ public partial class Engine: IEngine, IDisposable
         return $"{ Convert.ToInt32((speed) / 1000000)} Mb/s";
     }
     
-    private async Task<(long, bool)> getFileSizeAndRangeSupport(string url)
+    internal enum ClientType
+    {
+        Octane,
+        Normal
+    }
+    
+    private async Task<(long, ClientType)> getFileSizeAndRangeSupport(string url)
     {
         var client = _clientFactory.Rent(OctaneHttpClientPool.DEFAULT_CLIENT_NAME);
         using var request = new HttpRequestMessage(HttpMethod.Head, url);
@@ -127,7 +133,8 @@ public partial class Engine: IEngine, IDisposable
         var responseLength = response.Content.Headers.ContentLength ?? 0;
         var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
         _clientFactory.Return(OctaneHttpClientPool.DEFAULT_CLIENT_NAME, client);
-        return (responseLength, rangeSupported);
+        LogRangeSupportedRange(rangeSupported);
+        return (responseLength, rangeSupported ? ClientType.Octane : ClientType.Normal);
     }
 
     /// <summary>
@@ -156,7 +163,7 @@ public partial class Engine: IEngine, IDisposable
     {
         _config.Proxy = proxy;
     }
-
+    
     /// <summary>
     ///     The core octane download function. 
     /// </summary>
@@ -168,7 +175,7 @@ public partial class Engine: IEngine, IDisposable
         var stopwatch = new Stopwatch();
         var success = false;
         var filename = string.Empty;
-        var clientType = string.Empty;
+        ClientType clientType = ClientType.Normal;
         HttpClient? client = null;
         client = _clientFactory.Rent(OctaneHttpClientPool.DEFAULT_CLIENT_NAME);
         _client = new OctaneClient(_config, client, _factory);
@@ -176,39 +183,31 @@ public partial class Engine: IEngine, IDisposable
 
         try
         {
-            var (_length, _range) = await getFileSizeAndRangeSupport(request.Url);
+            (var length, clientType) = await getFileSizeAndRangeSupport(request.Url);
             
             #region Varible Initilization
             filename = request.OutFile ?? Path.GetFileName(new Uri(request.Url).LocalPath);
             var cancellation_token = token;
             var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
             var memPool = ArrayPool<byte>.Shared;
-            LogRangeSupportedRange(_range);
             int tasksDone = 0;
             #endregion
             
             #region ServicePoint Configuration
                 LogServerFileNameFilename(filename);
-                ServicePointManager.Expect100Continue = false;
-                ServicePointManager.DefaultConnectionLimit = 10000;
-                ServicePointManager.SetTcpKeepAlive(true, Int32.MaxValue,1);
-                ServicePointManager.MaxServicePoints = _config.Parts;
-                #if NET6_0_OR_GREATER
-                    ServicePointManager.ReusePort = true;
-                #endif
+                ServicePointHelper.ConfigureServicePoint(_config.Parts);
             #endregion
             
-            LogTotalSizeLength(NetworkAnalyzer.NetworkAnalyzer.PrettySize(_length));
+            LogTotalSizeLength(NetworkAnalyzer.NetworkAnalyzer.PrettySize(length));
                 
             stopwatch.Start();
             
-            using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, _length, MemoryMappedFileAccess.ReadWrite))
+            using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, length, MemoryMappedFileAccess.ReadWrite))
             {
                 //Check if range is supported
-                if (_range)
+                if (clientType == ClientType.Octane)
                 {
-                    clientType = "Octane";
-                    var pieces = Helpers.CreatePartsList(_length, _config.Parts, _logger);
+                    var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger);
                     _client.SetMmf(mmf);
                     _client.SetArrayPool(memPool);
                     LogUsingOctaneClientToDownloadFile();
@@ -255,7 +254,6 @@ public partial class Engine: IEngine, IDisposable
                 else
                 {
                     LogUsingDefaultClientToDownloadFile();
-                    clientType = "Normal";
                     _defaultClient.SetMmf(mmf);
                     _defaultClient.SetArrayPool(memPool);
                     try
@@ -322,7 +320,7 @@ public partial class Engine: IEngine, IDisposable
     partial void LogUsingDefaultClientToDownloadFile();
 
     [LoggerMessage(LogLevel.Error, "Error Downloading File with {clientType} client")]
-    partial void LogErrorDownloadingFileWithClienttypeClientEx(string clientType, Exception exception);
+    partial void LogErrorDownloadingFileWithClienttypeClientEx(ClientType clientType, Exception exception);
 
     [LoggerMessage(LogLevel.Information, "File downloaded successfully in {StopwatchElapsedMilliseconds} ms.")]
     partial void LogFileDownloadedSuccessfullyInStopwatchelapsedmillisecondsMs(long StopwatchElapsedMilliseconds);
