@@ -10,9 +10,9 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: | 
           8.x
@@ -31,7 +31,7 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     - name: Setup NuGet.exe for use with actions
-      uses: NuGet/setup-nuget@v1.0.5
+      uses: NuGet/setup-nuget@v3.0.0
     - name: Restore NuGet
       if: steps.cacheStep.outputs.cache-hit != 'true'
       run: nuget restore Octane.sln
