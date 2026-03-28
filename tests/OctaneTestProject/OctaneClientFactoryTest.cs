@@ -13,7 +13,7 @@ namespace OctaneTestProject
     [TestFixture]
     public class OctaneClientFactoryTest
     {
-        private OctaneHTTPClientPool _factory;
+        private OctaneHttpClientPool _factory;
         private ILoggerFactory _loggerFactory;
 
         [SetUp]
@@ -43,7 +43,7 @@ namespace OctaneTestProject
             var options = Options.Create(config);
             
             // Create the factory directly
-            _factory = new OctaneHTTPClientPool(config, _loggerFactory);
+            _factory = new OctaneHttpClientPool(config, _loggerFactory);
         }
 
         [TearDown]
@@ -162,7 +162,7 @@ namespace OctaneTestProject
         {
             // Act
             var client1 = _factory.Rent(null);
-            var client2 = _factory.Rent(OctaneHTTPClientPool.DEFAULT_CLIENT_NAME);
+            var client2 = _factory.Rent(OctaneHttpClientPool.DEFAULT_CLIENT_NAME);
 
             // Assert
             Assert.That(client1, Is.SameAs(client2));
@@ -174,7 +174,7 @@ namespace OctaneTestProject
         {
             // Act
             var client1 = _factory.Rent("");
-            var client2 = _factory.Rent(OctaneHTTPClientPool.DEFAULT_CLIENT_NAME);
+            var client2 = _factory.Rent(OctaneHttpClientPool.DEFAULT_CLIENT_NAME);
 
             // Assert
             Assert.That(client1, Is.SameAs(client2));
