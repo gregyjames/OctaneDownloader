@@ -30,7 +30,7 @@ using Microsoft.Extensions.Logging;
 
 namespace OctaneEngineCore.Streams;
 
-public class ThrottleStream : Stream
+public partial class ThrottleStream : Stream
 {
     protected override void Dispose(bool disposing)
     {
@@ -88,7 +88,7 @@ public class ThrottleStream : Stream
     {
         _processed += bytes;
        
-        _log.LogTrace("Throttle stream processed {Processed} bytes", _processed);
+        LogThrottleStreamProcessedProcessedBytes(_processed);
         var targetTime = TimeSpan.FromSeconds((double)_processed / _maxBps);
         var actualTime = _stopwatch.Elapsed;
         var sleep = targetTime - actualTime;
@@ -117,7 +117,7 @@ public class ThrottleStream : Stream
 
     public override int Read(byte[] buffer, int offset, int count)
     {
-        _log.LogTrace("Throttle stream read");
+        LogThrottleStreamRead();
         var read = _parentStream.Read(buffer, offset, count);
         Throttle(read);
         return read;
@@ -135,7 +135,7 @@ public class ThrottleStream : Stream
 
     public override void Write(byte[] buffer, int offset, int count)
     {
-        _log.LogTrace("Throttle stream write");
+        LogThrottleStreamWrite();
         Throttle(count);
         _parentStream.Write(buffer, offset, count);
     }
@@ -159,4 +159,13 @@ public class ThrottleStream : Stream
     {
         _maxBps = maxBytesPerSecond;
     }
+
+    [LoggerMessage(LogLevel.Trace, "Throttle stream processed {processed} bytes")]
+    partial void LogThrottleStreamProcessedProcessedBytes(long processed);
+
+    [LoggerMessage(LogLevel.Trace, "Throttle stream read")]
+    partial void LogThrottleStreamRead();
+
+    [LoggerMessage(LogLevel.Trace, "Throttle stream write")]
+    partial void LogThrottleStreamWrite();
 }

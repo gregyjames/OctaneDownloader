@@ -24,6 +24,7 @@
 #nullable enable
 using System;
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,7 +32,7 @@ using Microsoft.Extensions.Logging;
 
 namespace OctaneEngineCore.Clients;
 
-internal class RetryHandler : DelegatingHandler
+internal partial class RetryHandler : DelegatingHandler
 {
     private readonly ILogger<RetryHandler> _log;
     private readonly int _maxRetries;
@@ -42,7 +43,7 @@ internal class RetryHandler : DelegatingHandler
         _maxRetries = maxRetries;
         _retryCap = retryCap;
         _log = loggerFactory.CreateLogger<RetryHandler>();
-        _log.LogDebug("Retry handler created with {MaxRetries} retries, with a max cap of {RetryCap}.", _maxRetries, _retryCap <= -1 ? "[DISABLED]" : _retryCap + "s");
+        LogRetryHandlerCreatedWithMaxRetriesRetriesWithAMaxCapOfRetryCap(_maxRetries, _retryCap <= -1 ? "[DISABLED]" : _retryCap + "s");
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
@@ -60,7 +61,7 @@ internal class RetryHandler : DelegatingHandler
             // I consider these transient HTTP error codes
             bool shouldRetryWithBackoff = status is 408 or 429 or 500 or 502 or 503 or 504;
             
-            _log.LogWarning("Client failed sending request. Retrying attempt: {Attempt}/{MaxRetries} (Status: {StatusCode})", i + 1, _maxRetries, response.StatusCode);
+            LogClientFailedSendingRequestRetryingAttemptAttemptMaxRetriesStatusStatusCode(i + 1, _maxRetries, response.StatusCode);
 
             if (shouldRetryWithBackoff)
             {
@@ -68,7 +69,7 @@ internal class RetryHandler : DelegatingHandler
                 response = null;
                 
                 var delayTime = _retryCap <= -1 ? Math.Pow(2, i) : Math.Min(Math.Pow(2, i), _retryCap);
-                _log.LogDebug("Transient status of {StatusCode} waiting {delay}s before trying again.", status, delayTime);
+                LogTransientStatusOfStatusCodeWaitingDelaySBeforeTryingAgain(status, delayTime);
                 var delay = TimeSpan.FromSeconds(delayTime);
                 await Task.Delay(delay, cancellationToken);
             }
@@ -76,8 +77,20 @@ internal class RetryHandler : DelegatingHandler
 
         Debug.Assert(response != null, nameof(response) + " != null");
 
-        if (!response.IsSuccessStatusCode) _log.LogError("HTTP Response code unsuccessful");
+        if (!response.IsSuccessStatusCode) LogHttpResponseCodeUnsuccessful();
 
         return response;
     }
+
+    [LoggerMessage(LogLevel.Debug, "Retry handler created with {maxRetries} retries, with a max cap of {retryCap}.")]
+    partial void LogRetryHandlerCreatedWithMaxRetriesRetriesWithAMaxCapOfRetryCap(int maxRetries, string retryCap);
+
+    [LoggerMessage(LogLevel.Warning, "Client failed sending request. Retrying attempt: {attempt}/{maxRetries} (Status: {statusCode})")]
+    partial void LogClientFailedSendingRequestRetryingAttemptAttemptMaxRetriesStatusStatusCode(int attempt, int maxRetries, HttpStatusCode statusCode);
+
+    [LoggerMessage(LogLevel.Debug, "Transient status of {statusCode} waiting {delay}s before trying again.")]
+    partial void LogTransientStatusOfStatusCodeWaitingDelaySBeforeTryingAgain(int statusCode, double delay);
+
+    [LoggerMessage(LogLevel.Error, "HTTP Response code unsuccessful")]
+    partial void LogHttpResponseCodeUnsuccessful();
 }

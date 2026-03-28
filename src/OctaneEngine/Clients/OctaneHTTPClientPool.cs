@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Net;
@@ -9,24 +8,25 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace OctaneEngineCore.Clients;
 
-public class OctaneHTTPClientPool: IDisposable
+public partial class OctaneHttpClientPool: IDisposable
 {
     private readonly OctaneConfiguration _configuration;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ConcurrentDictionary<string, HttpClient> _items = new();
-    private readonly ILogger<OctaneHTTPClientPool> _logger;
+    private readonly ILogger<OctaneHttpClientPool> _logger;
     private readonly object _lockObject = new();
     private bool _disposed;
     private readonly int _receiveBufferSize;
     private readonly int _sendBufferSize;
+    private readonly byte[] _windowsKeepAliveSettings;
 
-    public static readonly string DEFAULT_CLIENT_NAME = "DEFAULT";
-    private readonly byte[]? _windowsKeepAliveSettings;
-    public OctaneHTTPClientPool(OctaneConfiguration configuration, ILoggerFactory loggerFactory)
+    public const string DEFAULT_CLIENT_NAME = "DEFAULT";
+
+    public OctaneHttpClientPool(OctaneConfiguration configuration, ILoggerFactory? loggerFactory)
     {
         _configuration = configuration;
         _loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
-        _logger = _loggerFactory.CreateLogger<OctaneHTTPClientPool>();
+        _logger = _loggerFactory.CreateLogger<OctaneHttpClientPool>();
         _receiveBufferSize = Math.Max(1024 * 1024, _configuration.BufferSize * 128); // 1MB minimum
         _sendBufferSize = 512 * 1024; // 512 KB for sends
 
@@ -43,7 +43,7 @@ public class OctaneHTTPClientPool: IDisposable
     {
         if (_logger.IsEnabled(LogLevel.Trace))
         {
-            _logger.LogTrace("Adding default client to pool");
+            LogAddingDefaultClientToPool();
         }
         _items.TryAdd(DEFAULT_CLIENT_NAME, client);
     }
@@ -53,18 +53,18 @@ public class OctaneHTTPClientPool: IDisposable
         string clientName = string.IsNullOrEmpty(key) ? DEFAULT_CLIENT_NAME : key!;
         if (_logger.IsEnabled(LogLevel.Trace))
         {
-            _logger.LogTrace("Renting client with name {clientName}", clientName);
+            LogRentingClientWithNameClientname(clientName);
         }
         var client = _items.GetOrAdd(clientName, CreateNewClient);
         return client;
     }
     
-    public HttpClient Rent(string? key, Action<HttpClient> configuration)
+    public HttpClient Rent(string? key, Action<HttpClient>? configuration)
     {
         string clientName = string.IsNullOrEmpty(key) ? DEFAULT_CLIENT_NAME : key!;
         if (_logger.IsEnabled(LogLevel.Trace))
         {
-            _logger.LogTrace("Renting client with name {clientName}", clientName);
+            LogRentingClientWithNameClientname(clientName);
         }
         var client = _items.GetOrAdd(clientName, CreateNewClient);
         configuration?.Invoke(client);
@@ -75,7 +75,7 @@ public class OctaneHTTPClientPool: IDisposable
     {
         if (_logger.IsEnabled(LogLevel.Trace))
         {
-            _logger.LogTrace("Returning client with name {clientName}", name);
+            LogReturningClientWithNameClientname(name);
         }
         _items.AddOrUpdate(name, item, (_, existing) => existing ?? item);
     }
@@ -86,7 +86,7 @@ public class OctaneHTTPClientPool: IDisposable
     {
         foreach (var key in _items.Keys)
         {
-            _logger.LogTrace("Removing and disposing client with name {clientName}", key);
+            LogRemovingAndDisposingClientWithNameClientname(key);
             if (_items.TryRemove(key, out var item))
             {
                 item.Dispose();
@@ -99,13 +99,13 @@ public class OctaneHTTPClientPool: IDisposable
     /// <summary>
     /// Creates a new HttpClient instance with optimized configuration for the Octane engine.
     /// </summary>
-    /// <param name="clientName">The name of the client</param>
+    /// <param name="key">The name of the client</param>
     /// <returns>A configured HttpClient</returns>
     private HttpClient CreateNewClient(string key)
     {
         if (_logger.IsEnabled(LogLevel.Debug))
         {
-            _logger.LogDebug("Creating new HttpClient");
+            LogCreatingNewHttpclient();
         }
         
         var handler = CreateOptimizedHandler(_configuration);
@@ -129,7 +129,7 @@ public class OctaneHTTPClientPool: IDisposable
         
         if (_logger.IsEnabled(LogLevel.Trace))
         {
-            _logger.LogTrace("HttpClient created successfully with send buffer size {SendBufferSize} and receive buffer size {ReceiveBufferSize}", _sendBufferSize, _receiveBufferSize);
+            LogHttpclientCreatedSuccessfullyWithSendBufferSizeSendbuffersizeAndReceiveBufferSize(_sendBufferSize, _receiveBufferSize);
         }
         
         return client;
@@ -254,7 +254,7 @@ public class OctaneHTTPClientPool: IDisposable
         
         if (_logger.IsEnabled(LogLevel.Debug))
         {
-            _logger.LogDebug("Disposing OctaneClientFactory");
+            LogDisposingOctaneClientFactory();
         }
         
         lock (_lockObject)
@@ -267,7 +267,31 @@ public class OctaneHTTPClientPool: IDisposable
 
         if (_logger.IsEnabled(LogLevel.Debug))
         {
-            _logger.LogDebug("OctaneClientFactory disposed successfully");
+            LogOctaneClientFactoryDisposedSuccessfully();
         }
     }
+
+    [LoggerMessage(LogLevel.Trace, "Adding default client to pool")]
+    partial void LogAddingDefaultClientToPool();
+
+    [LoggerMessage(LogLevel.Trace, "Renting client with name {clientName}")]
+    partial void LogRentingClientWithNameClientname(string clientName);
+
+    [LoggerMessage(LogLevel.Trace, "Returning client with name {clientName}")]
+    partial void LogReturningClientWithNameClientname(string clientName);
+
+    [LoggerMessage(LogLevel.Trace, "Removing and disposing client with name {clientName}")]
+    partial void LogRemovingAndDisposingClientWithNameClientname(string clientName);
+
+    [LoggerMessage(LogLevel.Debug, "Creating new HttpClient")]
+    partial void LogCreatingNewHttpclient();
+
+    [LoggerMessage(LogLevel.Trace, "HttpClient created successfully with send buffer size {sendBufferSize} and receive buffer size {receiveBufferSize}")]
+    partial void LogHttpclientCreatedSuccessfullyWithSendBufferSizeSendbuffersizeAndReceiveBufferSize(int sendBufferSize, int receiveBufferSize);
+
+    [LoggerMessage(LogLevel.Debug, "Disposing OctaneClientFactory")]
+    partial void LogDisposingOctaneClientFactory();
+
+    [LoggerMessage(LogLevel.Debug, "OctaneClientFactory disposed successfully")]
+    partial void LogOctaneClientFactoryDisposedSuccessfully();
 }
