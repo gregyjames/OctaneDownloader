@@ -1,12 +1,24 @@
 version: 2
 updates:
-  - package-ecosystem: nuget
-    directory: "/"
+  - package-ecosystem: "nuget"
+    directory: "/" # The location of our solution file
     schedule:
-      interval: daily
-      time: "18:00"
-    open-pull-requests-limit: 20
+      interval: "weekly"
+    open-pull-requests-limit: 10
     groups:
       nuget-dependencies:
         patterns:
           - "*"
+    assignees:
+      - gregyjames
+
+  - package-ecosystem: "github-actions"
+    directory: "/" # The location of our .github/workflows directory
+    schedule:
+      interval: "weekly"
+    groups:
+      action-dependencies:
+        patterns:
+          - "*"
+    assignees:
+      - gregyjames
