@@ -40,21 +40,19 @@ using OctaneEngineCore.Clients;
 using OctaneEngineCore.Implementations.NetworkAnalyzer;
 using OctaneEngineCore.Interfaces;
 using OctaneEngineCore.ShellProgressBar;
-
-using OctaneEngineCore;
 // ReSharper disable All
 
 namespace OctaneEngineCore.Implementations;
 
-public class Engine: IEngine, IDisposable
+public partial class Engine: IEngine, IDisposable
 {
     private readonly ILoggerFactory _factory;
     private OctaneClient? _client;
     private DefaultClient? _defaultClient;
     private OctaneConfiguration _config;
     private readonly ILogger<Engine> _logger;
-    private readonly OctaneHTTPClientPool _clientFactory;
-    public Engine(IOptions<OctaneConfiguration> config, OctaneHTTPClientPool clientFactory, ILoggerFactory factory)
+    private readonly OctaneHttpClientPool _clientFactory;
+    public Engine(IOptions<OctaneConfiguration> config, OctaneHttpClientPool clientFactory, ILoggerFactory factory)
     {
         _clientFactory = clientFactory;
         _factory = factory ?? NullLoggerFactory.Instance;
@@ -66,7 +64,7 @@ public class Engine: IEngine, IDisposable
     /// <summary>
     /// Creates a new Engine instance without dependency injection
     /// </summary>
-    internal Engine(OctaneClient? client, DefaultClient? defaultClient, OctaneHTTPClientPool clientFactory,
+    internal Engine(OctaneClient? client, DefaultClient? defaultClient, OctaneHttpClientPool clientFactory,
         OctaneConfiguration config, ILoggerFactory? factory = null)
     {
         _factory = factory ?? NullLoggerFactory.Instance;
@@ -74,16 +72,16 @@ public class Engine: IEngine, IDisposable
         _client = client;
         _defaultClient = defaultClient;
         _config = config ?? throw new ArgumentNullException(nameof(config));
-        _clientFactory = new OctaneHTTPClientPool(_config, _factory);
+        _clientFactory = new OctaneHttpClientPool(_config, _factory);
     }
         
     #region Helpers
     private void Cleanup(Stopwatch stopwatch, OctaneConfiguration config, bool success)
     {
-        _logger.LogTrace("Calling callback function...");
+        LogCallingCallbackFunction();
         if (!success)
         {
-            _logger.LogError("Download Failed.");
+            LogDownloadFailed();
         }
         config.DoneCallback?.Invoke(success);
     }
@@ -123,12 +121,12 @@ public class Engine: IEngine, IDisposable
     
     private async Task<(long, bool)> getFileSizeAndRangeSupport(string url)
     {
-        var client = _clientFactory.Rent(OctaneHTTPClientPool.DEFAULT_CLIENT_NAME);
+        var client = _clientFactory.Rent(OctaneHttpClientPool.DEFAULT_CLIENT_NAME);
         using var request = new HttpRequestMessage(HttpMethod.Head, url);
         var response = await client.SendAsync(request);
         var responseLength = response.Content.Headers.ContentLength ?? 0;
         var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
-        _clientFactory.Return(OctaneHTTPClientPool.DEFAULT_CLIENT_NAME, client);
+        _clientFactory.Return(OctaneHttpClientPool.DEFAULT_CLIENT_NAME, client);
         return (responseLength, rangeSupported);
     }
 
@@ -172,7 +170,7 @@ public class Engine: IEngine, IDisposable
         var filename = string.Empty;
         var clientType = string.Empty;
         HttpClient? client = null;
-        client = _clientFactory.Rent(OctaneHTTPClientPool.DEFAULT_CLIENT_NAME);
+        client = _clientFactory.Rent(OctaneHttpClientPool.DEFAULT_CLIENT_NAME);
         _client = new OctaneClient(_config, client, _factory);
         _defaultClient = new DefaultClient(client, _config);
 
@@ -185,22 +183,22 @@ public class Engine: IEngine, IDisposable
             var cancellation_token = token;
             var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
             var memPool = ArrayPool<byte>.Shared;
-            _logger.LogInformation("Range supported: {range}", _range);
+            LogRangeSupportedRange(_range);
             int tasksDone = 0;
             #endregion
             
             #region ServicePoint Configuration
-            _logger.LogInformation("Server file name: {filename}.", filename);
-            ServicePointManager.Expect100Continue = false;
-            ServicePointManager.DefaultConnectionLimit = 10000;
-            ServicePointManager.SetTcpKeepAlive(true, Int32.MaxValue,1);
-            ServicePointManager.MaxServicePoints = _config.Parts;
-#if NET6_0_OR_GREATER
-            ServicePointManager.ReusePort = true;
-#endif
+                LogServerFileNameFilename(filename);
+                ServicePointManager.Expect100Continue = false;
+                ServicePointManager.DefaultConnectionLimit = 10000;
+                ServicePointManager.SetTcpKeepAlive(true, Int32.MaxValue,1);
+                ServicePointManager.MaxServicePoints = _config.Parts;
+                #if NET6_0_OR_GREATER
+                    ServicePointManager.ReusePort = true;
+                #endif
             #endregion
             
-            _logger.LogInformation("TOTAL SIZE: {length}", NetworkAnalyzer.NetworkAnalyzer.PrettySize(_length));
+            LogTotalSizeLength(NetworkAnalyzer.NetworkAnalyzer.PrettySize(_length));
                 
             stopwatch.Start();
             
@@ -213,7 +211,7 @@ public class Engine: IEngine, IDisposable
                     var pieces = Helpers.CreatePartsList(_length, _config.Parts, _logger);
                     _client.SetMmf(mmf);
                     _client.SetArrayPool(memPool);
-                    _logger.LogDebug("Using Octane Client to download file.");
+                    LogUsingOctaneClientToDownloadFile();
                     var options = new ParallelOptions()
                     {
                         MaxDegreeOfParallelism = Environment.ProcessorCount,
@@ -256,7 +254,7 @@ public class Engine: IEngine, IDisposable
                 }
                 else
                 {
-                    _logger.LogDebug("Using Default Client to download file.");
+                    LogUsingDefaultClientToDownloadFile();
                     clientType = "Normal";
                     _defaultClient.SetMmf(mmf);
                     _defaultClient.SetArrayPool(memPool);
@@ -275,14 +273,14 @@ public class Engine: IEngine, IDisposable
                 stopwatch.Stop();
                 if (success)
                 {
-                    _logger.LogInformation($"File downloaded successfully in {stopwatch.ElapsedMilliseconds} ms.");
+                    LogFileDownloadedSuccessfullyInStopwatchelapsedmillisecondsMs(stopwatch.ElapsedMilliseconds);
                 }
             }
         }
         catch (Exception ex)
         {
             success = false;
-            _logger.LogError(ex, "Error Downloading File with {clientType} client: {ex}", clientType, ex);
+            LogErrorDownloadingFileWithClienttypeClientEx(clientType, ex);
             throw;
         }
         finally
@@ -292,7 +290,7 @@ public class Engine: IEngine, IDisposable
                 File.Delete(filename);
             }
             Cleanup(stopwatch, _config, success);
-            _clientFactory.Return(OctaneHTTPClientPool.DEFAULT_CLIENT_NAME, client);
+            _clientFactory.Return(OctaneHttpClientPool.DEFAULT_CLIENT_NAME, client);
         }
     }
 
@@ -301,4 +299,31 @@ public class Engine: IEngine, IDisposable
         _factory?.Dispose();
         _clientFactory.Dispose();
     }
+
+    [LoggerMessage(LogLevel.Trace, "Calling callback function...")]
+    partial void LogCallingCallbackFunction();
+
+    [LoggerMessage(LogLevel.Error, "Download Failed.")]
+    partial void LogDownloadFailed();
+
+    [LoggerMessage(LogLevel.Information, "Range supported: {range}")]
+    partial void LogRangeSupportedRange(bool range);
+
+    [LoggerMessage(LogLevel.Information, "Server file name: {filename}.")]
+    partial void LogServerFileNameFilename(string filename);
+
+    [LoggerMessage(LogLevel.Information, "TOTAL SIZE: {length}")]
+    partial void LogTotalSizeLength(string length);
+
+    [LoggerMessage(LogLevel.Debug, "Using Octane Client to download file.")]
+    partial void LogUsingOctaneClientToDownloadFile();
+
+    [LoggerMessage(LogLevel.Debug, "Using Default Client to download file.")]
+    partial void LogUsingDefaultClientToDownloadFile();
+
+    [LoggerMessage(LogLevel.Error, "Error Downloading File with {clientType} client")]
+    partial void LogErrorDownloadingFileWithClienttypeClientEx(string clientType, Exception exception);
+
+    [LoggerMessage(LogLevel.Information, "File downloaded successfully in {StopwatchElapsedMilliseconds} ms.")]
+    partial void LogFileDownloadedSuccessfullyInStopwatchelapsedmillisecondsMs(long StopwatchElapsedMilliseconds);
 }

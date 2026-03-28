@@ -28,32 +28,28 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.IO.Pipelines;
-using System.Net;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.ObjectPool;
 using OctaneEngineCore.Implementations.NetworkAnalyzer;
 using OctaneEngineCore.ShellProgressBar;
 using OctaneEngineCore.Streams;
 
-using OctaneEngineCore;
 // ReSharper disable TemplateIsNotCompileTimeConstantProblem
 
 namespace OctaneEngineCore.Clients;
 
-public class OctaneClient : IClient
+public partial class OctaneClient : IClient
 {
     private readonly HttpClient _client;
     private readonly OctaneConfiguration _config;
     private readonly ILogger<IClient> _log;
     private readonly ILoggerFactory _loggerFactory;
     private ArrayPool<byte> _memPool;
-    private MemoryMappedFile _mmf;
-    private ProgressBar _progressBar;
+    private MemoryMappedFile? _mmf;
+    private ProgressBar? _progressBar;
     private readonly PipeOptions _pipeOptions;
 
     private static readonly ProgressBarOptions ChildProgressBarOptions = new()
@@ -66,7 +62,7 @@ public class OctaneClient : IClient
         ShowEstimatedDuration = true
     };
     
-    public OctaneClient(OctaneConfiguration config, HttpClient httpClient, ILoggerFactory loggerFactory, ProgressBar progressBar = null)
+    public OctaneClient(OctaneConfiguration config, HttpClient httpClient, ILoggerFactory loggerFactory, ProgressBar? progressBar = null)
     {
         _config = config;
         _pipeOptions = new PipeOptions(
@@ -92,7 +88,7 @@ public class OctaneClient : IClient
     private async ValueTask<HttpResponseMessage> SendRangeRequestAsync(
         Uri uri, 
         (long start, long end) piece, 
-        Dictionary<string, string> headers, 
+        Dictionary<string, string>? headers, 
         CancellationToken cancellationToken)
     {
         HttpRequestMessage request = new()
@@ -123,9 +119,9 @@ public class OctaneClient : IClient
         return response;
     }
     
-    public async Task Download(string url,(long start, long end) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken)
+    public async Task Download(string url,(long start, long end) piece, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
-        _log.LogTrace("Sending request for range ({PieceItem1},{PieceItem2})...", piece.start, piece.end);
+        LogSendingRequestForRangePieceitem1Pieceitem2(piece.start, piece.end);
         
         var uri = new Uri(url, UriKind.Absolute);
         using var message = await SendRangeRequestAsync(uri, piece, headers, cancellationToken).ConfigureAwait(false);
@@ -144,7 +140,7 @@ public class OctaneClient : IClient
         stopwatch.Start();
         if (message.IsSuccessStatusCode)
         {
-            _log.LogDebug("HTTP request returned success status code {code} for piece ({PieceItem1:N0}, {PieceItem2:N0})", (int)message.StatusCode , piece.Item1, piece.Item2);
+            LogHttpRequestReturnedSuccessStatusCodeCodeForPiecePieceitem1N0Pieceitem2N0((int)message.StatusCode, piece.Item1, piece.Item2);
             using var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             Stream wrappedStream = _config.BytesPerSecond <= 1 ? networkStream : new ThrottleStream(_loggerFactory);
 
@@ -175,7 +171,7 @@ public class OctaneClient : IClient
                 }
                 catch (Exception ex)
                 {
-                    _log.LogError(ex, "Error: {ex}", ex);
+                    LogErrorEx(ex);
                     throw;
                 }
             }
@@ -186,7 +182,7 @@ public class OctaneClient : IClient
 
                 if(_log.IsEnabled(LogLevel.Debug))
                 {
-                    _log.LogDebug("Buffer rented of size {ConfigBufferSize} for piece ({PieceItem1},{PieceItem2})", _config.BufferSize, piece.start, piece.end);
+                    LogBufferRentedOfSizeConfigbuffersizeForPiecePieceitem1Pieceitem2(_config.BufferSize, piece.start, piece.end);
                 }
 
                 var stream = _mmf.CreateViewStream(piece.start, piece.end - piece.start + 1);
@@ -220,12 +216,12 @@ public class OctaneClient : IClient
                     await wrappedStream.DisposeAsync();
                 }
                 _memPool.Return(readBuffer);
-                _log.LogInformation("Buffer returned to memory pool");
+                LogBufferReturnedToMemoryPool();
             }
         }
         else
         {
-            _log.LogError("HTTP request returned success status code {code} for piece ({PieceItem1},{PieceItem2})", (int)message.StatusCode , NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end));
+            LogHttpRequestReturnedSuccessStatusCodeCodeForPiecePieceitem1Pieceitem2((int)message.StatusCode, NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end));
         }
         
         // Only tick the progress bar if ShowProgress is enabled
@@ -234,7 +230,7 @@ public class OctaneClient : IClient
             _progressBar?.Tick();
         }
         stopwatch.Stop();
-        _log.LogInformation("Piece ({PieceItem1},{PieceItem2}) finished in {StopwatchElapsedMilliseconds:N0}ms.", NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end), stopwatch.ElapsedMilliseconds);
+        LogPiecePieceitem1Pieceitem2FinishedInStopwatchelapsedmillisecondsN0Ms(NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end), stopwatch.ElapsedMilliseconds);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -332,15 +328,15 @@ public class OctaneClient : IClient
         }
         catch (AccessViolationException ex)
         {
-            _log.LogError(ex, "Memory access error while writing to accessor with offset {offset}.", writeOffset);
+            LogMemoryAccessErrorWhileWritingToAccessorWithOffsetOffset(ex, writeOffset);
         }
         catch (ArgumentException ex)
         {
-            _log.LogError(ex, "Invalid argument error while writing to accessor with offset {offset}.", writeOffset);
+            LogInvalidArgumentErrorWhileWritingToAccessorWithOffsetOffset(ex, writeOffset);
         }
         catch (InvalidOperationException ex)
         {
-            _log.LogError(ex, "Invalid operation error while writing to accessor with offset {offset}.", writeOffset);
+            LogInvalidOperationErrorWhileWritingToAccessorWithOffsetOffset(ex, writeOffset);
         }
         finally{
             if (accessorPtr != IntPtr.Zero){
@@ -348,4 +344,34 @@ public class OctaneClient : IClient
             }
         }
     }
+
+    [LoggerMessage(LogLevel.Trace, "Sending request for range ({pieceItem1},{pieceItem2})...")]
+    partial void LogSendingRequestForRangePieceitem1Pieceitem2(long pieceItem1, long pieceItem2);
+
+    [LoggerMessage(LogLevel.Debug, "HTTP request returned success status code {code} for piece ({pieceItem1:N0}, {pieceItem2:N0})")]
+    partial void LogHttpRequestReturnedSuccessStatusCodeCodeForPiecePieceitem1N0Pieceitem2N0(int code, long pieceItem1, long pieceItem2);
+
+    [LoggerMessage(LogLevel.Error, "Error")]
+    partial void LogErrorEx(Exception exception);
+
+    [LoggerMessage(LogLevel.Debug, "Buffer rented of size {configBufferSize} for piece ({pieceItem1},{pieceItem2})")]
+    partial void LogBufferRentedOfSizeConfigbuffersizeForPiecePieceitem1Pieceitem2(int configBufferSize, long pieceItem1, long pieceItem2);
+
+    [LoggerMessage(LogLevel.Information, "Buffer returned to memory pool")]
+    partial void LogBufferReturnedToMemoryPool();
+
+    [LoggerMessage(LogLevel.Error, "HTTP request returned success status code {code} for piece ({pieceItem1},{pieceItem2})")]
+    partial void LogHttpRequestReturnedSuccessStatusCodeCodeForPiecePieceitem1Pieceitem2(int code, string pieceItem1, string pieceItem2);
+
+    [LoggerMessage(LogLevel.Information, "Piece ({pieceItem1},{pieceItem2}) finished in {stopwatchElapsedMilliseconds:N0}ms.")]
+    partial void LogPiecePieceitem1Pieceitem2FinishedInStopwatchelapsedmillisecondsN0Ms(string pieceItem1, string pieceItem2, long stopwatchElapsedMilliseconds);
+
+    [LoggerMessage(LogLevel.Error, "Memory access error while writing to accessor with offset {offset}.")]
+    partial void LogMemoryAccessErrorWhileWritingToAccessorWithOffsetOffset(Exception ex, long offset);
+
+    [LoggerMessage(LogLevel.Error, "Invalid argument error while writing to accessor with offset {offset}.")]
+    partial void LogInvalidArgumentErrorWhileWritingToAccessorWithOffsetOffset(Exception ex, long offset);
+
+    [LoggerMessage(LogLevel.Error, "Invalid operation error while writing to accessor with offset {offset}.")]
+    partial void LogInvalidOperationErrorWhileWritingToAccessorWithOffsetOffset(Exception ex, long offset);
 }

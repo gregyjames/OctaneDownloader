@@ -18,7 +18,7 @@ public class EngineBuilder
     private ILoggerFactory _loggerFactory;
     private ProgressBar _progressBar;
     private HttpClient _client;
-    private OctaneHTTPClientPool _clientFactory;
+    private OctaneHttpClientPool _clientFactory;
 
     /// <summary>
     /// Creates a new EngineBuilder instance
@@ -95,8 +95,8 @@ public class EngineBuilder
             _configuration.BytesPerSecond = 1;
         
         // Create clients
-        _clientFactory = new OctaneHTTPClientPool(_configuration, _loggerFactory);
-        var clientToUse = _client ?? _clientFactory.Rent(OctaneHTTPClientPool.DEFAULT_CLIENT_NAME);
+        _clientFactory = new OctaneHttpClientPool(_configuration, _loggerFactory);
+        var clientToUse = _client ?? _clientFactory.Rent(OctaneHttpClientPool.DEFAULT_CLIENT_NAME);
         _clientFactory.AddClientToPool(clientToUse);
         
         var octaneClient = new OctaneClient(_configuration, clientToUse, _loggerFactory, _progressBar);

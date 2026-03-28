@@ -5,7 +5,7 @@ using OctaneEngineCore.Implementations.NetworkAnalyzer;
 
 namespace OctaneEngineCore;
 
-public static class Helpers
+public static partial class Helpers
 {
     internal static List<ValueTuple<long, long>> CreatePartsList(long responseLength, int parts, ILogger logger)
     {
@@ -14,7 +14,7 @@ public static class Helpers
         if (responseLength <= 0) throw new ArgumentException("Response length must be positive", nameof(responseLength));
 
         long basePartSize = responseLength / parts;
-        logger.LogInformation("PART SIZE: {partSize}", NetworkAnalyzer.PrettySize(basePartSize));
+        LogPartSizePartsize(logger, NetworkAnalyzer.PrettySize(basePartSize));
 
         long remainder = responseLength % parts;
         long start = 0;
@@ -70,4 +70,7 @@ public static class Helpers
 
         return current;
     }
+
+    [LoggerMessage(LogLevel.Information, "PART SIZE: {partSize}")]
+    static partial void LogPartSizePartsize(this ILogger logger, string partSize);
 }
