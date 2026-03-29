@@ -4,16 +4,16 @@ namespace OctaneEngineCore.ShellProgressBar
 {
 	public interface IProgressBar : IDisposable
 	{
-		ChildProgressBar Spawn(int maxTicks, string message, ProgressBarOptions options = null);
+		ChildProgressBar Spawn(long maxTicks, string message, ProgressBarOptions options = null);
 
 		void Tick(string message = null);
 		void Tick(int newTickCount, string message = null);
 
-		int MaxTicks { get; set; }
+		long MaxTicks { get; set; }
 		string Message { get; set; }
 
 		double Percentage { get; }
-		int CurrentTick { get; }
+		long CurrentTick { get; }
 
 		ConsoleColor ForegroundColor { get; set; }
 
