@@ -38,7 +38,6 @@ namespace OctaneEngineCore.Clients;
 public class DefaultClient : IClient
 {
     private MemoryMappedFile _mmf;
-    private ArrayPool<byte> _memPool;
     private ProgressBar _pBar;
     private readonly HttpClient _httpClient;
     private readonly OctaneConfiguration _config;
@@ -72,11 +71,6 @@ public class DefaultClient : IClient
     public void SetProgressbar(ProgressBar bar)
     {
         _pBar = bar;
-    }
-
-    public void SetArrayPool(ArrayPool<byte> pool)
-    {
-        _memPool = pool;
     }
     
     private async Task CopyMessageContentToStreamWithProgressAsync(

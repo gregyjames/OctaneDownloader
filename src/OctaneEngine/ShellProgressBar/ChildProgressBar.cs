@@ -16,7 +16,7 @@ namespace OctaneEngineCore.ShellProgressBar
 		protected override void DisplayProgress() => _scheduleDraw?.Invoke();
 
 		internal ChildProgressBar(
-			int maxTicks,
+			long maxTicks,
 			string message,
 			Action scheduleDraw,
 			Action<string> writeLine,

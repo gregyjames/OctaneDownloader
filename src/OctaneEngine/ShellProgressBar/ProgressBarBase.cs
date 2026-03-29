@@ -15,14 +15,14 @@ namespace OctaneEngineCore.ShellProgressBar
 		}
 
 		protected readonly DateTime _startDate = DateTime.Now;
-		private int _maxTicks;
-		private int _currentTick;
+		private long _maxTicks;
+		private long _currentTick;
 		private string _message;
 		private TimeSpan _estimatedDuration;
 
-		protected ProgressBarBase(int maxTicks, string message, ProgressBarOptions options)
+		protected ProgressBarBase(long maxTicks, string message, ProgressBarOptions options)
 		{
-			this._maxTicks = Math.Max(0, maxTicks);
+			this._maxTicks = Math.Max(0L, maxTicks);
 			this._message = message;
 			this.Options = options ?? ProgressBarOptions.Default;
 		}
@@ -56,9 +56,9 @@ namespace OctaneEngineCore.ShellProgressBar
 			set => _dynamicForegroundColor = value;
 		}
 
-		public int CurrentTick => _currentTick;
+		public long CurrentTick => _currentTick;
 
-		public int MaxTicks
+		public long MaxTicks
 		{
 			get => _maxTicks;
 			set
@@ -101,7 +101,7 @@ namespace OctaneEngineCore.ShellProgressBar
 
 		public bool Collapse => this.EndTime.HasValue && this.Options.CollapseWhenFinished;
 
-		public ChildProgressBar Spawn(int maxTicks, string message, ProgressBarOptions options = null)
+		public ChildProgressBar Spawn(long maxTicks, string message, ProgressBarOptions options = null)
 		{
 			// if this bar collapses all child progressbar will collapse
 			if (options?.CollapseWhenFinished == false && this.Options.CollapseWhenFinished)
@@ -139,7 +139,7 @@ namespace OctaneEngineCore.ShellProgressBar
 			FinishTick(message);
 		}
 
-		public void Tick(int newTickCount, string message = null)
+		public void Tick(long newTickCount, string message = null)
 		{
 			Interlocked.Exchange(ref _currentTick, newTickCount);
 			FinishTick(message);
