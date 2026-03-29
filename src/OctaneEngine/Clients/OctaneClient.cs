@@ -121,13 +121,13 @@ public partial class OctaneClient : IClient
     
     public async Task Download(string url,(long start, long end) piece, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
-        LogSendingRequestForRangePieceitem1Pieceitem2(piece.start, piece.end);
+        LogSendingRequestForRangePieces(piece.start, piece.end);
+        var stopwatch = new Stopwatch();
         
         var uri = new Uri(url, UriKind.Absolute);
         using var message = await SendRangeRequestAsync(uri, piece, headers, cancellationToken).ConfigureAwait(false);
         
         #region Variable Declaration
-        var stopwatch = new Stopwatch();
         var programBps = _config.BytesPerSecond / _config.Parts;
         long bytesReadOverall = 0;
         #endregion
@@ -142,7 +142,7 @@ public partial class OctaneClient : IClient
         {
             LogHttpRequestReturnedSuccessStatusCodeCodeForPiecePieceitem1N0Pieceitem2N0((int)message.StatusCode, piece.Item1, piece.Item2);
             using var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            Stream wrappedStream = _config.BytesPerSecond <= 1 ? networkStream : new ThrottleStream(_loggerFactory);
+            var wrappedStream = _config.BytesPerSecond <= 1 ? networkStream : new ThrottleStream(_loggerFactory);
 
             if (wrappedStream is ThrottleStream throttleStream)
             {
@@ -152,27 +152,54 @@ public partial class OctaneClient : IClient
 
             // Only create child progress bar if ShowProgress is enabled, and we have a progress bar
             using var child = (_config.ShowProgress && _progressBar != null) 
-                ? _progressBar.Spawn(Convert.ToInt32(piece.end - piece.start), "Downloading part...", ChildProgressBarOptions)
+                ? _progressBar.Spawn(piece.end - piece.start, "Downloading part...", ChildProgressBarOptions)
                 : null;
 
+            if (_mmf is null)
+            {
+                throw new InvalidOperationException("MMF not initialized before download.");
+            }
+            
             if (_config.LowMemoryMode)
             {
                 if (_config.BytesPerSecond > 1)
                 {
                     throw new ArgumentException("Low memory mode cannot be used while bytes per second is enabled (greater than 1).");
                 }
-                    
+                
+                long accessorLength = piece.end - piece.start + 1;
+
+                using var accessor = _mmf.CreateViewAccessor(piece.start, accessorLength);
+                IntPtr accessorPtr = IntPtr.Zero;
+
                 try
                 {
-                    var pipe = new Pipe(_pipeOptions);
-                    var writing = FillPipeAsync(wrappedStream, pipe.Writer, cancellationToken);
-                    var reading = ReadPipeToFileAsync(pipe.Reader, piece, child, cancellationToken);
-                    await Task.WhenAll(reading, writing);
+                    unsafe
+                    {
+                        byte* ptr = null;
+                        accessor.SafeMemoryMappedViewHandle.AcquirePointer(ref ptr);
+                        byte* accessorBasePtr = ptr + accessor.PointerOffset;
+                        accessorPtr = (IntPtr)accessorBasePtr;
+                    }
+
+                    try
+                    {
+                        var pipe = new Pipe(_pipeOptions);
+                        var writing = FillPipeAsync(wrappedStream, pipe.Writer, cancellationToken);
+                        var reading = ReadPipeToFileAsync(pipe.Reader, piece, child, accessorPtr, cancellationToken);
+                        await Task.WhenAll(reading, writing);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogError(ex);
+                    }
                 }
-                catch (Exception ex)
-                {
-                    LogErrorEx(ex);
-                    throw;
+                finally{
+                    if (accessorPtr != IntPtr.Zero){
+                        accessor.SafeMemoryMappedViewHandle.ReleasePointer();
+                    }
+
+                    await wrappedStream.DisposeAsync();
                 }
             }
             else
@@ -182,7 +209,7 @@ public partial class OctaneClient : IClient
 
                 if(_log.IsEnabled(LogLevel.Debug))
                 {
-                    LogBufferRentedOfSizeConfigbuffersizeForPiecePieceitem1Pieceitem2(_config.BufferSize, piece.start, piece.end);
+                    LogBufferRentedOfSize(_config.BufferSize, piece.start, piece.end);
                 }
 
                 var stream = _mmf.CreateViewStream(piece.start, piece.end - piece.start + 1);
@@ -214,9 +241,9 @@ public partial class OctaneClient : IClient
                 {
                     await stream.DisposeAsync();
                     await wrappedStream.DisposeAsync();
+                    _memPool.Return(readBuffer);
+                    LogBufferReturnedToMemoryPool();
                 }
-                _memPool.Return(readBuffer);
-                LogBufferReturnedToMemoryPool();
             }
         }
         else
@@ -237,45 +264,42 @@ public partial class OctaneClient : IClient
     private async Task FillPipeAsync(Stream stream, PipeWriter writer, CancellationToken token)
     {
         int bufferSize = Math.Max(_config.BufferSize, 512 * 1024);
-        
-        while (true)
+
+        try
         {
-            var memory = writer.GetMemory(bufferSize);
-            int bytesRead = await stream.ReadAsync(memory, token);
-
-            if (bytesRead == 0)
+            while (true)
             {
-                break; // End of stream
+                var memory = writer.GetMemory(bufferSize);
+                int bytesRead = await stream.ReadAsync(memory, token);
+                if (bytesRead == 0)
+                {
+                    break;
+                } // End of stream 
+
+                writer.Advance(bytesRead);
+                var result = await writer.FlushAsync(token);
+                if (result.IsCompleted || result.IsCanceled)
+                {
+                    break;
+                } // The reader is done or cancelled
             }
-
-            writer.Advance(bytesRead);
-
-            var result = await writer.FlushAsync(token);
-            if (result.IsCompleted || result.IsCanceled)
-                break; // The reader is done or cancelled
+        }
+        finally
+        {
+            await writer.CompleteAsync();
         }
     }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private async Task ReadPipeToFileAsync(PipeReader reader, (long start, long end) piece, ChildProgressBar child, CancellationToken token)
+    private async Task ReadPipeToFileAsync(PipeReader reader, (long start, long end) piece, ChildProgressBar? child, IntPtr accessorPtr, CancellationToken token)
     {
         long accessorLength = piece.end - piece.start + 1;
-        using var accessor = _mmf.CreateViewAccessor(piece.start, accessorLength);
-        IntPtr accessorPtr = IntPtr.Zero;
         long writeOffset = 0;
         
         try
         {
-            unsafe
-            {
-                byte* ptr = null;
-                accessor.SafeMemoryMappedViewHandle.AcquirePointer(ref ptr);
-                byte* accessorBasePtr = ptr + accessor.PointerOffset;
-                accessorPtr = (IntPtr)accessorBasePtr;
-            }
-            
-            int tickStep = _config.BufferSize * 2;
-            int lastTick = 0;
+            long tickStep = Math.Max(_config.BufferSize * 2L, 1 * 1024 * 1024L);
+            long lastTick = 0;
 
             while (true)
             {
@@ -309,7 +333,7 @@ public partial class OctaneClient : IClient
                     if (writeOffset - lastTick >= tickStep || writeOffset == accessorLength)
                     {
                         child?.Tick((int)writeOffset);
-                        lastTick = (int)writeOffset;
+                        lastTick = writeOffset;
                     }
 
                     if (writeOffset >= accessorLength)
@@ -329,6 +353,7 @@ public partial class OctaneClient : IClient
         catch (AccessViolationException ex)
         {
             LogMemoryAccessErrorWhileWritingToAccessorWithOffsetOffset(ex, writeOffset);
+            throw;
         }
         catch (ArgumentException ex)
         {
@@ -338,24 +363,19 @@ public partial class OctaneClient : IClient
         {
             LogInvalidOperationErrorWhileWritingToAccessorWithOffsetOffset(ex, writeOffset);
         }
-        finally{
-            if (accessorPtr != IntPtr.Zero){
-                accessor.SafeMemoryMappedViewHandle.ReleasePointer();
-            }
-        }
     }
 
     [LoggerMessage(LogLevel.Trace, "Sending request for range ({pieceItem1},{pieceItem2})...")]
-    partial void LogSendingRequestForRangePieceitem1Pieceitem2(long pieceItem1, long pieceItem2);
+    partial void LogSendingRequestForRangePieces(long pieceItem1, long pieceItem2);
 
     [LoggerMessage(LogLevel.Debug, "HTTP request returned success status code {code} for piece ({pieceItem1:N0}, {pieceItem2:N0})")]
     partial void LogHttpRequestReturnedSuccessStatusCodeCodeForPiecePieceitem1N0Pieceitem2N0(int code, long pieceItem1, long pieceItem2);
 
     [LoggerMessage(LogLevel.Error, "Error")]
-    partial void LogErrorEx(Exception exception);
+    partial void LogError(Exception exception);
 
     [LoggerMessage(LogLevel.Debug, "Buffer rented of size {configBufferSize} for piece ({pieceItem1},{pieceItem2})")]
-    partial void LogBufferRentedOfSizeConfigbuffersizeForPiecePieceitem1Pieceitem2(int configBufferSize, long pieceItem1, long pieceItem2);
+    partial void LogBufferRentedOfSize(int configBufferSize, long pieceItem1, long pieceItem2);
 
     [LoggerMessage(LogLevel.Information, "Buffer returned to memory pool")]
     partial void LogBufferReturnedToMemoryPool();
