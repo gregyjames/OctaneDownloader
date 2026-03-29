@@ -139,7 +139,7 @@ namespace OctaneEngineCore.ShellProgressBar
 			FinishTick(message);
 		}
 
-		public void Tick(int newTickCount, string message = null)
+		public void Tick(long newTickCount, string message = null)
 		{
 			Interlocked.Exchange(ref _currentTick, newTickCount);
 			FinishTick(message);

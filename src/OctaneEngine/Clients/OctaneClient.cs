@@ -140,7 +140,7 @@ public partial class OctaneClient : IClient
         stopwatch.Start();
         if (message.IsSuccessStatusCode)
         {
-            LogHttpRequestReturnedSuccessStatusCodeCodeForPiecePieceitem1N0Pieceitem2N0((int)message.StatusCode, piece.Item1, piece.Item2);
+            LogHttpRequestReturnedSuccessStatus((int)message.StatusCode, piece.start, piece.end);
             using var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             var wrappedStream = _config.BytesPerSecond <= 1 ? networkStream : new ThrottleStream(_loggerFactory);
 
@@ -217,7 +217,7 @@ public partial class OctaneClient : IClient
                 try
                 {
                     int progressUpdateInterval = readBufferSize * 4;
-                    int lastProgressUpdate = 0;
+                    long lastProgressUpdate = 0L;
 
                     while (true)
                     {
@@ -227,13 +227,13 @@ public partial class OctaneClient : IClient
                             break;
                         }
 
-                        await stream.WriteAsync(readBuffer.AsMemory()[..bytesRead], cancellationToken);
+                        await stream.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken);
                         bytesReadOverall += bytesRead;
                         
                         if(child != null && (bytesReadOverall - lastProgressUpdate >= progressUpdateInterval))
                         {
-                            child.Tick((int)bytesReadOverall);
-                            lastProgressUpdate = (int)bytesReadOverall;
+                            child.Tick(bytesReadOverall);
+                            lastProgressUpdate = bytesReadOverall;
                         }
                     }
                 }
@@ -248,7 +248,7 @@ public partial class OctaneClient : IClient
         }
         else
         {
-            LogHttpRequestReturnedSuccessStatusCodeCodeForPiecePieceitem1Pieceitem2((int)message.StatusCode, NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end));
+            LogHttpRequestReturnedSuccessStatusCodeCode((int)message.StatusCode, NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end));
         }
         
         // Only tick the progress bar if ShowProgress is enabled
@@ -257,7 +257,7 @@ public partial class OctaneClient : IClient
             _progressBar?.Tick();
         }
         stopwatch.Stop();
-        LogPiecePieceitem1Pieceitem2FinishedInStopwatchelapsedmillisecondsN0Ms(NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end), stopwatch.ElapsedMilliseconds);
+        LogPieceExecutionTimeElapsedMilliseconds(NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end), stopwatch.ElapsedMilliseconds);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -306,39 +306,53 @@ public partial class OctaneClient : IClient
                 ReadResult result = await reader.ReadAsync(token);
                 ReadOnlySequence<byte> buffer = result.Buffer;
 
-                foreach (var segment in buffer)
+                if (buffer.IsSingleSegment)
                 {
-                    var span = segment.Span;
-                    int bytesToWrite = span.Length;
-                    
-                    long remaining = accessorLength - writeOffset;
-                    if (remaining <= 0)
-                    {
-                        break;
-                    }
-                    
-                    int safeBytesToWrite = (int)Math.Min(bytesToWrite, remaining);
-                    
+                    var span = buffer.First.Span;
+                    int safe = (int)Math.Min(span.Length, accessorLength - writeOffset);
                     unsafe
                     {
-                        byte* dest = (byte*)accessorPtr + writeOffset;
                         fixed (byte* src = span)
-                        {
-                            Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
-                        }
+                            Unsafe.CopyBlockUnaligned((byte*)accessorPtr + writeOffset, src, (uint)safe);
                     }
+                    writeOffset += safe;
+                }
+                else
+                {
+                    foreach (var segment in buffer)
+                    {
+                        var span = segment.Span;
+                        int bytesToWrite = span.Length;
                     
-                    writeOffset += safeBytesToWrite;
+                        long remaining = accessorLength - writeOffset;
+                        if (remaining <= 0)
+                        {
+                            break;
+                        }
+                    
+                        int safeBytesToWrite = (int)Math.Min(bytesToWrite, remaining);
+                    
+                        unsafe
+                        {
+                            byte* dest = (byte*)accessorPtr + writeOffset;
+                            fixed (byte* src = span)
+                            {
+                                Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
+                            }
+                        }
+                    
+                        writeOffset += safeBytesToWrite;
 
-                    if (writeOffset - lastTick >= tickStep || writeOffset == accessorLength)
-                    {
-                        child?.Tick((int)writeOffset);
-                        lastTick = writeOffset;
-                    }
+                        if (writeOffset - lastTick >= tickStep || writeOffset == accessorLength)
+                        {
+                            child?.Tick((int)writeOffset);
+                            lastTick = writeOffset;
+                        }
 
-                    if (writeOffset >= accessorLength)
-                    {
-                        break;
+                        if (writeOffset >= accessorLength)
+                        {
+                            break;
+                        }
                     }
                 }
                     
@@ -369,7 +383,7 @@ public partial class OctaneClient : IClient
     partial void LogSendingRequestForRangePieces(long pieceItem1, long pieceItem2);
 
     [LoggerMessage(LogLevel.Debug, "HTTP request returned success status code {code} for piece ({pieceItem1:N0}, {pieceItem2:N0})")]
-    partial void LogHttpRequestReturnedSuccessStatusCodeCodeForPiecePieceitem1N0Pieceitem2N0(int code, long pieceItem1, long pieceItem2);
+    partial void LogHttpRequestReturnedSuccessStatus(int code, long pieceItem1, long pieceItem2);
 
     [LoggerMessage(LogLevel.Error, "Error")]
     partial void LogError(Exception exception);
@@ -381,10 +395,10 @@ public partial class OctaneClient : IClient
     partial void LogBufferReturnedToMemoryPool();
 
     [LoggerMessage(LogLevel.Error, "HTTP request returned success status code {code} for piece ({pieceItem1},{pieceItem2})")]
-    partial void LogHttpRequestReturnedSuccessStatusCodeCodeForPiecePieceitem1Pieceitem2(int code, string pieceItem1, string pieceItem2);
+    partial void LogHttpRequestReturnedSuccessStatusCodeCode(int code, string pieceItem1, string pieceItem2);
 
     [LoggerMessage(LogLevel.Information, "Piece ({pieceItem1},{pieceItem2}) finished in {stopwatchElapsedMilliseconds:N0}ms.")]
-    partial void LogPiecePieceitem1Pieceitem2FinishedInStopwatchelapsedmillisecondsN0Ms(string pieceItem1, string pieceItem2, long stopwatchElapsedMilliseconds);
+    partial void LogPieceExecutionTimeElapsedMilliseconds(string pieceItem1, string pieceItem2, long stopwatchElapsedMilliseconds);
 
     [LoggerMessage(LogLevel.Error, "Memory access error while writing to accessor with offset {offset}.")]
     partial void LogMemoryAccessErrorWhileWritingToAccessorWithOffsetOffset(Exception ex, long offset);

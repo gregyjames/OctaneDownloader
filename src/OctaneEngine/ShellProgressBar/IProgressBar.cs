@@ -7,7 +7,7 @@ namespace OctaneEngineCore.ShellProgressBar
 		ChildProgressBar Spawn(long maxTicks, string message, ProgressBarOptions options = null);
 
 		void Tick(string message = null);
-		void Tick(int newTickCount, string message = null);
+		void Tick(long newTickCount, string message = null);
 
 		long MaxTicks { get; set; }
 		string Message { get; set; }
