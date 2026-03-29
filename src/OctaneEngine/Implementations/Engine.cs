@@ -209,7 +209,6 @@ public partial class Engine: IEngine, IDisposable
                 {
                     var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger);
                     _client.SetMmf(mmf);
-                    _client.SetArrayPool(memPool);
                     LogUsingOctaneClientToDownloadFile();
                     var options = new ParallelOptions()
                     {
@@ -230,7 +229,7 @@ public partial class Engine: IEngine, IDisposable
                     {
                         await pieces.ForEachAsync(options, async (piece, token) =>
                         {
-                            await _client.Download(request.Url, piece, request.Headers, cancellation_token, pause_token.Token);
+                            await _client.Download(request.Url, piece, request.Headers ?? [], cancellation_token, pause_token.Token);
 
                             Interlocked.Increment(ref tasksDone);
                                 
@@ -255,10 +254,9 @@ public partial class Engine: IEngine, IDisposable
                 {
                     LogUsingDefaultClientToDownloadFile();
                     _defaultClient.SetMmf(mmf);
-                    _defaultClient.SetArrayPool(memPool);
                     try
                     {
-                        await _defaultClient.Download(request.Url, (0, 0), request.Headers, cancellation_token, pause_token.Token).ConfigureAwait(false);
+                        await _defaultClient.Download(request.Url, (0, 0), request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);
                         success = true;
                     }
                     catch (Exception)
