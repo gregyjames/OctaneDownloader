@@ -68,11 +68,28 @@ internal static class NetworkAnalyzer
         // Measure the network speed by downloading a test file from a fast server
         using var client = new HttpClient();
         var sw = Stopwatch.StartNew();
-        await client.GetByteArrayAsync(testFile.Item1);
+
+        // Use streaming to avoid large heap allocations (LOH) when downloading test files
+        using var response = await client.GetAsync(testFile.Item1, HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+        using var stream = await response.Content.ReadAsStreamAsync();
+
+        var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(8192);
+        try
+        {
+            while (await stream.ReadAsync(buffer, 0, buffer.Length) > 0)
+            {
+                // Discard data
+            }
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
+        }
+
         sw.Stop();
         // Time to download the test file in seconds.
         var downloadTime = sw.Elapsed.TotalSeconds;
-        // 100 KB
         var downloadSize = testFile.Item2;
         var networkSpeed = (int)Math.Round(downloadSize / downloadTime);
         return networkSpeed;

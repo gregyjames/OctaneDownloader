@@ -212,7 +212,7 @@ public partial class Engine: IEngine, IDisposable
                     LogUsingOctaneClientToDownloadFile();
                     var options = new ParallelOptions()
                     {
-                        MaxDegreeOfParallelism = Environment.ProcessorCount,
+                        MaxDegreeOfParallelism = _config.Parts,
                         CancellationToken = cancellation_token,
                         //TaskScheduler = TaskScheduler.Current
                     };
