@@ -74,7 +74,9 @@ internal static class NetworkAnalyzer
         response.EnsureSuccessStatusCode();
         using var stream = await response.Content.ReadAsStreamAsync();
 
-        var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(8192);
+        // Optimization: Increased buffer size from 8KB to 1MB to reduce system call overhead
+        // and improve throughput during network speed testing.
+        var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(1024 * 1024);
         try
         {
             while (await stream.ReadAsync(buffer, 0, buffer.Length) > 0)
