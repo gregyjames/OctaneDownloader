@@ -23,7 +23,7 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     - name: Setup NuGet.exe for use with actions
-      uses: NuGet/setup-nuget@v3.1.0
+      uses: NuGet/setup-nuget@v4
     - name: Restore NuGet
       if: steps.cacheStep.outputs.cache-hit != 'true'
       run: nuget restore Octane.sln
