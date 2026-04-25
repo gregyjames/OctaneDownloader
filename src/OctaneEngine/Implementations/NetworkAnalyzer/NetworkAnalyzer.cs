@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Net.NetworkInformation;
@@ -24,16 +25,15 @@ internal static class NetworkAnalyzer
 
     public static string PrettySize(long len)
     {
+        double num = len;
         int order = 0;
-        while (len >= 1024 && order < Sizes.Length - 1)
+        while (num >= 1024 && order < Sizes.Length - 1)
         {
             order++;
-            len = len >> 10;
+            num /= 1024;
         }
             
-        string result = ZString.Format("{0:0.##} {1}", len, Sizes[order]); 
-            
-        return result;
+        return ZString.Format("{0:0.##} {1}", num, Sizes[order]);
     }
     
     public static (string,int) GetTestFile(TestFileSize size)
@@ -74,20 +74,9 @@ internal static class NetworkAnalyzer
         response.EnsureSuccessStatusCode();
         using var stream = await response.Content.ReadAsStreamAsync();
 
-        // Optimization: Increased buffer size from 8KB to 1MB to reduce system call overhead
-        // and improve throughput during network speed testing.
-        var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(1024 * 1024);
-        try
-        {
-            while (await stream.ReadAsync(buffer, 0, buffer.Length) > 0)
-            {
-                // Discard data
-            }
-        }
-        finally
-        {
-            System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
-        }
+        // Use stream.CopyToAsync(Stream.Null) to minimize allocations and system call overhead
+        // compared to manual read loops, leveraging internal .NET optimizations.
+        await stream.CopyToAsync(Stream.Null).ConfigureAwait(false);
 
         sw.Stop();
         // Time to download the test file in seconds.
