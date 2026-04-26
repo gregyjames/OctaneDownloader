@@ -281,7 +281,7 @@ public partial class Engine: IEngine, IDisposable
         }
         finally
         {
-            if (!success)
+            if (!success && !string.IsNullOrEmpty(filename))
             {
                 File.Delete(filename);
             }
