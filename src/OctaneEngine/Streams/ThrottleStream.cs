@@ -88,7 +88,7 @@ public partial class ThrottleStream : Stream
     {
         _processed += bytes;
        
-        LogThrottleStreamProcessedProcessedBytes(_processed);
+        LogThrottleStreamProcessedBytes(_processed);
         var targetTime = TimeSpan.FromSeconds((double)_processed / _maxBps);
         var actualTime = _stopwatch.Elapsed;
         var sleep = targetTime - actualTime;
@@ -97,6 +97,20 @@ public partial class ThrottleStream : Stream
             using var waitHandle = new AutoResetEvent(false);
             _scheduler.Sleep(sleep).GetAwaiter().OnCompleted(() => waitHandle.Set());
             waitHandle.WaitOne();
+        }
+    }
+
+    protected async Task ThrottleAsync(int bytes, CancellationToken cancellationToken)
+    {
+        _processed += bytes;
+
+        LogThrottleStreamProcessedBytes(_processed);
+        var targetTime = TimeSpan.FromSeconds((double)_processed / _maxBps);
+        var actualTime = _stopwatch.Elapsed;
+        var sleep = targetTime - actualTime;
+        if (sleep > TimeSpan.Zero)
+        {
+            await _scheduler.Sleep(sleep).ConfigureAwait(false);
         }
     }
 
@@ -123,12 +137,20 @@ public partial class ThrottleStream : Stream
         return read;
     }
 
+    public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+    {
+        LogThrottleStreamRead();
+        var read = await _parentStream.ReadAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
+        await ThrottleAsync(read, cancellationToken).ConfigureAwait(false);
+        return read;
+    }
+
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP || NET5_0_OR_GREATER
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
     {
-        _log.LogTrace("Throttle stream read");
+        LogThrottleStreamRead();
         var read = await _parentStream.ReadAsync(buffer, token).ConfigureAwait(false);
-        Throttle(read);
+        await ThrottleAsync(read, token).ConfigureAwait(false);
         return read;
     }
 #endif
@@ -139,6 +161,22 @@ public partial class ThrottleStream : Stream
         Throttle(count);
         _parentStream.Write(buffer, offset, count);
     }
+
+    public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+    {
+        LogThrottleStreamWrite();
+        await ThrottleAsync(count, cancellationToken).ConfigureAwait(false);
+        await _parentStream.WriteAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
+    }
+
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP || NET5_0_OR_GREATER
+    public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken token = default)
+    {
+        LogThrottleStreamWrite();
+        await ThrottleAsync(buffer.Length, token).ConfigureAwait(false);
+        await _parentStream.WriteAsync(buffer, token).ConfigureAwait(false);
+    }
+#endif
 
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP || NET5_0_OR_GREATER
     public override async ValueTask DisposeAsync()
@@ -161,7 +199,7 @@ public partial class ThrottleStream : Stream
     }
 
     [LoggerMessage(LogLevel.Trace, "Throttle stream processed {processed} bytes")]
-    partial void LogThrottleStreamProcessedProcessedBytes(long processed);
+    partial void LogThrottleStreamProcessedBytes(long processed);
 
     [LoggerMessage(LogLevel.Trace, "Throttle stream read")]
     partial void LogThrottleStreamRead();
