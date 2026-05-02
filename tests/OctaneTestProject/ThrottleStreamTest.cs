@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -119,5 +120,35 @@ namespace OctaneTestProject
             ts.Dispose();
             Assert.Throws<ObjectDisposedException>(() => ms.WriteByte(1));
         }
+
+        [Test]
+        public async Task ReadAsync_ShouldThrottleWithoutBlocking()
+        {
+            // Set up a stream with enough data
+            var data = new byte[100];
+            new Random().NextBytes(data);
+            using var ms = new MemoryStream(data);
+
+            // Throttle to 10 bytes per second (so 100 bytes should take 10 seconds)
+            var ts = new ThrottleStream(ms, 10, _factory);
+            var buffer = new byte[100].AsMemory();
+
+            var sw = Stopwatch.StartNew();
+            // Start the read task using the Memory overload to ensure we hit the async path
+            Console.WriteLine($"Starting ReadAsync at {sw.ElapsedMilliseconds}ms");
+            var readTask = ts.ReadAsync(buffer).AsTask();
+            var callElapsed = sw.ElapsedMilliseconds;
+            Console.WriteLine($"ReadAsync call returned in {callElapsed}ms. Task status: {readTask.Status}");
+
+            // If it's blocking, callElapsed will be large (~10s) because MemoryStream.ReadAsync completes synchronously,
+            // and then Throttle() is called which blocks.
+
+            // We want it to be truly async.
+            Assert.That(callElapsed, Is.LessThan(1000), "ReadAsync call should return quickly even if throttled");
+            Assert.That(readTask.IsCompleted, Is.False, "ReadTask should be pending due to throttling");
+
+            await readTask;
+            Console.WriteLine($"ReadTask completed at {sw.ElapsedMilliseconds}ms");
+        }
     }
-} 
+}

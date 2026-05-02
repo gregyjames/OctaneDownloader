@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
@@ -74,20 +75,9 @@ internal static class NetworkAnalyzer
         response.EnsureSuccessStatusCode();
         using var stream = await response.Content.ReadAsStreamAsync();
 
-        // Optimization: Increased buffer size from 8KB to 1MB to reduce system call overhead
-        // and improve throughput during network speed testing.
-        var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(1024 * 1024);
-        try
-        {
-            while (await stream.ReadAsync(buffer, 0, buffer.Length) > 0)
-            {
-                // Discard data
-            }
-        }
-        finally
-        {
-            System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
-        }
+        // Optimization: Use CopyToAsync with Stream.Null to efficiently discard data
+        // and minimize allocations and system call overhead.
+        await stream.CopyToAsync(Stream.Null, 1024 * 1024).ConfigureAwait(false);
 
         sw.Stop();
         // Time to download the test file in seconds.
