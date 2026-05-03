@@ -31,6 +31,21 @@ namespace OctaneTestProject
         }
 
         [Test]
+        public async Task WriteAndReadAsync_ShouldThrottleAndWorkCorrectly()
+        {
+            using var ms = new MemoryStream();
+            var ts = new ThrottleStream(ms, 1024 * 1024, _factory); // High BPS to avoid actual throttling delay
+            var data = new byte[] { 1, 2, 3, 4, 5 };
+            await ts.WriteAsync(data, 0, data.Length);
+            await ts.FlushAsync();
+            ts.Position = 0;
+            var buffer = new byte[5];
+            var bytesRead = await ts.ReadAsync(buffer, 0, 5);
+            Assert.That(bytesRead, Is.EqualTo(5));
+            Assert.That(buffer, Is.EqualTo(data));
+        }
+
+        [Test]
         public void Constructor_Default_ShouldNotThrow()
         {
             Assert.DoesNotThrow(() => new ThrottleStream(_factory));

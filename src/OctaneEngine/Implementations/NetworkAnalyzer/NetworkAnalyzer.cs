@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
@@ -21,6 +22,7 @@ public enum TestFileSize
 internal static class NetworkAnalyzer
 {
     private static readonly string[] Sizes = { "B", "KB", "MB", "GB", "TB" };
+    private static readonly HttpClient SharedClient = new HttpClient();
 
     public static string PrettySize(long len)
     {
@@ -66,28 +68,15 @@ internal static class NetworkAnalyzer
     internal static async Task<int> GetNetworkSpeed((string,int) testFile, IHttpDownloader downloader)
     {
         // Measure the network speed by downloading a test file from a fast server
-        using var client = new HttpClient();
         var sw = Stopwatch.StartNew();
 
         // Use streaming to avoid large heap allocations (LOH) when downloading test files
-        using var response = await client.GetAsync(testFile.Item1, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await SharedClient.GetAsync(testFile.Item1, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         using var stream = await response.Content.ReadAsStreamAsync();
 
-        // Optimization: Increased buffer size from 8KB to 1MB to reduce system call overhead
-        // and improve throughput during network speed testing.
-        var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(1024 * 1024);
-        try
-        {
-            while (await stream.ReadAsync(buffer, 0, buffer.Length) > 0)
-            {
-                // Discard data
-            }
-        }
-        finally
-        {
-            System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
-        }
+        // Optimization: Use CopyToAsync with a 1MB buffer to minimize allocations and system call overhead.
+        await stream.CopyToAsync(Stream.Null, 1024 * 1024).ConfigureAwait(false);
 
         sw.Stop();
         // Time to download the test file in seconds.

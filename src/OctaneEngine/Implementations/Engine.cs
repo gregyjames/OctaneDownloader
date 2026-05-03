@@ -46,6 +46,7 @@ namespace OctaneEngineCore.Implementations;
 
 public partial class Engine: IEngine, IDisposable
 {
+    private static readonly HttpClient SharedClient = new HttpClient();
     private readonly ILoggerFactory _factory;
     private OctaneClient? _client;
     private DefaultClient? _defaultClient;
@@ -98,8 +99,7 @@ public partial class Engine: IEngine, IDisposable
         if (!Enum.IsDefined(typeof(TestFileSize), sizeToUse))
             throw new InvalidEnumArgumentException(nameof(sizeToUse), (int)sizeToUse,
                 typeof(TestFileSize));
-        using var client = new HttpClient();
-        var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await SharedClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         var size_of_file = response.Content.Headers.ContentLength ?? 0;
         var networkSpeed = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.NetworkAnalyzer.GetTestFile(sizeToUse), new HttpDownloader());
         var networkLatency = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkLatency(new PingService());
@@ -281,7 +281,7 @@ public partial class Engine: IEngine, IDisposable
         }
         finally
         {
-            if (!success)
+            if (!success && !string.IsNullOrEmpty(filename))
             {
                 File.Delete(filename);
             }
