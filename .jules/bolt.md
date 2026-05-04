@@ -5,3 +5,7 @@
 ## 2025-05-14 — [Sandbox Network Restrictions]
 **Learning:** The .NET 8.0 sandbox environment throws PlatformNotSupportedException during custom socket ConnectCallback logic in OctaneHttpClientPool, while .NET 10.0 handles it correctly. This makes net8.0 tests unreliable for verifying socket-level performance changes.
 **Action:** Prioritize net10.0 for behavioral verification of networking logic in the current environment.
+
+## 2026-05-04 — [Async Throttling in Custom Streams]
+**Learning:** Custom Stream implementations that implement throttling via thread-blocking waits (e.g., `WaitHandle.WaitOne()` or `Thread.Sleep`) in asynchronous paths like `ReadAsync` or `WriteAsync` cause "sync-over-async" bottlenecks, leading to thread pool starvation.
+**Action:** Always provide an asynchronous `ThrottleAsync` path using `Task.Delay` or async-compatible schedulers, and ensure all `ReadAsync` and `WriteAsync` overloads (including `Memory<T>` and legacy `byte[]`) are overridden to use it.
