@@ -25,13 +25,14 @@ internal static class NetworkAnalyzer
     public static string PrettySize(long len)
     {
         int order = 0;
-        while (len >= 1024 && order < Sizes.Length - 1)
+        double doubleLen = len;
+        while (doubleLen >= 1024 && order < Sizes.Length - 1)
         {
             order++;
-            len = len >> 10;
+            doubleLen /= 1024;
         }
             
-        string result = ZString.Format("{0:0.##} {1}", len, Sizes[order]); 
+        string result = ZString.Format("{0:0.##} {1}", doubleLen, Sizes[order]);
             
         return result;
     }

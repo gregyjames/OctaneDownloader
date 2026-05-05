@@ -388,72 +388,89 @@ namespace OctaneEngineCore.ShellProgressBar
 			} while (++cursorTop < (windowHeight - 1));
 		}
 
+		/// <summary>
+		/// Draws child progress bars.
+		/// Optimized to avoid LINQ allocations (Where/Select/ToList) in the rendering loop.
+		/// </summary>
 		private static void DrawChildren(IEnumerable<ChildProgressBar> children, Indentation[] indentation,
 			ref int cursorTop, string percentageFormat)
 		{
-			var view = children.Where(c => !c.Collapse).Select((c, i) => new {c, i}).ToList();
-			if (!view.Any()) return;
+			ChildProgressBar lastVisibleChild = null;
+			foreach (var child in children)
+			{
+				if (!child.Collapse)
+				{
+					lastVisibleChild = child;
+				}
+			}
+
+			if (lastVisibleChild == null) return;
 
 			var windowHeight = Console.WindowHeight;
-			var lastChild = view.Max(t => t.i);
-			foreach (var tuple in view)
+			foreach (var child in children)
 			{
+				if (child.Collapse) continue;
+
 				//Dont bother drawing children that would fall off the screen
 				if (cursorTop >= (windowHeight - 2))
 					return;
 
-				var child = tuple.c;
-				var currentIndentation = new Indentation(child.ForegroundColor, tuple.i == lastChild);
-				var childIndentation = NewIndentation(indentation, currentIndentation);
-
-				var percentage = child.Percentage;
-				Console.ForegroundColor = child.ForegroundColor;
-
-				void TopHalf()
-				{
-					ProgressBarTopHalf(percentage,
-						child.Options.ProgressCharacter,
-						child.Options.BackgroundCharacter,
-						child.Options.BackgroundColor,
-						childIndentation,
-						child.Options.ProgressBarOnBottom
-					);
-				}
-
-				Console.SetCursorPosition(0, ++cursorTop);
-
-				if (child.Options.DenseProgressBar)
-				{
-					CondensedProgressBar(percentage,
-						child.Message,
-						child.Options.ProgressCharacter,
-						child.Options.BackgroundCharacter,
-						child.Options.BackgroundColor,
-						childIndentation,
-						child.Options.ProgressBarOnBottom
-					);
-				}
-				else if (child.Options.ProgressBarOnBottom)
-				{
-					ProgressBarBottomHalf(percentage, child.StartDate, child.EndTime, child.Message, childIndentation,
-						child.Options.ProgressBarOnBottom, child.Options.ShowEstimatedDuration,
-						child.EstimatedDuration, child.Options.DisableBottomPercentage,
-						percentageFormat);
-					Console.SetCursorPosition(0, ++cursorTop);
-					TopHalf();
-				}
-				else
-				{
-					TopHalf();
-					Console.SetCursorPosition(0, ++cursorTop);
-					ProgressBarBottomHalf(percentage, child.StartDate, child.EndTime, child.Message, childIndentation,
-						child.Options.ProgressBarOnBottom, child.Options.ShowEstimatedDuration,
-						child.EstimatedDuration, child.Options.DisableBottomPercentage,
-						percentageFormat);
-				}
-
-				DrawChildren(child.Children, childIndentation, ref cursorTop, percentageFormat);
+				DrawSingleChild(child, child == lastVisibleChild, indentation, ref cursorTop, percentageFormat);
 			}
+		}
+
+		private static void DrawSingleChild(ChildProgressBar child, bool isLast, Indentation[] indentation, ref int cursorTop, string percentageFormat)
+		{
+			var currentIndentation = new Indentation(child.ForegroundColor, isLast);
+			var childIndentation = NewIndentation(indentation, currentIndentation);
+
+			var percentage = child.Percentage;
+			Console.ForegroundColor = child.ForegroundColor;
+
+			void TopHalf()
+			{
+				ProgressBarTopHalf(percentage,
+					child.Options.ProgressCharacter,
+					child.Options.BackgroundCharacter,
+					child.Options.BackgroundColor,
+					childIndentation,
+					child.Options.ProgressBarOnBottom
+				);
+			}
+
+			Console.SetCursorPosition(0, ++cursorTop);
+
+			if (child.Options.DenseProgressBar)
+			{
+				CondensedProgressBar(percentage,
+					child.Message,
+					child.Options.ProgressCharacter,
+					child.Options.BackgroundCharacter,
+					child.Options.BackgroundColor,
+					childIndentation,
+					child.Options.ProgressBarOnBottom
+				);
+			}
+			else if (child.Options.ProgressBarOnBottom)
+			{
+				ProgressBarBottomHalf(percentage, child.StartDate, child.EndTime, child.Message, childIndentation,
+					child.Options.ProgressBarOnBottom, child.Options.ShowEstimatedDuration,
+					child.EstimatedDuration, child.Options.DisableBottomPercentage,
+					percentageFormat);
+				Console.SetCursorPosition(0, ++cursorTop);
+				TopHalf();
+			}
+			else
+			{
+				TopHalf();
+				Console.SetCursorPosition(0, ++cursorTop);
+				ProgressBarBottomHalf(percentage, child.StartDate, child.EndTime, child.Message, childIndentation,
+					child.Options.ProgressBarOnBottom, child.Options.ShowEstimatedDuration,
+					child.EstimatedDuration, child.Options.DisableBottomPercentage,
+					percentageFormat);
+			}
+
+			DrawChildren(child.Children, childIndentation, ref cursorTop, percentageFormat);
 		}
 
 		private static Indentation[] NewIndentation(Indentation[] array, Indentation append)

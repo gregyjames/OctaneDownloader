@@ -5,3 +5,7 @@
 ## 2025-05-14 — [Sandbox Network Restrictions]
 **Learning:** The .NET 8.0 sandbox environment throws PlatformNotSupportedException during custom socket ConnectCallback logic in OctaneHttpClientPool, while .NET 10.0 handles it correctly. This makes net8.0 tests unreliable for verifying socket-level performance changes.
 **Action:** Prioritize net10.0 for behavioral verification of networking logic in the current environment.
+
+## 2025-05-14 — [ProgressBar Allocation Optimization]
+**Learning:** Using LINQ methods like `Where`, `Select`, and `ToList` in high-frequency rendering loops (like a console progress bar) creates significant heap pressure due to intermediate collection and anonymous object allocations.
+**Action:** Replace LINQ with manual loops in hot UI paths to achieve zero-allocation rendering cycles.
