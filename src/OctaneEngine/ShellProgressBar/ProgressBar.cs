@@ -391,19 +391,27 @@ namespace OctaneEngineCore.ShellProgressBar
 		private static void DrawChildren(IEnumerable<ChildProgressBar> children, Indentation[] indentation,
 			ref int cursorTop, string percentageFormat)
 		{
-			var view = children.Where(c => !c.Collapse).Select((c, i) => new {c, i}).ToList();
-			if (!view.Any()) return;
+			// Find the last visible child to determine correct glyphs without allocating a new list/anonymous objects
+			ChildProgressBar lastVisibleChild = null;
+			foreach (var child in children)
+			{
+				if (!child.Collapse)
+					lastVisibleChild = child;
+			}
+
+			if (lastVisibleChild == null) return;
 
 			var windowHeight = Console.WindowHeight;
-			var lastChild = view.Max(t => t.i);
-			foreach (var tuple in view)
+			foreach (var child in children)
 			{
-				//Dont bother drawing children that would fall off the screen
+				if (child.Collapse) continue;
+
+				// Dont bother drawing children that would fall off the screen
 				if (cursorTop >= (windowHeight - 2))
 					return;
 
-				var child = tuple.c;
-				var currentIndentation = new Indentation(child.ForegroundColor, tuple.i == lastChild);
+				var isLast = child == lastVisibleChild;
+				var currentIndentation = new Indentation(child.ForegroundColor, isLast);
 				var childIndentation = NewIndentation(indentation, currentIndentation);
 
 				var percentage = child.Percentage;
