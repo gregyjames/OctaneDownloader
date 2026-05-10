@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Cysharp.Text;
+using ZLinq;
 
 namespace OctaneEngineCore.ShellProgressBar
 {
@@ -391,19 +392,21 @@ namespace OctaneEngineCore.ShellProgressBar
 		private static void DrawChildren(IEnumerable<ChildProgressBar> children, Indentation[] indentation,
 			ref int cursorTop, string percentageFormat)
 		{
-			var view = children.Where(c => !c.Collapse).Select((c, i) => new {c, i}).ToList();
-			if (!view.Any()) return;
+			// Use ZLinq to avoid allocations while finding the last visible child
+			var lastVisibleChild = children.AsValueEnumerable().LastOrDefault(c => !c.Collapse);
+			if (lastVisibleChild == null) return;
 
 			var windowHeight = Console.WindowHeight;
-			var lastChild = view.Max(t => t.i);
-			foreach (var tuple in view)
+			foreach (var child in children)
 			{
-				//Dont bother drawing children that would fall off the screen
+				if (child.Collapse) continue;
+
+				// Dont bother drawing children that would fall off the screen
 				if (cursorTop >= (windowHeight - 2))
 					return;
 
-				var child = tuple.c;
-				var currentIndentation = new Indentation(child.ForegroundColor, tuple.i == lastChild);
+				var isLast = child == lastVisibleChild;
+				var currentIndentation = new Indentation(child.ForegroundColor, isLast);
 				var childIndentation = NewIndentation(indentation, currentIndentation);
 
 				var percentage = child.Percentage;
