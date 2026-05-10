@@ -10,6 +10,6 @@
 **Learning:** Overriding `ReadAsync` and `WriteAsync` in a custom `Stream` is insufficient if the implementation calls a blocking method (like `WaitOne` or `Thread.Sleep`). This causes thread pool starvation during throttled operations. Using `await Task.Delay` or `TaskCompletionSource` with `IScheduler` maintains both performance and testability.
 **Action:** Always provide truly asynchronous paths in custom `Stream` implementations, especially for high-latency operations like throttling.
 
-## 2025-05-16 — [Allocation-Free Rendering]
-**Learning:** High-frequency UI rendering (like a CLI progress bar) should avoid LINQ operations (.Where, .Select, .ToList) and anonymous objects. Even if the collection is small, frequent allocations trigger garbage collection cycles that can jitter the application and consume CPU on hot paths.
-**Action:** Use manual loops and avoid intermediate collection copies in methods called during every render tick.
+## 2025-05-16 — [Allocation-Free Rendering with ZLinq]
+**Learning:** High-frequency UI rendering (like a CLI progress bar) should avoid standard LINQ operations (.Where, .Select, .ToList) and anonymous objects to minimize GC pressure. While manual loops are effective, libraries like `ZLinq` provide allocation-free LINQ-like extensions using value-typed enumerators, allowing for both readability and performance.
+**Action:** Use `ZLinq` or manual loops to avoid heap allocations in hot paths like render ticks.

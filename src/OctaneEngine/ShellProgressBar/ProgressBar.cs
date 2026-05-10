@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Cysharp.Text;
+using ZLinq;
 
 namespace OctaneEngineCore.ShellProgressBar
 {
@@ -391,14 +392,8 @@ namespace OctaneEngineCore.ShellProgressBar
 		private static void DrawChildren(IEnumerable<ChildProgressBar> children, Indentation[] indentation,
 			ref int cursorTop, string percentageFormat)
 		{
-			// Find the last visible child to determine correct glyphs without allocating a new list/anonymous objects
-			ChildProgressBar lastVisibleChild = null;
-			foreach (var child in children)
-			{
-				if (!child.Collapse)
-					lastVisibleChild = child;
-			}
-
+			// Use ZLinq to avoid allocations while finding the last visible child
+			var lastVisibleChild = children.AsValueEnumerable().LastOrDefault(c => !c.Collapse);
 			if (lastVisibleChild == null) return;
 
 			var windowHeight = Console.WindowHeight;
