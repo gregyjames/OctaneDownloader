@@ -8,9 +8,9 @@ namespace OctaneEngineCore.Implementations.NetworkAnalyzer;
 [ExcludeFromCodeCoverage]
 public class HttpDownloader : IHttpDownloader
 {
+    private static readonly HttpClient HttpClient = new HttpClient();
     public async Task<byte[]> GetByteArrayAsync(string url)
     {
-        using var client = new HttpClient();
-        return await client.GetByteArrayAsync(url);
+        return await HttpClient.GetByteArrayAsync(url);
     }
 }
