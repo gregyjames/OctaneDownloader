@@ -27,7 +27,7 @@ public partial class OctaneHttpClientPool: IDisposable
         _configuration = configuration;
         _loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
         _logger = _loggerFactory.CreateLogger<OctaneHttpClientPool>();
-        _receiveBufferSize = Math.Max(1024 * 1024, _configuration.BufferSize * 128); // 1MB minimum
+        _receiveBufferSize = Math.Max(1024 * 1024, _configuration.BufferSize * 8); // 1MB minimum
         _sendBufferSize = 512 * 1024; // 512 KB for sends
 
         if (OperatingSystem.IsWindows())
