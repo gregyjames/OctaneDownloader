@@ -281,12 +281,15 @@ public partial class Engine: IEngine, IDisposable
         }
         finally
         {
-            if (!success)
+            if (!success && !string.IsNullOrEmpty(filename) && File.Exists(filename))
             {
                 File.Delete(filename);
             }
             Cleanup(stopwatch, _config, success);
-            _clientFactory.Return(OctaneHttpClientPool.DEFAULT_CLIENT_NAME, client);
+            if (client != null)
+            {
+                _clientFactory.Return(OctaneHttpClientPool.DEFAULT_CLIENT_NAME, client);
+            }
         }
     }
 
