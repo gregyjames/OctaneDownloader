@@ -47,8 +47,8 @@ namespace OctaneEngineCore.Implementations;
 public partial class Engine: IEngine, IDisposable
 {
     private readonly ILoggerFactory _factory;
-    private OctaneClient? _client;
-    private DefaultClient? _defaultClient;
+    private readonly OctaneClient? _client;
+    private readonly DefaultClient? _defaultClient;
     private OctaneConfiguration _config;
     private readonly ILogger<Engine> _logger;
     private readonly OctaneHttpClientPool _clientFactory;
@@ -177,12 +177,15 @@ public partial class Engine: IEngine, IDisposable
         var filename = string.Empty;
         ClientType clientType = ClientType.Normal;
         HttpClient? client = null;
-        client = _clientFactory.Rent(OctaneHttpClientPool.DEFAULT_CLIENT_NAME);
-        _client = new OctaneClient(_config, client, _factory);
-        _defaultClient = new DefaultClient(client, _config);
 
         try
         {
+            client = _clientFactory.Rent(OctaneHttpClientPool.DEFAULT_CLIENT_NAME);
+            
+            // Thread-safe local variable resolution to support concurrency
+            var octaneClient = _client ?? new OctaneClient(_config, client, _factory);
+            var defaultClient = _defaultClient ?? new DefaultClient(client, _config);
+
             (var length, clientType) = await getFileSizeAndRangeSupport(request.Url);
             
             #region Varible Initilization
@@ -208,7 +211,7 @@ public partial class Engine: IEngine, IDisposable
                 if (clientType == ClientType.Octane)
                 {
                     var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger);
-                    _client.SetMmf(mmf);
+                    octaneClient.SetMmf(mmf);
                     LogUsingOctaneClientToDownloadFile();
                     var options = new ParallelOptions()
                     {
@@ -221,15 +224,15 @@ public partial class Engine: IEngine, IDisposable
                     if (_config.ShowProgress)
                     {
                         pbar = new ProgressBar(pieces.Count * 2, "Downloading file...");
-                        _client.SetProgressbar(pbar);
-                        _defaultClient.SetProgressbar(pbar);
+                        octaneClient.SetProgressbar(pbar);
+                        defaultClient.SetProgressbar(pbar);
                     }
 
                     try
                     {
                         await pieces.ForEachAsync(options, async (piece, token) =>
                         {
-                            await _client.Download(request.Url, piece, request.Headers ?? [], cancellation_token, pause_token.Token);
+                            await octaneClient.Download(request.Url, piece, request.Headers ?? [], cancellation_token, pause_token.Token);
 
                             Interlocked.Increment(ref tasksDone);
                                 
@@ -253,10 +256,10 @@ public partial class Engine: IEngine, IDisposable
                 else
                 {
                     LogUsingDefaultClientToDownloadFile();
-                    _defaultClient.SetMmf(mmf);
+                    defaultClient.SetMmf(mmf);
                     try
                     {
-                        await _defaultClient.Download(request.Url, (0, 0), request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);
+                        await defaultClient.Download(request.Url, (0, 0), request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);
                         success = true;
                     }
                     catch (Exception)
