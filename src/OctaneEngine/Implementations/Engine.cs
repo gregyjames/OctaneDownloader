@@ -74,6 +74,31 @@ public partial class Engine: IEngine, IDisposable
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _clientFactory = new OctaneHttpClientPool(_config, _factory);
     }
+
+    /// <summary>
+    /// Creates a new Engine instance with a pre-configured HttpClient, useful for testing.
+    /// </summary>
+    public Engine(OctaneConfiguration config, HttpClient httpClient, ILoggerFactory? factory = null)
+    {
+        _factory = factory ?? NullLoggerFactory.Instance;
+        _logger = _factory.CreateLogger<Engine>();
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+        
+        // Normalize config values just like EngineBuilder does
+        if (_config.Parts <= 0)
+            _config.Parts = Environment.ProcessorCount;
+        if (_config.BufferSize <= 0)
+            _config.BufferSize = 8192;
+        if (_config.NumRetries < 0)
+            _config.NumRetries = 3;
+        if (_config.BytesPerSecond <= 0)
+            _config.BytesPerSecond = 1;
+
+        _clientFactory = new OctaneHttpClientPool(_config, _factory);
+        _clientFactory.AddClientToPool(httpClient);
+        _client = new OctaneClient(_config, httpClient, _factory, null);
+        _defaultClient = new DefaultClient(httpClient, _config);
+    }
         
     #region Helpers
     private void Cleanup(Stopwatch stopwatch, OctaneConfiguration config, bool success)
