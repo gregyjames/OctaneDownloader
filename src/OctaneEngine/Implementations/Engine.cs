@@ -51,20 +51,19 @@ public partial class Engine: IEngine, IDisposable
     private readonly DefaultClient? _defaultClient;
     private OctaneConfiguration _config;
     private readonly ILogger<Engine> _logger;
-    private readonly OctaneHttpClientPool _clientFactory;
-    public Engine(IOptions<OctaneConfiguration> config, OctaneHttpClientPool clientFactory, ILoggerFactory factory)
+    private readonly IHttpClientFactory _clientFactory;
+    public Engine(IOptions<OctaneConfiguration> config, IHttpClientFactory clientFactory, ILoggerFactory factory)
     {
         _clientFactory = clientFactory;
         _factory = factory ?? NullLoggerFactory.Instance;
         _logger = _factory.CreateLogger<Engine>();
         _config = config.Value;
-        _clientFactory = clientFactory;
     }
 
     /// <summary>
     /// Creates a new Engine instance without dependency injection
     /// </summary>
-    internal Engine(OctaneClient? client, DefaultClient? defaultClient, OctaneHttpClientPool clientFactory,
+    internal Engine(OctaneClient? client, DefaultClient? defaultClient, IHttpClientFactory clientFactory,
         OctaneConfiguration config, ILoggerFactory? factory = null)
     {
         _factory = factory ?? NullLoggerFactory.Instance;
@@ -72,7 +71,7 @@ public partial class Engine: IEngine, IDisposable
         _client = client;
         _defaultClient = defaultClient;
         _config = config ?? throw new ArgumentNullException(nameof(config));
-        _clientFactory = new OctaneHttpClientPool(_config, _factory);
+        _clientFactory = clientFactory;
     }
 
     /// <summary>
@@ -94,8 +93,7 @@ public partial class Engine: IEngine, IDisposable
         if (_config.BytesPerSecond <= 0)
             _config.BytesPerSecond = 1;
 
-        _clientFactory = new OctaneHttpClientPool(_config, _factory);
-        _clientFactory.AddClientToPool(httpClient);
+        _clientFactory = new SingleHttpClientFactory(httpClient);
         _client = new OctaneClient(_config, httpClient, _factory, null);
         _defaultClient = new DefaultClient(httpClient, _config);
     }
@@ -152,12 +150,11 @@ public partial class Engine: IEngine, IDisposable
     
     private async Task<(long, ClientType)> getFileSizeAndRangeSupport(string url)
     {
-        var client = _clientFactory.Rent(OctaneHttpClientPool.DEFAULT_CLIENT_NAME);
+        var client = _clientFactory.CreateClient("OctaneClient");
         using var request = new HttpRequestMessage(HttpMethod.Head, url);
         var response = await client.SendAsync(request);
         var responseLength = response.Content.Headers.ContentLength ?? 0;
         var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
-        _clientFactory.Return(OctaneHttpClientPool.DEFAULT_CLIENT_NAME, client);
         LogRangeSupportedRange(rangeSupported);
         return (responseLength, rangeSupported ? ClientType.Octane : ClientType.Normal);
     }
@@ -205,7 +202,7 @@ public partial class Engine: IEngine, IDisposable
 
         try
         {
-            client = _clientFactory.Rent(OctaneHttpClientPool.DEFAULT_CLIENT_NAME);
+            client = _clientFactory.CreateClient("OctaneClient");
             
             // Thread-safe local variable resolution to support concurrency
             var octaneClient = _client ?? new OctaneClient(_config, client, _factory);
@@ -314,17 +311,16 @@ public partial class Engine: IEngine, IDisposable
                 File.Delete(filename);
             }
             Cleanup(stopwatch, _config, success);
-            if (client != null)
-            {
-                _clientFactory.Return(OctaneHttpClientPool.DEFAULT_CLIENT_NAME, client);
-            }
         }
     }
 
     public void Dispose()
     {
         _factory?.Dispose();
-        _clientFactory.Dispose();
+        if (_clientFactory is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
     }
 
     [LoggerMessage(LogLevel.Trace, "Calling callback function...")]
