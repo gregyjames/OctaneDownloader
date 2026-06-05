@@ -33,7 +33,8 @@ namespace OctaneTestProject
         [Test]
         public void Constructor_Default_ShouldNotThrow()
         {
-            Assert.DoesNotThrow(() => new ThrottleStream(_factory));
+            Action testDelegate = () => new ThrottleStream(_factory);
+            Assert.DoesNotThrow(testDelegate);
         }
 
         [Test]
@@ -108,7 +109,8 @@ namespace OctaneTestProject
             var ms = new MemoryStream();
             var ts = new ThrottleStream(ms, 1024, _factory);
             await ts.DisposeAsync();
-            Assert.Throws<ObjectDisposedException>(() => ms.WriteByte(1));
+            Action testDelegate = () => ms.WriteByte(1);
+            Assert.Throws<ObjectDisposedException>(testDelegate);
         }
 
         [Test]
@@ -117,7 +119,8 @@ namespace OctaneTestProject
             var ms = new MemoryStream();
             var ts = new ThrottleStream(ms, 1024, _factory);
             ts.Dispose();
-            Assert.Throws<ObjectDisposedException>(() => ms.WriteByte(1));
+            Action testDelegate = () => ms.WriteByte(1);
+            Assert.Throws<ObjectDisposedException>(testDelegate);
         }
     }
 } 
