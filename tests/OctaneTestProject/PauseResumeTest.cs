@@ -1,33 +1,35 @@
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
+using OctaneEngineCore.Implementations;
 using Serilog;
 using ILogger = Serilog.ILogger;
 
 namespace OctaneTestProject
 {
     [TestFixture]
-    // Checks if pausing and resume during downloads works.
     public class PauseResumeTest
     {
         private PauseTokenSource _pauseTokenSource;
         private CancellationTokenSource _cancelTokenSource;
         private ILogger _log;
         private ILoggerFactory _factory;
-        readonly string _outFile = Path.GetRandomFileName();
+        private string _outFile;
+        private byte[] _mockData;
         
         [SetUp]
         public void Init()
         {
+            _outFile = Path.GetRandomFileName();
             _log = new LoggerConfiguration()
                 .Enrich.FromLogContext()
                 .MinimumLevel.Verbose()
-                .WriteTo.File("./OctaneLog.txt")
                 .WriteTo.Console()
                 .CreateLogger();
 
@@ -38,20 +40,33 @@ namespace OctaneTestProject
             
             _pauseTokenSource = new PauseTokenSource(_factory);
             _cancelTokenSource = new CancellationTokenSource();
+
+            _mockData = new byte[1024 * 50]; // 50 KB
+            new Random().NextBytes(_mockData);
         }
 
         [TearDown]
         public void CleanUp()
         {
-            //File.Delete(outFile);
+            try
+            {
+                if (File.Exists(_outFile))
+                    File.Delete(_outFile);
+            }
+            catch
+            {
+                // ignored
+            }
         }
 
         [Test]
         public void PauseResumeFile()
         {
-            const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
+            const string url = @"https://mockurl.com/file.png";
 
             _log.Information("Starting Pause Resume Test");
+            
+            using var mockClient = Helpers.GetMockHttpClient(_mockData);
             
             var config = new OctaneConfiguration
             {
@@ -65,20 +80,30 @@ namespace OctaneTestProject
             
             _pauseTokenSource.Pause();
             
-            var engine = EngineBuilder.Create().WithConfiguration(config).WithLogger(_factory).Build();
+            var engine = new Engine(config, mockClient, _factory);
             
-            engine.SetDoneCallback(_ => Assert.That(File.Exists(_outFile), Is.True));
+            var doneCalled = false;
+            engine.SetDoneCallback(success =>
+            {
+                doneCalled = true;
+                Assert.That(success, Is.True);
+                Assert.That(File.Exists(_outFile), Is.True);
+                Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
+            });
             engine.SetProgressCallback(Console.WriteLine);
             engine.SetProxy(null);
+            
             Parallel.Invoke(
                 () => Action(_pauseTokenSource),
                 () => engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait()
             );
+            
+            Assert.That(doneCalled, Is.True, "Done callback should have been invoked after resume");
         }
 
         private void Action(PauseTokenSource pcs)
         {
-            Thread.Sleep(5000);
+            Thread.Sleep(2000); // Reduced delay for faster test execution
             pcs.Resume();
         }
     }

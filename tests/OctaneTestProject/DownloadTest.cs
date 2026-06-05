@@ -1,28 +1,30 @@
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
+using OctaneEngineCore.Implementations;
 using Serilog;
 using ILogger = Serilog.ILogger;
 
 namespace OctaneTestProject
 {
     [TestFixture]
-    // Checks if octane can successfully download a file.
     public class DownloadTest
     {
         private PauseTokenSource _pauseTokenSource;
         private CancellationTokenSource _cancelTokenSource;
         private ILogger _log;
         private ILoggerFactory _factory;
-        readonly string _outFile = Path.GetRandomFileName();
+        private string _outFile;
         
         [SetUp]
         public void Init()
         {
+            _outFile = Path.GetRandomFileName();
             _log = new LoggerConfiguration()
                 .Enrich.FromLogContext()
                 .MinimumLevel.Verbose()
@@ -44,7 +46,12 @@ namespace OctaneTestProject
         {
             try
             {
-                //File.Delete(outFile);
+                if (File.Exists(_outFile))
+                    File.Delete(_outFile);
+                
+                var logFile = $"./{_outFile}.log";
+                if (File.Exists(logFile))
+                    File.Delete(logFile);
             }
             catch
             {
@@ -55,35 +62,47 @@ namespace OctaneTestProject
         [Test]
         public void DownloadFile()
         {
-            const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
+            const string url = @"https://mockurl.com/file.png";
+            
+            // Generate mock file content
+            var mockData = new byte[1024 * 100]; // 100 KB
+            new Random().NextBytes(mockData);
+            
+            using var mockHandler = new MockHttpMessageHandler(mockData);
+            using var mockClient = new HttpClient(mockHandler);
 
             _log.Information("Starting File Download Test");
-            try
+            
+            var config = new OctaneConfiguration
             {
-                var config = new OctaneConfiguration
-                {
-                    Parts = 2,
-                    BufferSize = 8192,
-                    ShowProgress = false,
-                    NumRetries = 20,
-                    BytesPerSecond = 1,
-                    UseProxy = false,
-                };
+                Parts = 2,
+                BufferSize = 8192,
+                ShowProgress = false,
+                NumRetries = 20,
+                BytesPerSecond = 1,
+                UseProxy = false,
+            };
 
-                var engine = EngineBuilder.Create().WithConfiguration(config).WithLogger(_factory).Build();
-                engine.SetProxy(null);
-                engine.SetDoneCallback(_ =>
-                {
-                    Console.WriteLine("Done!");
-                    Assert.That(File.Exists(_outFile), Is.True);
-                });
-                engine.SetProgressCallback(Console.WriteLine);
-                engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
-            }
-            catch
+            var engine = new Engine(config, mockClient, _factory);
+            
+            engine.SetProxy(null);
+            
+            var doneCalled = false;
+            engine.SetDoneCallback(success =>
             {
-                // ignored
-            }
+                Console.WriteLine("Done!");
+                doneCalled = true;
+                Assert.That(success, Is.True);
+                Assert.That(File.Exists(_outFile), Is.True);
+                
+                var downloadedData = File.ReadAllBytes(_outFile);
+                Assert.That(downloadedData, Is.EqualTo(mockData));
+            });
+            
+            engine.SetProgressCallback(Console.WriteLine);
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
+            
+            Assert.That(doneCalled, Is.True, "Done callback should be invoked");
         }
     }
 }

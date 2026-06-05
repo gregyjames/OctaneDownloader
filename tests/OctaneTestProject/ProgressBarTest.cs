@@ -1,10 +1,12 @@
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
+using OctaneEngineCore.Implementations;
 using Serilog;
 using ILogger = Serilog.ILogger;
 
@@ -17,15 +19,16 @@ namespace OctaneTestProject
         private CancellationTokenSource _cancelTokenSource;
         private ILogger _log;
         private ILoggerFactory _factory;
-        readonly string _outFile = Path.GetRandomFileName();
+        private string _outFile;
+        private byte[] _mockData;
         
         [SetUp]
         public void Init()
         {
+            _outFile = Path.GetRandomFileName();
             _log = new LoggerConfiguration()
                 .Enrich.FromLogContext()
                 .MinimumLevel.Verbose()
-                .WriteTo.File("./OctaneLog.txt")
                 .WriteTo.Console()
                 .CreateLogger();
 
@@ -36,6 +39,9 @@ namespace OctaneTestProject
             
             _pauseTokenSource = new PauseTokenSource(_factory);
             _cancelTokenSource = new CancellationTokenSource();
+
+            _mockData = new byte[1024 * 30]; // 30 KB
+            new Random().NextBytes(_mockData);
         }
 
         [TearDown]
@@ -55,23 +61,26 @@ namespace OctaneTestProject
         [Test]
         public void ProgressBar_ShowProgressEnabled_ShouldCallProgressCallback()
         {
-            const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
+            const string url = @"https://mockurl.com/file.png";
 
             _log.Information("Testing progress bar with ShowProgress enabled");
             
             var progressCallCount = 0;
             var doneCallCount = 0;
             
-            var engine = EngineBuilder.Create(config =>
+            using var mockClient = Helpers.GetMockHttpClient(_mockData);
+            
+            var config = new OctaneConfiguration
             {
-                config.Parts = 2;
-                config.BufferSize = 8192;
-                config.ShowProgress = true; // Enable progress bar
-                config.NumRetries = 3;
-                config.BytesPerSecond = 1;
-                config.UseProxy = false;
-                config.LowMemoryMode = false;
-            }, _factory).Build();
+                Parts = 2,
+                BufferSize = 8192,
+                ShowProgress = true, // Enable progress bar
+                NumRetries = 3,
+                BytesPerSecond = 1,
+                UseProxy = false,
+                LowMemoryMode = false
+            };
+            var engine = new Engine(config, mockClient, _factory);
             
             Assert.That(engine, Is.Not.Null);
             
@@ -100,23 +109,26 @@ namespace OctaneTestProject
         [Test]
         public void ProgressBar_ShowProgressDisabled_ShouldStillCallProgressCallback()
         {
-            const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
+            const string url = @"https://mockurl.com/file.png";
 
             _log.Information("Testing progress callback with ShowProgress disabled");
             
             var progressCallCount = 0;
             var doneCallCount = 0;
             
-            var engine = EngineBuilder.Create(config =>
+            using var mockClient = Helpers.GetMockHttpClient(_mockData);
+            
+            var config = new OctaneConfiguration
             {
-                config.Parts = 2;
-                config.BufferSize = 8192;
-                config.ShowProgress = false; // Disable progress bar
-                config.NumRetries = 3;
-                config.BytesPerSecond = 1;
-                config.UseProxy = false;
-                config.LowMemoryMode = false;
-            }, _factory).Build();
+                Parts = 2,
+                BufferSize = 8192,
+                ShowProgress = false, // Disable progress bar
+                NumRetries = 3,
+                BytesPerSecond = 1,
+                UseProxy = false,
+                LowMemoryMode = false
+            };
+            var engine = new Engine(config, mockClient, _factory);
             
             Assert.That(engine, Is.Not.Null);
             
@@ -145,20 +157,23 @@ namespace OctaneTestProject
         [Test]
         public void ProgressBar_NoCallbacks_ShouldWorkNormally()
         {
-            const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
+            const string url = @"https://mockurl.com/file.png";
 
             _log.Information("Testing progress bar without callbacks");
             
-            var engine = EngineBuilder.Create(config =>
+            using var mockClient = Helpers.GetMockHttpClient(_mockData);
+            
+            var config = new OctaneConfiguration
             {
-                config.Parts = 2;
-                config.BufferSize = 8192;
-                config.ShowProgress = true;
-                config.NumRetries = 3;
-                config.BytesPerSecond = 1;
-                config.UseProxy = false;
-                config.LowMemoryMode = false;
-            }, _factory).Build();
+                Parts = 2,
+                BufferSize = 8192,
+                ShowProgress = true,
+                NumRetries = 3,
+                BytesPerSecond = 1,
+                UseProxy = false,
+                LowMemoryMode = false
+            };
+            var engine = new Engine(config, mockClient, _factory);
             
             Assert.That(engine, Is.Not.Null);
             
@@ -166,6 +181,7 @@ namespace OctaneTestProject
             engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
             
             Assert.That(File.Exists(_outFile), Is.True, "File should be downloaded successfully");
+            Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
         }
     }
-} 
+}
