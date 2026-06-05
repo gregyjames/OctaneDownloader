@@ -1,10 +1,13 @@
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngineCore;
 using OctaneEngineCore.Clients;
+using OctaneEngineCore.Implementations;
 using Serilog;
 using ILogger = Serilog.ILogger;
 
@@ -17,15 +20,16 @@ namespace OctaneTestProject
         private CancellationTokenSource _cancelTokenSource;
         private ILogger _log;
         private ILoggerFactory _factory;
-        readonly string _outFile = Path.GetRandomFileName();
+        private string _outFile;
+        private byte[] _mockData;
         
         [SetUp]
         public void Init()
         {
+            _outFile = Path.GetRandomFileName();
             _log = new LoggerConfiguration()
                 .Enrich.FromLogContext()
                 .MinimumLevel.Verbose()
-                .WriteTo.File($"./{_outFile}.log")
                 .WriteTo.Console()
                 .CreateLogger();
 
@@ -36,6 +40,9 @@ namespace OctaneTestProject
             
             _pauseTokenSource = new PauseTokenSource(_factory);
             _cancelTokenSource = new CancellationTokenSource();
+
+            _mockData = new byte[1024 * 20]; // 20 KB
+            new Random().NextBytes(_mockData);
         }
 
         [TearDown]
@@ -55,20 +62,23 @@ namespace OctaneTestProject
         [Test]
         public void ErrorHandling_InvalidUrl_ShouldThrowException()
         {
-            const string invalidUrl = @"00invalid-url-that-does-not-exist.com/file.zip";
+            const string invalidUrl = @"https://invalid-domain.com/file.zip";
 
             _log.Information("Testing error handling with invalid URL");
             
-            var engine = EngineBuilder.Create(config =>
+            using var mockClient = Helpers.GetMockHttpClient(_mockData, shouldFail: true);
+            
+            var config = new OctaneConfiguration
             {
-                config.Parts = 2;
-                config.BufferSize = 8192;
-                config.ShowProgress = false;
-                config.NumRetries = 1; // Low retries for faster failure
-                config.BytesPerSecond = 1;
-                config.UseProxy = false;
-                config.LowMemoryMode = false;
-            }, _factory).Build();
+                Parts = 2,
+                BufferSize = 8192,
+                ShowProgress = false,
+                NumRetries = 1, 
+                BytesPerSecond = 1,
+                UseProxy = false,
+                LowMemoryMode = false
+            };
+            var engine = new Engine(config, mockClient, _factory);
             
             Assert.That(engine, Is.Not.Null);
             
@@ -89,20 +99,23 @@ namespace OctaneTestProject
         [Test]
         public void ErrorHandling_NonExistentFile_ShouldThrowException()
         {
-            const string nonExistentUrl = @"https://httpbin.org/status/404";
+            const string nonExistentUrl = @"https://mockurl.com/status/404";
 
             _log.Information("Testing error handling with non-existent file");
             
-            var engine = EngineBuilder.Create(config =>
+            using var mockClient = Helpers.GetMockHttpClient(_mockData, shouldFail: true);
+            
+            var config = new OctaneConfiguration
             {
-                config.Parts = 2;
-                config.BufferSize = 8192;
-                config.ShowProgress = false;
-                config.NumRetries = 1; // Low retries for faster failure
-                config.BytesPerSecond = 1;
-                config.UseProxy = false;
-                config.LowMemoryMode = false;
-            }, _factory).Build();
+                Parts = 2,
+                BufferSize = 8192,
+                ShowProgress = false,
+                NumRetries = 1, 
+                BytesPerSecond = 1,
+                UseProxy = false,
+                LowMemoryMode = false
+            };
+            var engine = new Engine(config, mockClient, _factory);
             
             Assert.That(engine, Is.Not.Null);
             
@@ -123,31 +136,34 @@ namespace OctaneTestProject
         [Test]
         public void ErrorHandling_Cancellation_ShouldCancelDownload()
         {
-            const string url = @"https://httpbin.org/delay/10"; // 10 second delay
+            const string url = @"https://mockurl.com/delay/10"; 
 
             _log.Information("Testing error handling with cancellation");
             
-            var engine = EngineBuilder.Create(config =>
+            using var mockClient = Helpers.GetMockHttpClient(_mockData);
+            
+            var config = new OctaneConfiguration
             {
-                config.Parts = 2;
-                config.BufferSize = 8192;
-                config.ShowProgress = false;
-                config.NumRetries = 3;
-                config.BytesPerSecond = 1;
-                config.UseProxy = false;
-                config.LowMemoryMode = false;
-            }, _factory).Build();
+                Parts = 2,
+                BufferSize = 8192,
+                ShowProgress = false,
+                NumRetries = 3,
+                BytesPerSecond = 1,
+                UseProxy = false,
+                LowMemoryMode = false
+            };
+            var engine = new Engine(config, mockClient, _factory);
             
             Assert.That(engine, Is.Not.Null);
             
             var cancellationRequested = false;
             
-            // Cancel after 2 seconds
+            // Cancel after 100 ms
             var timer = new System.Threading.Timer(_ =>
             {
                 _cancelTokenSource.Cancel();
                 cancellationRequested = true;
-            }, null, 2000, Timeout.Infinite);
+            }, null, 100, Timeout.Infinite);
             
             var exceptionThrown = false;
             
@@ -159,7 +175,7 @@ namespace OctaneTestProject
             {
                 exceptionThrown = true;
             }
-            catch (AggregateException ex) when (ex.InnerException is OperationCanceledException)
+            catch (AggregateException ex) when (ex.InnerException is OperationCanceledException || ex.InnerException is TaskCanceledException)
             {
                 exceptionThrown = true;
             }
@@ -173,88 +189,112 @@ namespace OctaneTestProject
         [Test]
         public void ErrorHandling_ZeroParts_ShouldUseDefault()
         {
-            const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
+            const string url = @"https://mockurl.com/file.png";
 
             _log.Information("Testing error handling with zero parts");
             
-            var engine = EngineBuilder.Create(config =>
+            using var mockClient = Helpers.GetMockHttpClient(_mockData);
+            
+            var config = new OctaneConfiguration
             {
-                config.Parts = 0; // Invalid value
-                config.BufferSize = 8192;
-                config.ShowProgress = false;
-                config.NumRetries = 3;
-                config.BytesPerSecond = 1;
-                config.UseProxy = false;
-                config.LowMemoryMode = false;
-            }, _factory).Build();
+                Parts = 0, // Invalid value
+                BufferSize = 8192,
+                ShowProgress = false,
+                NumRetries = 3,
+                BytesPerSecond = 1,
+                UseProxy = false,
+                LowMemoryMode = false
+            };
+            var engine = new Engine(config, mockClient, _factory);
             
             Assert.That(engine, Is.Not.Null);
             
-            engine.SetDoneCallback(_ =>
+            var doneCalled = false;
+            engine.SetDoneCallback(success =>
             {
+                doneCalled = true;
                 Console.WriteLine("Done with zero parts!");
+                Assert.That(success, Is.True);
                 Assert.That(File.Exists(_outFile), Is.True);
+                Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
             });
             
             engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
+            Assert.That(doneCalled, Is.True);
         }
 
         [Test]
         public void ErrorHandling_ZeroBufferSize_ShouldUseDefault()
         {
-            const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
+            const string url = @"https://mockurl.com/file.png";
 
             _log.Information("Testing error handling with zero buffer size");
             
-            var engine = EngineBuilder.Create(config =>
+            using var mockClient = Helpers.GetMockHttpClient(_mockData);
+            
+            var config = new OctaneConfiguration
             {
-                config.Parts = 2;
-                config.BufferSize = 0; // Invalid value
-                config.ShowProgress = false;
-                config.NumRetries = 3;
-                config.BytesPerSecond = 1;
-                config.UseProxy = false;
-                config.LowMemoryMode = false;
-            }, _factory).Build();
+                Parts = 2,
+                BufferSize = 0, // Invalid value
+                ShowProgress = false,
+                NumRetries = 3,
+                BytesPerSecond = 1,
+                UseProxy = false,
+                LowMemoryMode = false
+            };
+            var engine = new Engine(config, mockClient, _factory);
             
             Assert.That(engine, Is.Not.Null);
             
-            engine.SetDoneCallback(_ =>
+            var doneCalled = false;
+            engine.SetDoneCallback(success =>
             {
+                doneCalled = true;
                 Console.WriteLine("Done with zero buffer size!");
+                Assert.That(success, Is.True);
                 Assert.That(File.Exists(_outFile), Is.True);
+                Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
             });
             
             engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
+            Assert.That(doneCalled, Is.True);
         }
 
         [Test]
         public void ErrorHandling_InvalidConfiguration_ShouldHandleGracefully()
         {
-            const string url = @"https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png";
+            const string url = @"https://mockurl.com/file.png";
 
             _log.Information("Testing error handling with invalid configuration");
             
-            var engine = EngineBuilder.Create(config =>
+            using var mockClient = Helpers.GetMockHttpClient(_mockData);
+            
+            var config = new OctaneConfiguration
             {
-                config.Parts = -1; // Invalid negative value
-                config.BufferSize = -1; // Invalid negative value
-                config.ShowProgress = false;
-                config.NumRetries = -1; // Invalid negative value
-                config.BytesPerSecond = -1; // Invalid negative value
-                config.UseProxy = false;
-                config.LowMemoryMode = false;
-            }, _factory).Build();
+                Parts = -1, // Invalid negative value
+                BufferSize = -1, // Invalid negative value
+                ShowProgress = false,
+                NumRetries = -1, // Invalid negative value
+                BytesPerSecond = -1, // Invalid negative value
+                UseProxy = false,
+                LowMemoryMode = false
+            };
+            var engine = new Engine(config, mockClient, _factory);
             
             Assert.That(engine, Is.Not.Null);
             
-            engine.SetDoneCallback(_ =>
+            var doneCalled = false;
+            engine.SetDoneCallback(success =>
             {
+                doneCalled = true;
                 Console.WriteLine("Done with invalid configuration!");
+                Assert.That(success, Is.True);
                 Assert.That(File.Exists(_outFile), Is.True);
+                Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
             });
             
             engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
+            Assert.That(doneCalled, Is.True);
         }
     }
-} 
+}

@@ -51,5 +51,11 @@ namespace OctaneTestProject
 
             throw new Exception($"Failed to read files {file1} and {file2} after {maxAttempts} attempts.");
         }
+
+        public static System.Net.Http.HttpClient GetMockHttpClient(byte[] fileData, bool supportsRange = true, bool shouldFail = false)
+        {
+            var handler = new MockHttpMessageHandler(fileData, supportsRange, shouldFail);
+            return new System.Net.Http.HttpClient(handler);
+        }
     }
 }
