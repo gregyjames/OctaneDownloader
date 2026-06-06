@@ -1,7 +1,9 @@
 using System;
 using System.Net.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using OctaneEngineCore.Implementations;
 using OctaneEngineCore.Clients;
 using OctaneEngineCore.Interfaces;
@@ -18,7 +20,7 @@ public class EngineBuilder
     private ILoggerFactory _loggerFactory;
     private ProgressBar _progressBar;
     private HttpClient _client;
-    private OctaneHttpClientPool _clientFactory;
+    private IHttpClientFactory _clientFactory;
 
     /// <summary>
     /// Creates a new EngineBuilder instance
@@ -94,10 +96,20 @@ public class EngineBuilder
         if (_configuration.BytesPerSecond <= 0)
             _configuration.BytesPerSecond = 1;
         
-        // Create clients
-        _clientFactory = new OctaneHttpClientPool(_configuration, _loggerFactory);
-        var clientToUse = _client ?? _clientFactory.Rent(OctaneHttpClientPool.DEFAULT_CLIENT_NAME);
-        _clientFactory.AddClientToPool(clientToUse);
+        // Create standard IHttpClientFactory using a local service collection
+        var services = new ServiceCollection();
+        services.AddSingleton(Microsoft.Extensions.Options.Options.Create(_configuration));
+        services.AddSingleton(_loggerFactory);
+        services.AddClient();
+        
+        var serviceProvider = services.BuildServiceProvider();
+        _clientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+        
+        var clientToUse = _client ?? _clientFactory.CreateClient("OctaneClient");
+        if (_client != null)
+        {
+            _clientFactory = new SingleHttpClientFactory(_client);
+        }
         
         var octaneClient = new OctaneClient(_configuration, clientToUse, _loggerFactory, _progressBar);
         var defaultClient = new DefaultClient(clientToUse, _configuration);
