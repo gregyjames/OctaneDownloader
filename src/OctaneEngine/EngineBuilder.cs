@@ -56,7 +56,6 @@ public class EngineBuilder
         return this;
     }
 
-
     /// <summary>
     /// Sets the preconfigured HTTP Client to use (optional)
     /// </summary>
