@@ -1,13 +1,13 @@
-﻿using System;
+using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 namespace OctaneEngineCore.ShellProgressBar
 {
 	[ExcludeFromCodeCoverage]
-	public static class TaskbarProgress
+	internal static class TaskbarProgress
 	{
-		public enum TaskbarStates
+		internal enum TaskbarStates
 		{
 			NoProgress = 0,
 			Indeterminate = 0x1,

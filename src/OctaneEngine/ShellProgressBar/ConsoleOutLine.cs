@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace OctaneEngineCore.ShellProgressBar
 {
 	[ExcludeFromCodeCoverage]
-	public struct ConsoleOutLine
+	internal struct ConsoleOutLine
 	{
 		public bool Error { get; }
 		public string Line { get; }

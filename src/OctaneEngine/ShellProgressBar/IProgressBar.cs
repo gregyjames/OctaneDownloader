@@ -2,7 +2,7 @@ using System;
 
 namespace OctaneEngineCore.ShellProgressBar
 {
-	public interface IProgressBar : IDisposable
+	internal interface IProgressBar : IDisposable
 	{
 		ChildProgressBar Spawn(long maxTicks, string message, ProgressBarOptions options = null);
 

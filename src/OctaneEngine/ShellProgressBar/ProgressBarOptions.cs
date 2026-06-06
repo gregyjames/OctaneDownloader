@@ -108,7 +108,7 @@ namespace OctaneEngineCore.ShellProgressBar
 		/// The delegate is expected to return the number of messages written to the console as a result of the string argument.
 		/// <para>Use case: pretty print or change the console colors, the progressbar will reset back</para>
 		/// </summary>
-		public Func<ConsoleOutLine, int> WriteQueuedMessage { get; set; }
+		internal Func<ConsoleOutLine, int> WriteQueuedMessage { get; set; }
 
 	}
 }
