@@ -19,7 +19,7 @@ public class DownloadService(IEngine engine, IOptions<OctaneConfiguration> confi
         logger.LogInformation("Current Latency: {latency}", await engine.GetCurrentNetworkLatency());
         logger.LogInformation("Current Network speed: {speed}", await engine.GetCurrentNetworkSpeed());
         
-        using var progressReporter = new ConsoleProgressReporter(config.Value);
+        using var progressReporter = new ConsoleProgressReporter(config.Value.ShowProgress);
         await engine.DownloadFile(new OctaneRequest(Url, "test1.zip"), pauseTokenSource, stoppingToken, progressReporter);
         
         lifetime.StopApplication();

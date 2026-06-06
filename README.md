@@ -48,7 +48,7 @@ var engine = EngineBuilder.Create().WithConfiguration(config).Build();
 // Setup download
 var pauseTokenSource = new PauseTokenSource();
 using var cancelTokenSource = new CancellationTokenSource();
-using var progressReporter = new ConsoleProgressReporter(config);
+using var progressReporter = new ConsoleProgressReporter(config.ShowProgress);
         
 // Download the file
 engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource.Token, progressReporter).Wait();  

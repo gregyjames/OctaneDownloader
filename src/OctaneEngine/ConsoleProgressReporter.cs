@@ -5,13 +5,14 @@ namespace OctaneEngineCore;
 
 public class ConsoleProgressReporter : IProgress<DownloadProgress>, IDisposable
 {
-    private readonly OctaneConfiguration _config;
     private ProgressBar? _mainProgressBar;
     private readonly ConcurrentDictionary<int, ChildProgressBar> _childBars = new();
     private readonly object _lock = new();
     private bool _isDisposed;
 
-    private static readonly ProgressBarOptions MainProgressBarOptions = new()
+    public bool ShowProgress { get; set; } = true;
+
+    public ProgressBarOptions MainProgressBarOptions { get; set; } = new()
     {
         ProgressBarOnBottom = false,
         BackgroundCharacter = '\u2593',
@@ -19,7 +20,7 @@ public class ConsoleProgressReporter : IProgress<DownloadProgress>, IDisposable
         DisplayTimeInRealTime = false
     };
 
-    private static readonly ProgressBarOptions ChildProgressBarOptions = new()
+    public ProgressBarOptions ChildProgressBarOptions { get; set; } = new()
     {
         CollapseWhenFinished = true,
         DisplayTimeInRealTime = false,
@@ -29,14 +30,25 @@ public class ConsoleProgressReporter : IProgress<DownloadProgress>, IDisposable
         ShowEstimatedDuration = true
     };
 
-    public ConsoleProgressReporter(OctaneConfiguration config)
+    public ConsoleProgressReporter()
     {
-        _config = config;
+    }
+
+    public ConsoleProgressReporter(bool showProgress)
+    {
+        ShowProgress = showProgress;
+    }
+
+    public ConsoleProgressReporter(bool showProgress, ProgressBarOptions mainOptions, ProgressBarOptions childOptions)
+    {
+        ShowProgress = showProgress;
+        MainProgressBarOptions = mainOptions ?? MainProgressBarOptions;
+        ChildProgressBarOptions = childOptions ?? ChildProgressBarOptions;
     }
 
     public void Report(DownloadProgress value)
     {
-        if (!_config.ShowProgress)
+        if (!ShowProgress)
         {
             return;
         }
