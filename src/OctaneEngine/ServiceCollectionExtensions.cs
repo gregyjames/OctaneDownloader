@@ -6,7 +6,6 @@ using Microsoft.Extensions.Options;
 using OctaneEngineCore.Clients;
 using OctaneEngineCore.Implementations;
 using OctaneEngineCore.Interfaces;
-using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngineCore;
 
@@ -20,7 +19,6 @@ public static class ServiceCollectionExtensions
         hostBuilder.ConfigureServices((context, services) =>
         {
             services.Configure<OctaneConfiguration>(context.Configuration.GetSection("Octane"));
-            services.AddProgressBar();
             services.AddClient();
             services.AddTransient<IEngine, Engine>();
         });
@@ -36,7 +34,6 @@ public static class ServiceCollectionExtensions
         hostBuilder.ConfigureServices((context, services) =>
         {
             services.Configure<OctaneConfiguration>(configure);
-            services.AddProgressBar();
             services.AddClient();
             services.AddTransient<IEngine, Engine>();
         });
@@ -49,7 +46,6 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddOctaneEngine(this IServiceCollection services)
     {
-        services.AddProgressBar();
         services.AddClient();
         services.AddTransient<IEngine, Engine>();
         return services;
@@ -61,7 +57,6 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddOctaneEngine(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<OctaneConfiguration>(configuration.GetSection("Octane"));
-        services.AddProgressBar();
         services.AddClient();
         services.AddTransient<IEngine, Engine>();
         return services;
@@ -73,7 +68,6 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddOctaneEngine(this IServiceCollection services, Action<OctaneConfiguration> configure)
     {
         services.Configure<OctaneConfiguration>(configure);
-        services.AddProgressBar();
         services.AddClient();
         services.AddTransient<IEngine, Engine>();
         return services;
@@ -85,7 +79,6 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddOctaneEngine(this IServiceCollection services, OctaneConfiguration configuration)
     {
         services.AddSingleton<IOptions<OctaneConfiguration>>(Options.Create(configuration));
-        services.AddProgressBar();
         services.AddClient();
         services.AddTransient<IEngine, Engine>();
         return services;

@@ -28,6 +28,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Runtime.ExceptionServices;
@@ -39,7 +40,6 @@ using Microsoft.Extensions.Options;
 using OctaneEngineCore.Clients;
 using OctaneEngineCore.Implementations.NetworkAnalyzer;
 using OctaneEngineCore.Interfaces;
-using OctaneEngineCore.ShellProgressBar;
 // ReSharper disable All
 
 namespace OctaneEngineCore.Implementations;
@@ -94,7 +94,7 @@ public partial class Engine: IEngine, IDisposable
             _config.BytesPerSecond = 1;
 
         _clientFactory = new SingleHttpClientFactory(httpClient);
-        _client = new OctaneClient(_config, httpClient, _factory, null);
+        _client = new OctaneClient(_config, httpClient, _factory);
         _defaultClient = new DefaultClient(httpClient, _config);
     }
         
@@ -192,7 +192,7 @@ public partial class Engine: IEngine, IDisposable
     /// <param name="request">The OctaneRequest Object for the request.</param>
     /// <param name="pauseTokenSource">The pause token source to use for pausing and resuming.</param>
     /// <param name="token">The cancellation token to use for the download.</param>
-    public async Task DownloadFile(OctaneRequest request, PauseTokenSource? pauseTokenSource = null, CancellationToken token = default)
+    public async Task DownloadFile(OctaneRequest request, PauseTokenSource? pauseTokenSource = null, CancellationToken token = default, IProgress<DownloadProgress>? progress = null)
     {
         var stopwatch = new Stopwatch();
         var success = false;
@@ -241,24 +241,60 @@ public partial class Engine: IEngine, IDisposable
                         CancellationToken = cancellation_token,
                         //TaskScheduler = TaskScheduler.Current
                     };
-                    ProgressBar? pbar = null;
                     
-                    if (_config.ShowProgress)
+                    long totalBytes = length;
+                    int totalParts = pieces.Count;
+                    long[] partBytes = new long[totalParts];
+                    bool[] partCompleted = new bool[totalParts];
+                    int partsCompleted = 0;
+                    var progressLock = new object();
+
+                    var internalProgress = new Progress<DownloadProgress>(p =>
                     {
-                        pbar = new ProgressBar(pieces.Count * 2, "Downloading file...");
-                        octaneClient.SetProgressbar(pbar);
-                        defaultClient.SetProgressbar(pbar);
-                    }
+                        lock (progressLock)
+                        {
+                            partBytes[p.PartIndex] = p.PartBytesDownloaded;
+                            if (p.PartCompleted && !partCompleted[p.PartIndex])
+                            {
+                                partCompleted[p.PartIndex] = true;
+                                partsCompleted++;
+                            }
+                            
+                            long overallDownloaded = 0;
+                            for (int i = 0; i < totalParts; i++)
+                            {
+                                overallDownloaded += partBytes[i];
+                            }
+                            
+                            double percentage = totalBytes > 0 ? (double)overallDownloaded / totalBytes * 100.0 : 0.0;
+                            
+                            var report = new DownloadProgress
+                            {
+                                TotalBytes = totalBytes,
+                                BytesDownloaded = overallDownloaded,
+                                ProgressPercentage = percentage,
+                                TotalParts = totalParts,
+                                PartsCompleted = partsCompleted,
+                                PartIndex = p.PartIndex,
+                                PartBytesDownloaded = p.PartBytesDownloaded,
+                                PartTotalBytes = p.PartTotalBytes,
+                                PartCompleted = p.PartCompleted
+                            };
+
+                            progress?.Report(report);
+                        }
+                    });
 
                     try
                     {
-                        await pieces.ForEachAsync(options, async (piece, token) =>
+                        var piecesWithIndex = pieces.Select((piece, index) => (piece, index)).ToList();
+                        await piecesWithIndex.ForEachAsync(options, async (item, token) =>
                         {
-                            await octaneClient.Download(request.Url, piece, request.Headers ?? [], cancellation_token, pause_token.Token);
+                            var (piece, index) = item;
+                            await octaneClient.Download(request.Url, piece, index, totalBytes, request.Headers ?? [], internalProgress, cancellation_token, pause_token.Token);
 
                             Interlocked.Increment(ref tasksDone);
                                 
-                            pbar?.Tick();
                             _config?.ProgressCallback?.Invoke((double)tasksDone / _config.Parts);
                         }).ConfigureAwait(false);
                             
@@ -279,9 +315,15 @@ public partial class Engine: IEngine, IDisposable
                 {
                     LogUsingDefaultClientToDownloadFile();
                     defaultClient.SetMmf(mmf);
+                    long totalBytes = length;
+                    var internalProgress = new Progress<DownloadProgress>(p =>
+                    {
+                        progress?.Report(p);
+                    });
+
                     try
                     {
-                        await defaultClient.Download(request.Url, (0, 0), request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);
+                        await defaultClient.Download(request.Url, (0, 0), 0, totalBytes, request.Headers ?? [], internalProgress, cancellation_token, pause_token.Token).ConfigureAwait(false);
                         success = true;
                     }
                     catch (Exception)

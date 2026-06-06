@@ -27,7 +27,6 @@ using System.Collections.Generic;
 using System.IO.MemoryMappedFiles;
 using System.Threading;
 using System.Threading.Tasks;
-using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngineCore.Clients;
 
@@ -35,6 +34,5 @@ public interface IClient
 {
     public bool IsRangeSupported();
     public void SetMmf(MemoryMappedFile file);
-    public void SetProgressbar(ProgressBar bar);
-    internal Task Download(string url, (long start, long end) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken);
+    internal Task Download(string url, (long start, long end) piece, int partIndex, long totalBytes, Dictionary<string, string>? headers, IProgress<DownloadProgress>? progress, CancellationToken cancellationToken, PauseToken pauseToken);
 }

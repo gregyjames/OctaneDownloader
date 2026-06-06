@@ -30,7 +30,6 @@ using System.IO.Pipelines;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using OctaneEngineCore.ShellProgressBar;
 using OctaneEngineCore;
 
 namespace OctaneEngineCore.Clients;
@@ -38,7 +37,6 @@ namespace OctaneEngineCore.Clients;
 public class DefaultClient : IClient
 {
     private MemoryMappedFile _mmf;
-    private ProgressBar _pBar;
     private readonly HttpClient _httpClient;
     private readonly OctaneConfiguration _config;
     private readonly PipeOptions _pipeOptions;
@@ -68,11 +66,6 @@ public class DefaultClient : IClient
         _mmf = file;
     }
 
-    public void SetProgressbar(ProgressBar bar)
-    {
-        _pBar = bar;
-    }
-    
     private async Task CopyMessageContentToStreamWithProgressAsync(
         HttpResponseMessage message, 
         Stream stream, 
@@ -136,7 +129,7 @@ public class DefaultClient : IClient
         }
     }
     
-    public async Task Download(string url, (long, long) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken)
+    public async Task Download(string url, (long start, long end) piece, int partIndex, long totalBytes, Dictionary<string, string>? headers, IProgress<DownloadProgress>? progress, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         if (pauseToken.IsPaused)
         {
@@ -161,25 +154,32 @@ public class DefaultClient : IClient
         }
 
         long totalWritten = 0;
+        long pieceLength = totalBytes;
         
-        var progress = new System.Progress<long>(bytesWritten =>
+        var progressReporter = new System.Progress<long>(bytesWritten =>
         {
-            totalWritten += bytesWritten;
+            totalWritten = bytesWritten;
 
-            // Only update progress bar if ShowProgress is enabled
-            if (_config.ShowProgress && totalWritten % ((piece.Item2-piece.Item1) / _config.BufferSize) == 0)
+            progress?.Report(new DownloadProgress
             {
-                _pBar?.Tick();
-            }
+                TotalBytes = totalBytes,
+                BytesDownloaded = totalWritten,
+                ProgressPercentage = totalBytes > 0 ? (double)totalWritten / totalBytes * 100.0 : 0.0,
+                TotalParts = 1,
+                PartsCompleted = totalWritten >= pieceLength ? 1 : 0,
+                PartIndex = partIndex,
+                PartBytesDownloaded = totalWritten,
+                PartTotalBytes = pieceLength,
+                PartCompleted = totalWritten >= pieceLength
+            });
         });
         using var stream = _mmf.CreateViewStream();
-        await CopyMessageContentToStreamWithProgressAsync(message, stream, progress);
+        await CopyMessageContentToStreamWithProgressAsync(message, stream, progressReporter);
     }
 
     public void Dispose()
     {
         _httpClient?.Dispose();
         _mmf?.Dispose();
-        _pBar?.Dispose();
     }
 }
