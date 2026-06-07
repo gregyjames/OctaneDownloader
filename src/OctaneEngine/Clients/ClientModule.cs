@@ -57,7 +57,7 @@ public static class ClientModule
 
             if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsIOS())
             {
-                int receiveBufferSize = Math.Max(1024 * 1024, config.BufferSize * 128); // 1MB minimum
+                int receiveBufferSize = Math.Max(1024 * 1024, config.BufferSize * 8); // 1MB minimum
                 int sendBufferSize = 512 * 1024; // 512 KB
                 byte[]? windowsKeepAliveSettings = null;
 
