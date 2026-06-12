@@ -36,7 +36,7 @@ jobs:
     - name: Run Tests
       run: dotnet test --collect:"XPlat Code Coverage"
     - name: Upload coverage
-      uses: codecov/codecov-action@v6
+      uses: codecov/codecov-action@v7
       with:
         files: '**/coverage.cobertura.xml'
         fail_ci_if_error: false
