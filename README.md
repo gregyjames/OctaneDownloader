@@ -31,24 +31,27 @@ dotnet add package OctaneEngineCore
 ```csharp
 const string url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
 
+var config = new OctaneConfiguration {
+        Parts = 8,
+        BufferSize = 8192,
+        ShowProgress = true,
+        NumRetries = 10,
+        BytesPerSecond = 1,
+        UseProxy = false,
+        LowMemoryMode = false,
+        RetryCap = 30
+};
+
 // Create engine directly without builder - no DI required (if you don't want it!)
-var engine = EngineBuilder.Create().WithConfiguration(config => {
-        config.Parts = 8;
-        config.BufferSize = 8192;
-        config.ShowProgress = true;
-        config.NumRetries = 10;
-        config.BytesPerSecond = 1;
-        config.UseProxy = false;
-        config.LowMemoryMode = false;
-        config.RetryCap = 30;
-}).Build();
+var engine = EngineBuilder.Create().WithConfiguration(config).Build();
         
 // Setup download
 var pauseTokenSource = new PauseTokenSource();
 using var cancelTokenSource = new CancellationTokenSource();
+using var progressReporter = new ConsoleProgressReporter(config.ShowProgress);
         
 // Download the file
-engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource.Token).Wait();  
+engine.DownloadFile(new OctaneRequest(url, null), pauseTokenSource, cancelTokenSource.Token, progressReporter).Wait();  
 ```
 ## If you want to use Dependency Injection
 ### Program.cs
@@ -74,11 +77,12 @@ await Host.CreateDefaultBuilder(args).UseSerilog((context, configuration) =>
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using OctaneEngineCore;
 
 namespace OctaneTester;
 
-public class DownloadService(IEngine engine, IHostApplicationLifetime lifetime, ILogger<DownloadService> logger) : BackgroundService
+public class DownloadService(IEngine engine, IOptions<OctaneConfiguration> config, IHostApplicationLifetime lifetime, ILogger<DownloadService> logger) : BackgroundService
 {
     private const string Url = "https://plugins.jetbrains.com/files/7973/281233/sonarlint-intellij-7.4.0.60471.zip?updateId=281233&pluginId=7973&family=INTELLIJ";
 
@@ -87,7 +91,10 @@ public class DownloadService(IEngine engine, IHostApplicationLifetime lifetime, 
         var pauseTokenSource = new PauseTokenSource();
         logger.LogInformation("Current Latency: {latency}", await engine.GetCurrentNetworkLatency());
         logger.LogInformation("Current Network speed: {speed}", await engine.GetCurrentNetworkSpeed());
-        await engine.DownloadFile(new OctaneRequest(Url, null), pauseTokenSource, stoppingToken);
+        
+        using var progressReporter = new ConsoleProgressReporter(config.Value);
+        await engine.DownloadFile(new OctaneRequest(Url, null), pauseTokenSource, stoppingToken, progressReporter);
+        
         lifetime.StopApplication();
     }
 }

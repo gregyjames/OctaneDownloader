@@ -4,7 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace OctaneEngineCore.ShellProgressBar
 {
 	[ExcludeFromCodeCoverage]
-	public class ChildProgressBar : ProgressBarBase, IProgressBar
+	internal class ChildProgressBar : ProgressBarBase, IProgressBar
 	{
 		private readonly Action _scheduleDraw;
 		private readonly Action<string> _writeLine;
