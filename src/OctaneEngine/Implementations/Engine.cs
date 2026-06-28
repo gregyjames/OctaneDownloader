@@ -110,6 +110,8 @@ public partial class Engine: IEngine, IDisposable
     }
     #endregion
 
+    private static readonly HttpClient SharedClient = new HttpClient();
+
     /// <summary>
     /// Gets the optimal number of parts to use to download a file by downloading a small test file (1MB) and testing network latency.
     /// </summary>
@@ -121,8 +123,8 @@ public partial class Engine: IEngine, IDisposable
         if (!Enum.IsDefined(typeof(TestFileSize), sizeToUse))
             throw new InvalidEnumArgumentException(nameof(sizeToUse), (int)sizeToUse,
                 typeof(TestFileSize));
-        using var client = new HttpClient();
-        var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+
+        using var response = await SharedClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         var size_of_file = response.Content.Headers.ContentLength ?? 0;
         var networkSpeed = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.NetworkAnalyzer.GetTestFile(sizeToUse), new HttpDownloader());
         var networkLatency = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkLatency(new PingService());
