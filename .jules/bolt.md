@@ -13,3 +13,7 @@
 ## 2025-05-16 — [Allocation-Free Rendering with ZLinq]
 **Learning:** High-frequency UI rendering (like a CLI progress bar) should avoid standard LINQ operations (.Where, .Select, .ToList) and anonymous objects to minimize GC pressure. While manual loops are effective, libraries like `ZLinq` provide allocation-free LINQ-like extensions using value-typed enumerators, allowing for both readability and performance.
 **Action:** Use `ZLinq` or manual loops to avoid heap allocations in hot paths like render ticks.
+
+## 2025-05-20 — [Network and Memory Optimization]
+**Learning:** Ephemeral `HttpClient` instances in utility methods cause socket exhaustion and connection overhead. Capping socket receive buffers (e.g., from 128MB to 8MB per part) significantly reduces memory pressure without impacting throughput.
+**Action:** Reuse `HttpClient` via an `internal static readonly` field for non-DI utility operations and use `stream.CopyToAsync(Stream.Null)` for efficient data discarding.
