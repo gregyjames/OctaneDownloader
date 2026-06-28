@@ -13,3 +13,7 @@
 ## 2025-05-16 — [Allocation-Free Rendering with ZLinq]
 **Learning:** High-frequency UI rendering (like a CLI progress bar) should avoid standard LINQ operations (.Where, .Select, .ToList) and anonymous objects to minimize GC pressure. While manual loops are effective, libraries like `ZLinq` provide allocation-free LINQ-like extensions using value-typed enumerators, allowing for both readability and performance.
 **Action:** Use `ZLinq` or manual loops to avoid heap allocations in hot paths like render ticks.
+
+## 2026-06-28 — [HttpClient Reuse & Precision]
+**Learning:** Instantiating 'new HttpClient()' in static utility methods causes socket exhaustion and unnecessary connection overhead. Furthermore, using bit-shifting (>> 10) for file size formatting results in loss of precision due to integer division (e.g., '1.46 KB' becomes '1 KB').
+**Action:** Reuse a 'SharedClient' for assembly-wide utility requests and always use floating-point division for accurate reporting. Use 'stream.CopyToAsync(Stream.Null)' for efficient data discard.
