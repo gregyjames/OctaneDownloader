@@ -35,7 +35,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using OctaneEngineCore.Implementations.NetworkAnalyzer;
-using OctaneEngineCore.ShellProgressBar;
 using OctaneEngineCore.Streams;
 
 namespace OctaneEngineCore.Clients;
@@ -48,21 +47,10 @@ public partial class OctaneClient : IClient
     private readonly ILoggerFactory _loggerFactory;
     private ArrayPool<byte> _memPool = ArrayPool<byte>.Shared;
     private MemoryMappedFile? _mmf;
-    private ProgressBar? _progressBar;
     private readonly PipeOptions _pipeOptions;
     private readonly long _tickStep;
-
-    private static readonly ProgressBarOptions ChildProgressBarOptions = new()
-    {
-        CollapseWhenFinished = true,
-        DisplayTimeInRealTime = false,
-        BackgroundColor = ConsoleColor.Magenta,
-        DenseProgressBar = true,
-        DisableBottomPercentage = true,
-        ShowEstimatedDuration = true
-    };
     
-    public OctaneClient(OctaneConfiguration config, HttpClient httpClient, ILoggerFactory loggerFactory, ProgressBar? progressBar = null)
+    public OctaneClient(OctaneConfiguration config, HttpClient httpClient, ILoggerFactory loggerFactory)
     {
         _config = config;
         _pipeOptions = new PipeOptions(
@@ -76,7 +64,6 @@ public partial class OctaneClient : IClient
         );
         _client = httpClient;
         _loggerFactory = loggerFactory;
-        _progressBar = progressBar;
         _log = loggerFactory.CreateLogger<IClient>();
         _tickStep = Math.Max(_config.BufferSize * 2L, 1 * 1024 * 1024L);
     }
@@ -84,7 +71,6 @@ public partial class OctaneClient : IClient
     public bool IsRangeSupported() => true;
 
     public void SetMmf(MemoryMappedFile file) => _mmf = file;
-    public void SetProgressbar(ProgressBar bar) => _progressBar = bar;
     private async ValueTask<HttpResponseMessage> SendRangeRequestAsync(
         Uri uri, 
         (long start, long end) piece, 
@@ -119,7 +105,7 @@ public partial class OctaneClient : IClient
         return response;
     }
     
-    public async Task Download(string url,(long start, long end) piece, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
+    public async Task Download(string url, (long start, long end) piece, int partIndex, long totalBytes, Dictionary<string, string>? headers, IProgress<DownloadProgress>? progress, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         LogSendingRequestForRangePieces(piece.start, piece.end);
         var stopwatch = new Stopwatch();
@@ -149,11 +135,6 @@ public partial class OctaneClient : IClient
                 throttleStream.SetBps(programBps);
             }
 
-            // Only create child progress bar if ShowProgress is enabled, and we have a progress bar
-            using var child = (_config.ShowProgress && _progressBar != null) 
-                ? _progressBar.Spawn(piece.end - piece.start, "Downloading part...", ChildProgressBarOptions)
-                : null;
-
             if (_mmf is null)
             {
                 throw new InvalidOperationException("MMF not initialized before download.");
@@ -161,11 +142,11 @@ public partial class OctaneClient : IClient
             
             if (_config.LowMemoryMode)
             {
-                await LowMemoryDownload(piece, cancellationToken, wrappedStream, child);
+                await LowMemoryDownload(piece, partIndex, totalBytes, progress, cancellationToken, wrappedStream);
             }
             else
             {
-                await RegularDownload(piece, cancellationToken, wrappedStream, child);
+                await RegularDownload(piece, partIndex, totalBytes, progress, cancellationToken, wrappedStream);
             }
         }
         else
@@ -173,16 +154,11 @@ public partial class OctaneClient : IClient
             LogHttpRequestReturnedSuccessStatusCodeCode((int)message.StatusCode, NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end));
         }
         
-        // Only tick the progress bar if ShowProgress is enabled
-        if (_config.ShowProgress)
-        {
-            _progressBar?.Tick();
-        }
         stopwatch.Stop();
         LogPieceExecutionTimeElapsedMilliseconds(NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end), stopwatch.ElapsedMilliseconds);
     }
 
-    private async Task RegularDownload((long start, long end) piece, CancellationToken cancellationToken, Stream wrappedStream, ChildProgressBar? child)
+    private async Task RegularDownload((long start, long end) piece, int partIndex, long totalBytes, IProgress<DownloadProgress>? progress, CancellationToken cancellationToken, Stream wrappedStream)
     {
         int readBufferSize = Math.Max(_config.BufferSize, 256 * 1024);
         var readBuffer = _memPool.Rent(readBufferSize);
@@ -194,6 +170,7 @@ public partial class OctaneClient : IClient
         }
 
         var stream = _mmf.CreateViewStream(piece.start, piece.end - piece.start + 1);
+        long partTotalBytes = piece.end - piece.start + 1;
                 
         try
         {
@@ -211,9 +188,16 @@ public partial class OctaneClient : IClient
                 await stream.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken);
                 bytesReadOverall += bytesRead;
                         
-                if(child != null && (bytesReadOverall - lastProgressUpdate >= progressUpdateInterval))
+                if(progress != null && (bytesReadOverall - lastProgressUpdate >= progressUpdateInterval || bytesReadOverall == partTotalBytes))
                 {
-                    child.Tick(bytesReadOverall);
+                    progress.Report(new DownloadProgress
+                    {
+                        TotalBytes = totalBytes,
+                        PartIndex = partIndex,
+                        PartBytesDownloaded = bytesReadOverall,
+                        PartTotalBytes = partTotalBytes,
+                        PartCompleted = bytesReadOverall >= partTotalBytes
+                    });
                     lastProgressUpdate = bytesReadOverall;
                 }
             }
@@ -227,7 +211,7 @@ public partial class OctaneClient : IClient
         }
     }
 
-    private async Task LowMemoryDownload((long start, long end) piece, CancellationToken cancellationToken, Stream wrappedStream, ChildProgressBar? child)
+    private async Task LowMemoryDownload((long start, long end) piece, int partIndex, long totalBytes, IProgress<DownloadProgress>? progress, CancellationToken cancellationToken, Stream wrappedStream)
     {
         if (_config.BytesPerSecond > 1)
         {
@@ -253,7 +237,7 @@ public partial class OctaneClient : IClient
             {
                 var pipe = new Pipe(_pipeOptions);
                 var writing = FillPipeAsync(wrappedStream, pipe.Writer, cancellationToken);
-                var reading = ReadPipeToFileAsync(pipe.Reader, piece, child, accessorPtr, cancellationToken);
+                var reading = ReadPipeToFileAsync(pipe.Reader, piece, partIndex, totalBytes, progress, accessorPtr, cancellationToken);
                 await Task.WhenAll(reading, writing);
             }
             catch (Exception ex)
@@ -299,10 +283,11 @@ public partial class OctaneClient : IClient
         }
     }
     
-    private async Task ReadPipeToFileAsync(PipeReader reader, (long start, long end) piece, ChildProgressBar? child, IntPtr accessorPtr, CancellationToken token)
+    private async Task ReadPipeToFileAsync(PipeReader reader, (long start, long end) piece, int partIndex, long totalBytes, IProgress<DownloadProgress>? progress, IntPtr accessorPtr, CancellationToken token)
     {
         long accessorLength = piece.end - piece.start + 1;
         long writeOffset = 0;
+        long partTotalBytes = accessorLength;
 
         try
         {
@@ -329,7 +314,14 @@ public partial class OctaneClient : IClient
                     
                     if (writeOffset - lastTick >= _tickStep || writeOffset == accessorLength)
                     {
-                        child?.Tick((int)Math.Min(writeOffset, int.MaxValue));
+                        progress?.Report(new DownloadProgress
+                        {
+                            TotalBytes = totalBytes,
+                            PartIndex = partIndex,
+                            PartBytesDownloaded = writeOffset,
+                            PartTotalBytes = partTotalBytes,
+                            PartCompleted = writeOffset == accessorLength
+                        });
                         lastTick = writeOffset;
                     }
                 }
@@ -359,7 +351,14 @@ public partial class OctaneClient : IClient
 
                         if (writeOffset - lastTick >= _tickStep || writeOffset == accessorLength)
                         {
-                            child?.Tick((int)writeOffset);
+                            progress?.Report(new DownloadProgress
+                            {
+                                TotalBytes = totalBytes,
+                                PartIndex = partIndex,
+                                PartBytesDownloaded = writeOffset,
+                                PartTotalBytes = partTotalBytes,
+                                PartCompleted = writeOffset == accessorLength
+                            });
                             lastTick = writeOffset;
                         }
 

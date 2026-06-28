@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 
 namespace OctaneEngineCore.ShellProgressBar
 {
 	[ExcludeFromCodeCoverage]
-	public class FixedDurationBar : ProgressBar
+	internal class FixedDurationBar : ProgressBar
 	{
 		public bool IsCompleted { get; private set; }
 

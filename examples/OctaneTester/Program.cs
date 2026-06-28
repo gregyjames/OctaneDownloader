@@ -20,7 +20,7 @@ namespace OctaneTester
             {
                 configuration
                     .Enrich.FromLogContext()
-                    .MinimumLevel.Verbose()
+                    .MinimumLevel.Error()
                     .WriteTo.Async(a => a.Console(theme: AnsiConsoleTheme.Sixteen));
             }).ConfigureAppConfiguration(configurationBuilder =>
             {

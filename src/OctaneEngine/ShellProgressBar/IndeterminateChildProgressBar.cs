@@ -5,7 +5,7 @@ using System.Threading;
 namespace OctaneEngineCore.ShellProgressBar
 {
 	[ExcludeFromCodeCoverage]
-	public class IndeterminateChildProgressBar : ChildProgressBar
+	internal class IndeterminateChildProgressBar : ChildProgressBar
 	{
 		private const int MaxTicksForIndeterminate = 20;
 		private Timer _timer;

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace OctaneEngineCore.ShellProgressBar;
 
-public static class ProgressModule
+internal static class ProgressModule
 {
     [ExcludeFromCodeCoverage]
     internal static void AddProgressBar(this IServiceCollection services)

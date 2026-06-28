@@ -8,7 +8,7 @@ namespace OctaneEngineCore.Interfaces;
 
 public interface IEngine
 {
-    public Task DownloadFile(OctaneRequest request, PauseTokenSource pauseTokenSource = null, CancellationToken token = default);
+    public Task DownloadFile(OctaneRequest request, PauseTokenSource pauseTokenSource = null, CancellationToken token = default, IProgress<DownloadProgress>? progress = null);
     public void SetProgressCallback(Action<double> callback);
     public void SetDoneCallback(Action<bool> callback);
     public void SetProxy(IWebProxy proxy);

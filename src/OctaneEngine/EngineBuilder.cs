@@ -7,7 +7,6 @@ using Microsoft.Extensions.Options;
 using OctaneEngineCore.Implementations;
 using OctaneEngineCore.Clients;
 using OctaneEngineCore.Interfaces;
-using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngineCore;
 
@@ -18,7 +17,6 @@ public class EngineBuilder
 {
     private OctaneConfiguration _configuration;
     private ILoggerFactory _loggerFactory;
-    private ProgressBar _progressBar;
     private HttpClient _client;
     private IHttpClientFactory _clientFactory;
 
@@ -58,15 +56,6 @@ public class EngineBuilder
         return this;
     }
 
-    /// <summary>
-    /// Sets the progress bar (optional)
-    /// </summary>
-    public EngineBuilder WithProgressBar(ProgressBar progressBar)
-    {
-        _progressBar = progressBar;
-        return this;
-    }
-    
     /// <summary>
     /// Sets the preconfigured HTTP Client to use (optional)
     /// </summary>
@@ -111,7 +100,7 @@ public class EngineBuilder
             _clientFactory = new SingleHttpClientFactory(_client);
         }
         
-        var octaneClient = new OctaneClient(_configuration, clientToUse, _loggerFactory, _progressBar);
+        var octaneClient = new OctaneClient(_configuration, clientToUse, _loggerFactory);
         var defaultClient = new DefaultClient(clientToUse, _configuration);
 
         // Create engine

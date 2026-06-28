@@ -7,7 +7,7 @@ using System.Threading;
 namespace OctaneEngineCore.ShellProgressBar
 {
 	[ExcludeFromCodeCoverage]
-	public abstract class ProgressBarBase
+	internal abstract class ProgressBarBase
 	{
 		static ProgressBarBase()
 		{
