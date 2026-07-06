@@ -17,3 +17,7 @@
 ## 2026-07-05 — [NetworkAnalyzer and HttpClient Reuse]
 **Learning:** Reusing HttpClient via a static field prevents socket exhaustion and handshake overhead in library utility methods. Using Stream.CopyToAsync(Stream.Null, 1024 * 1024) is the most efficient way to discard data in .NET, reducing system call overhead compared to manual loops. Correcting integer division to floating-point in PrettySize ensures accurate reporting while maintaining performance with ZString.
 **Action:** For internal measurements and utility calls, always prefer a shared HttpClient instance and use Stream.Null for data discard paths.
+
+## 2026-07-06 — [Refined NetworkAnalyzer and HttpClient Optimization]
+**Learning:** Initial optimizations lacked .ConfigureAwait(false) and CancellationToken support, which are critical for library performance and robustness. Reusing HttpClient via a static field is enhanced by configuring SocketsHttpHandler.PooledConnectionLifetime to ensure DNS updates. Restoring the full InternalsVisibleTo with PublicKey is necessary for projects that enforce assembly signing.
+**Action:** Always include .ConfigureAwait(false) and CancellationToken in library networking calls. Use conditional compilation for framework-specific SocketsHttpHandler optimizations.

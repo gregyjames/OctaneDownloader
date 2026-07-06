@@ -14,5 +14,5 @@ public interface IEngine
     public void SetProxy(IWebProxy proxy);
 
     public Task<string> GetCurrentNetworkLatency();
-    public Task<string> GetCurrentNetworkSpeed();
+    public Task<string> GetCurrentNetworkSpeed(CancellationToken cancellationToken = default);
 }
