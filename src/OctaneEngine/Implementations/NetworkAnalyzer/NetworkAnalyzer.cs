@@ -62,11 +62,11 @@ internal static class NetworkAnalyzer
             _ => (url: "", size: 0)
         };
     }
-    internal static async Task<int> GetNetworkLatency(IPingService service)
+    internal static async Task<int> GetNetworkLatency(IPingService service, CancellationToken cancellationToken = default)
     {
         // Measure the network latency by pinging a fast server
         const string pingUrl = "www.google.com";
-        var reply = await service.SendPingAsync(pingUrl).ConfigureAwait(false);
+        var reply = await service.SendPingAsync(pingUrl, cancellationToken).ConfigureAwait(false);
         if (reply?.Status == IPStatus.Success)
         {
             var latency = (int)reply.RoundtripTime;
@@ -98,9 +98,9 @@ internal static class NetworkAnalyzer
         var networkSpeed = (int)Math.Round(testFile.size / downloadTime);
         return networkSpeed;
     }
-    public static async Task<string> GetCurrentNetworkLatency(IPingService service)
+    public static async Task<string> GetCurrentNetworkLatency(IPingService service, CancellationToken cancellationToken = default)
     {
-        return $"{await GetNetworkLatency(service).ConfigureAwait(false)}ms";
+        return $"{await GetNetworkLatency(service, cancellationToken).ConfigureAwait(false)}ms";
     }
     public static async Task<string> GetCurrentNetworkSpeed(CancellationToken cancellationToken = default)
     {

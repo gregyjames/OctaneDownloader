@@ -125,16 +125,16 @@ public partial class Engine: IEngine, IDisposable
         using var response = await NetworkAnalyzer.NetworkAnalyzer.SharedClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         var size_of_file = response.Content.Headers.ContentLength ?? 0;
         var networkSpeed = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.NetworkAnalyzer.GetTestFile(sizeToUse), cancellationToken).ConfigureAwait(false);
-        var networkLatency = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkLatency(new PingService()).ConfigureAwait(false);
+        var networkLatency = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkLatency(new PingService(), cancellationToken).ConfigureAwait(false);
         int chunkSize = (int)Math.Ceiling(Math.Sqrt((double)networkSpeed * networkLatency));
         int numParts = (int)Math.Ceiling((double)size_of_file / chunkSize);
         numParts = Math.Min(numParts, Environment.ProcessorCount);
         return numParts;
     }
         
-    public async Task<string> GetCurrentNetworkLatency()
+    public async Task<string> GetCurrentNetworkLatency(CancellationToken cancellationToken = default)
     {
-        return $"{await NetworkAnalyzer.NetworkAnalyzer.GetNetworkLatency(new PingService()).ConfigureAwait(false)}ms";
+        return $"{await NetworkAnalyzer.NetworkAnalyzer.GetNetworkLatency(new PingService(), cancellationToken).ConfigureAwait(false)}ms";
     }
     public async Task<string> GetCurrentNetworkSpeed(CancellationToken cancellationToken = default)
     {

@@ -21,3 +21,7 @@
 ## 2026-07-06 — [Refined NetworkAnalyzer and HttpClient Optimization]
 **Learning:** Initial optimizations lacked .ConfigureAwait(false) and CancellationToken support, which are critical for library performance and robustness. Reusing HttpClient via a static field is enhanced by configuring SocketsHttpHandler.PooledConnectionLifetime to ensure DNS updates. Restoring the full InternalsVisibleTo with PublicKey is necessary for projects that enforce assembly signing.
 **Action:** Always include .ConfigureAwait(false) and CancellationToken in library networking calls. Use conditional compilation for framework-specific SocketsHttpHandler optimizations.
+
+## 2026-07-06 — [Comprehensive Diagnostic and Resource Optimization]
+**Learning:** Extending CancellationToken support to IPingService and using modern SendPingAsync overloads (.NET 7+) ensures all diagnostic paths are robust. Reusing SharedClient in HttpDownloader further eliminates redundant connection overhead. Conditional compilation allows for using modern APIs while maintaining multi-targeting support.
+**Action:** Always verify library interfaces for CancellationToken consistency. Use #if NET7_0_OR_GREATER for modern Ping APIs.

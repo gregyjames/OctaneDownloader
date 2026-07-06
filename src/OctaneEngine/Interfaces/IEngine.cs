@@ -13,6 +13,6 @@ public interface IEngine
     public void SetDoneCallback(Action<bool> callback);
     public void SetProxy(IWebProxy proxy);
 
-    public Task<string> GetCurrentNetworkLatency();
+    public Task<string> GetCurrentNetworkLatency(CancellationToken cancellationToken = default);
     public Task<string> GetCurrentNetworkSpeed(CancellationToken cancellationToken = default);
 }
