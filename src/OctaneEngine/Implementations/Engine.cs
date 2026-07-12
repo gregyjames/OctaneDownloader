@@ -122,7 +122,8 @@ public partial class Engine: IEngine, IDisposable
             throw new InvalidEnumArgumentException(nameof(sizeToUse), (int)sizeToUse,
                 typeof(TestFileSize));
 
-        using var response = await NetworkAnalyzer.NetworkAnalyzer.SharedClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        using var request = new HttpRequestMessage(HttpMethod.Head, url);
+        using var response = await NetworkAnalyzer.NetworkAnalyzer.SharedClient.SendAsync(request);
         var size_of_file = response.Content.Headers.ContentLength ?? 0;
         var networkSpeed = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.NetworkAnalyzer.GetTestFile(sizeToUse));
         var networkLatency = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkLatency(new PingService());
