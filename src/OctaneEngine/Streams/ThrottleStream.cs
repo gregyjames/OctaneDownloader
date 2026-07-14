@@ -87,11 +87,14 @@ public partial class ThrottleStream : Stream
             
             if (maxBytesPerSecond > 0)
             {
+                int tokensPerPeriod = Math.Max(1, maxBytesPerSecond / 10);
+                TimeSpan replenishmentPeriod = TimeSpan.FromSeconds((double)tokensPerPeriod / maxBytesPerSecond);
+
                 _snapshot = new LimiterSnapshot(maxBytesPerSecond, new TokenBucketRateLimiter(new TokenBucketRateLimiterOptions
                 {
                     TokenLimit = maxBytesPerSecond,
-                    TokensPerPeriod = Math.Max(1, maxBytesPerSecond / 10),
-                    ReplenishmentPeriod = TimeSpan.FromMilliseconds(100),
+                    TokensPerPeriod = tokensPerPeriod,
+                    ReplenishmentPeriod = replenishmentPeriod,
                     AutoReplenishment = true,
                     QueueLimit = int.MaxValue,
                     QueueProcessingOrder = QueueProcessingOrder.OldestFirst
