@@ -32,10 +32,32 @@ namespace OctaneEngineCore.Streams;
 
 public partial class ThrottleStream : Stream
 {
+    private sealed class LimiterSnapshot
+    {
+        public int Bps { get; }
+        public TokenBucketRateLimiter? Limiter { get; }
+        private int _refCount = 1;
+
+        public LimiterSnapshot(int bps, TokenBucketRateLimiter? limiter)
+        {
+            Bps = bps;
+            Limiter = limiter;
+        }
+
+        public void AddRef() => Interlocked.Increment(ref _refCount);
+
+        public void Release()
+        {
+            if (Interlocked.Decrement(ref _refCount) == 0)
+            {
+                Limiter?.Dispose();
+            }
+        }
+    }
+
     private readonly ILogger<ThrottleStream> _log;
-    private int _maxBps;
     private Stream _parentStream;
-    private TokenBucketRateLimiter? _rateLimiter;
+    private LimiterSnapshot? _snapshot;
     private readonly object _limiterLock = new();
 
     public ThrottleStream(ILoggerFactory factory)
@@ -58,14 +80,14 @@ public partial class ThrottleStream : Stream
 
     public void SetBps(int maxBytesPerSecond)
     {
-        _maxBps = maxBytesPerSecond;
+        LimiterSnapshot? oldSnapshot;
         lock (_limiterLock)
         {
-            var oldLimiter = _rateLimiter;
+            oldSnapshot = _snapshot;
             
             if (maxBytesPerSecond > 0)
             {
-                _rateLimiter = new TokenBucketRateLimiter(new TokenBucketRateLimiterOptions
+                _snapshot = new LimiterSnapshot(maxBytesPerSecond, new TokenBucketRateLimiter(new TokenBucketRateLimiterOptions
                 {
                     TokenLimit = maxBytesPerSecond,
                     TokensPerPeriod = Math.Max(1, maxBytesPerSecond / 10),
@@ -73,15 +95,14 @@ public partial class ThrottleStream : Stream
                     AutoReplenishment = true,
                     QueueLimit = int.MaxValue,
                     QueueProcessingOrder = QueueProcessingOrder.OldestFirst
-                });
+                }));
             }
             else
             {
-                _rateLimiter = null;
+                _snapshot = null;
             }
-
-            oldLimiter?.Dispose();
         }
+        oldSnapshot?.Release();
     }
 
     public override bool CanRead => _parentStream.CanRead;
@@ -113,64 +134,106 @@ public partial class ThrottleStream : Stream
     public override int Read(byte[] buffer, int offset, int count)
     {
         LogThrottleStreamRead();
-        TokenBucketRateLimiter? limiter;
-        lock (_limiterLock) { limiter = _rateLimiter; }
-
-        int maxToRead = count;
-        if (limiter != null)
-            maxToRead = Math.Min(count, _maxBps);
-
-        var read = _parentStream.Read(buffer, offset, maxToRead);
-
-        if (limiter != null && read > 0)
+        LimiterSnapshot? snap;
+        lock (_limiterLock)
         {
-            using var lease = limiter.AcquireAsync(read).AsTask().GetAwaiter().GetResult();
+            snap = _snapshot;
+            snap?.AddRef();
         }
 
-        return read;
+        try
+        {
+            int maxToRead = count;
+            if (snap != null)
+                maxToRead = Math.Min(count, snap.Bps);
+
+            var read = _parentStream.Read(buffer, offset, maxToRead);
+
+            if (snap?.Limiter != null && read > 0)
+            {
+                using var lease = snap.Limiter.AcquireAsync(read).AsTask().GetAwaiter().GetResult();
+                if (!lease.IsAcquired) throw new InvalidOperationException("Rate limit lease was not acquired.");
+            }
+
+            return read;
+        }
+        finally
+        {
+            snap?.Release();
+        }
     }
 
     public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
     {
         LogThrottleStreamRead();
-        TokenBucketRateLimiter? limiter;
-        lock (_limiterLock) { limiter = _rateLimiter; }
-
-        int maxToRead = count;
-        if (limiter != null)
-            maxToRead = Math.Min(count, _maxBps);
-
-        var read = await _parentStream.ReadAsync(buffer, offset, maxToRead, cancellationToken).ConfigureAwait(false);
-
-        if (limiter != null && read > 0)
+        LimiterSnapshot? snap;
+        lock (_limiterLock)
         {
-            using var lease = await limiter.AcquireAsync(read, cancellationToken).ConfigureAwait(false);
-            if (!lease.IsAcquired) cancellationToken.ThrowIfCancellationRequested();
+            snap = _snapshot;
+            snap?.AddRef();
         }
 
-        return read;
+        try
+        {
+            int maxToRead = count;
+            if (snap != null)
+                maxToRead = Math.Min(count, snap.Bps);
+
+            var read = await _parentStream.ReadAsync(buffer, offset, maxToRead, cancellationToken).ConfigureAwait(false);
+
+            if (snap?.Limiter != null && read > 0)
+            {
+                using var lease = await snap.Limiter.AcquireAsync(read, cancellationToken).ConfigureAwait(false);
+                if (!lease.IsAcquired)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    throw new InvalidOperationException("Rate limit lease was not acquired.");
+                }
+            }
+
+            return read;
+        }
+        finally
+        {
+            snap?.Release();
+        }
     }
 
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP || NET5_0_OR_GREATER
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
     {
         LogThrottleStreamRead();
-        TokenBucketRateLimiter? limiter;
-        lock (_limiterLock) { limiter = _rateLimiter; }
-
-        int maxToRead = buffer.Length;
-        if (limiter != null)
-            maxToRead = Math.Min(maxToRead, _maxBps);
-
-        var read = await _parentStream.ReadAsync(buffer[..maxToRead], token).ConfigureAwait(false);
-
-        if (limiter != null && read > 0)
+        LimiterSnapshot? snap;
+        lock (_limiterLock)
         {
-            using var lease = await limiter.AcquireAsync(read, token).ConfigureAwait(false);
-            if (!lease.IsAcquired) token.ThrowIfCancellationRequested();
+            snap = _snapshot;
+            snap?.AddRef();
         }
 
-        return read;
+        try
+        {
+            int maxToRead = buffer.Length;
+            if (snap != null)
+                maxToRead = Math.Min(maxToRead, snap.Bps);
+
+            var read = await _parentStream.ReadAsync(buffer[..maxToRead], token).ConfigureAwait(false);
+
+            if (snap?.Limiter != null && read > 0)
+            {
+                using var lease = await snap.Limiter.AcquireAsync(read, token).ConfigureAwait(false);
+                if (!lease.IsAcquired)
+                {
+                    token.ThrowIfCancellationRequested();
+                    throw new InvalidOperationException("Rate limit lease was not acquired.");
+                }
+            }
+
+            return read;
+        }
+        finally
+        {
+            snap?.Release();
+        }
     }
 #endif
 
@@ -181,20 +244,32 @@ public partial class ThrottleStream : Stream
 
         while (totalWritten < count)
         {
-            int toWrite = count - totalWritten;
-            TokenBucketRateLimiter? limiter;
-            lock (_limiterLock) { limiter = _rateLimiter; }
-
-            if (limiter != null)
-                toWrite = Math.Min(toWrite, _maxBps);
-
-            if (limiter != null)
+            LimiterSnapshot? snap;
+            lock (_limiterLock)
             {
-                using var lease = limiter.AcquireAsync(toWrite).AsTask().GetAwaiter().GetResult();
+                snap = _snapshot;
+                snap?.AddRef();
             }
 
-            _parentStream.Write(buffer, offset + totalWritten, toWrite);
-            totalWritten += toWrite;
+            try
+            {
+                int toWrite = count - totalWritten;
+                if (snap != null)
+                    toWrite = Math.Min(toWrite, snap.Bps);
+
+                if (snap?.Limiter != null)
+                {
+                    using var lease = snap.Limiter.AcquireAsync(toWrite).AsTask().GetAwaiter().GetResult();
+                    if (!lease.IsAcquired) throw new InvalidOperationException("Rate limit lease was not acquired.");
+                }
+
+                _parentStream.Write(buffer, offset + totalWritten, toWrite);
+                totalWritten += toWrite;
+            }
+            finally
+            {
+                snap?.Release();
+            }
         }
     }
 
@@ -205,21 +280,36 @@ public partial class ThrottleStream : Stream
 
         while (totalWritten < count)
         {
-            int toWrite = count - totalWritten;
-            TokenBucketRateLimiter? limiter;
-            lock (_limiterLock) { limiter = _rateLimiter; }
-
-            if (limiter != null)
-                toWrite = Math.Min(toWrite, _maxBps);
-
-            if (limiter != null)
+            LimiterSnapshot? snap;
+            lock (_limiterLock)
             {
-                using var lease = await limiter.AcquireAsync(toWrite, cancellationToken).ConfigureAwait(false);
-                if (!lease.IsAcquired) cancellationToken.ThrowIfCancellationRequested();
+                snap = _snapshot;
+                snap?.AddRef();
             }
 
-            await _parentStream.WriteAsync(buffer, offset + totalWritten, toWrite, cancellationToken).ConfigureAwait(false);
-            totalWritten += toWrite;
+            try
+            {
+                int toWrite = count - totalWritten;
+                if (snap != null)
+                    toWrite = Math.Min(toWrite, snap.Bps);
+
+                if (snap?.Limiter != null)
+                {
+                    using var lease = await snap.Limiter.AcquireAsync(toWrite, cancellationToken).ConfigureAwait(false);
+                    if (!lease.IsAcquired)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        throw new InvalidOperationException("Rate limit lease was not acquired.");
+                    }
+                }
+
+                await _parentStream.WriteAsync(buffer, offset + totalWritten, toWrite, cancellationToken).ConfigureAwait(false);
+                totalWritten += toWrite;
+            }
+            finally
+            {
+                snap?.Release();
+            }
         }
     }
 
@@ -232,21 +322,36 @@ public partial class ThrottleStream : Stream
 
         while (totalWritten < count)
         {
-            int toWrite = count - totalWritten;
-            TokenBucketRateLimiter? limiter;
-            lock (_limiterLock) { limiter = _rateLimiter; }
-
-            if (limiter != null)
-                toWrite = Math.Min(toWrite, _maxBps);
-
-            if (limiter != null)
+            LimiterSnapshot? snap;
+            lock (_limiterLock)
             {
-                using var lease = await limiter.AcquireAsync(toWrite, token).ConfigureAwait(false);
-                if (!lease.IsAcquired) token.ThrowIfCancellationRequested();
+                snap = _snapshot;
+                snap?.AddRef();
             }
 
-            await _parentStream.WriteAsync(buffer.Slice(totalWritten, toWrite), token).ConfigureAwait(false);
-            totalWritten += toWrite;
+            try
+            {
+                int toWrite = count - totalWritten;
+                if (snap != null)
+                    toWrite = Math.Min(toWrite, snap.Bps);
+
+                if (snap?.Limiter != null)
+                {
+                    using var lease = await snap.Limiter.AcquireAsync(toWrite, token).ConfigureAwait(false);
+                    if (!lease.IsAcquired)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        throw new InvalidOperationException("Rate limit lease was not acquired.");
+                    }
+                }
+
+                await _parentStream.WriteAsync(buffer.Slice(totalWritten, toWrite), token).ConfigureAwait(false);
+                totalWritten += toWrite;
+            }
+            finally
+            {
+                snap?.Release();
+            }
         }
     }
 #endif
@@ -256,10 +361,13 @@ public partial class ThrottleStream : Stream
         if (disposing)
         {
             _parentStream?.Dispose();
+            LimiterSnapshot? oldSnap;
             lock (_limiterLock)
             {
-                _rateLimiter?.Dispose();
+                oldSnap = _snapshot;
+                _snapshot = null;
             }
+            oldSnap?.Release();
         }
 
         base.Dispose(disposing);
@@ -272,10 +380,13 @@ public partial class ThrottleStream : Stream
         {
             await _parentStream.DisposeAsync().ConfigureAwait(false);
         }
+        LimiterSnapshot? oldSnap;
         lock (_limiterLock)
         {
-            _rateLimiter?.Dispose();
+            oldSnap = _snapshot;
+            _snapshot = null;
         }
+        oldSnap?.Release();
     }
 #endif
 
