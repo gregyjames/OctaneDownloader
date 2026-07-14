@@ -56,16 +56,18 @@ public class PauseTokenTests
 
         int? continuationThreadId = null;
         var tcs = new TaskCompletionSource<bool>();
+        var handshakeTcs = new TaskCompletionSource<bool>();
 
         var waitTask = Task.Run(async () =>
         {
-            await token.WaitWhilePausedAsync();
+            var task = token.WaitWhilePausedAsync();
+            handshakeTcs.SetResult(true);
+            await task;
             continuationThreadId = Environment.CurrentManagedThreadId;
             tcs.SetResult(true);
         });
 
-        // Give it a moment to actually hit the await
-        await Task.Delay(50); 
+        await handshakeTcs.Task; 
         
         var resumeThreadId = Environment.CurrentManagedThreadId;
         source.Resume();
