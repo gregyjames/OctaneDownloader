@@ -13,3 +13,7 @@
 ## 2025-05-16 — [Allocation-Free Rendering with ZLinq]
 **Learning:** High-frequency UI rendering (like a CLI progress bar) should avoid standard LINQ operations (.Where, .Select, .ToList) and anonymous objects to minimize GC pressure. While manual loops are effective, libraries like `ZLinq` provide allocation-free LINQ-like extensions using value-typed enumerators, allowing for both readability and performance.
 **Action:** Use `ZLinq` or manual loops to avoid heap allocations in hot paths like render ticks.
+
+## 2025-05-17 — [O(1) Branch-Based Formatting in PrettySize]
+**Learning:** Loop-based byte formatting functions with right-shifts lose floating-point precision, resulting in truncated numbers (e.g., '1 KB' instead of '1.46 KB') despite using format strings like '{0:0.##}'. An O(1) branch-based division avoids unnecessary looping and right-shifting, while correctly preserving double precision for formatting.
+**Action:** Replaced the while-loop in `NetworkAnalyzer.PrettySize` with a clean, branch-based division that preserves decimal precision and runs O(1).
