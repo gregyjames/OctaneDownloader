@@ -90,7 +90,7 @@ namespace OctaneTestProject
             var buffer = new byte[1000]; // Would take 10 seconds to write
             using var cts = new CancellationTokenSource(200); // Cancel after 200ms
             
-            Assert.CatchAsync<OperationCanceledException>((Func<Task>)(async () =>
+            Assert.CatchAsync<OperationCanceledException>((AsyncTestDelegate)(async () =>
             {
                 await ts.WriteAsync(buffer, 0, buffer.Length, cts.Token);
             }));
@@ -138,7 +138,7 @@ namespace OctaneTestProject
             var ms = new MemoryStream();
             var ts = new ThrottleStream(ms, 1024, _factory);
             await ts.DisposeAsync();
-            Assert.Throws<ObjectDisposedException>((TestDelegate)(() => ms.WriteByte(1)));
+            Assert.Throws<ObjectDisposedException>((Action)(() => ms.WriteByte(1)));
         }
 
         [Test]
@@ -147,7 +147,7 @@ namespace OctaneTestProject
             var ms = new MemoryStream();
             var ts = new ThrottleStream(ms, 1024, _factory);
             ts.Dispose();
-            Assert.Throws<ObjectDisposedException>((TestDelegate)(() => ms.WriteByte(1)));
+            Assert.Throws<ObjectDisposedException>((Action)(() => ms.WriteByte(1)));
         }
     }
 }
