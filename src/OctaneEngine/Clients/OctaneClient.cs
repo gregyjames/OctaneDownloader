@@ -249,7 +249,7 @@ public partial class OctaneClient : IClient
             {
                 var pipe = new Pipe(_pipeOptions);
                 var writing = FillPipeAsync(wrappedStream, pipe.Writer, cancellationToken, pauseToken);
-                var reading = ReadPipeToFileAsync(pipe.Reader, piece, child, accessorPtr, cancellationToken);
+                var reading = ReadPipeToFileAsync(pipe.Reader, piece, child, accessorPtr, cancellationToken, pauseToken);
                 await Task.WhenAll(reading, writing);
             }
             catch (OperationCanceledException)
@@ -301,7 +301,7 @@ public partial class OctaneClient : IClient
         }
     }
     
-    private async Task ReadPipeToFileAsync(PipeReader reader, (long start, long end) piece, ChildProgressBar? child, IntPtr accessorPtr, CancellationToken token)
+    private async Task ReadPipeToFileAsync(PipeReader reader, (long start, long end) piece, ChildProgressBar? child, IntPtr accessorPtr, CancellationToken token, PauseToken pauseToken)
     {
         long accessorLength = piece.end - piece.start + 1;
         long writeOffset = 0;
@@ -314,6 +314,8 @@ public partial class OctaneClient : IClient
             {
                 if (!reader.TryRead(out ReadResult result))
                     result = await reader.ReadAsync(token);
+
+                await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
 
                 ReadOnlySequence<byte> buffer = result.Buffer;
 
