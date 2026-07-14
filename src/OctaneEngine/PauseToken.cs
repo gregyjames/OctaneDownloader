@@ -21,6 +21,7 @@
  * SOFTWARE.
  */
 
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -38,11 +39,14 @@ public readonly struct PauseToken
         _log = log;
     }
 
-    public Task WaitWhilePausedAsync()
+    public Task WaitWhilePausedAsync(CancellationToken token = default)
     {
-        _log.LogInformation("Waiting for task to resume...");
-        return IsPaused
-            ? _tokenSource.WaitWhilePausedAsync()
-            : PauseTokenSource.CompletedTask;
+        var task = _tokenSource?.WaitWhilePausedAsync();
+        
+        // If there's no source, or the source returned a completed task (i.e. not paused)
+        if (task == null || task.IsCompleted)
+            return Task.CompletedTask;
+
+        return task.WaitAsync(token);
     }
 }

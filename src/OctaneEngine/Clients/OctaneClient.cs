@@ -121,20 +121,15 @@ public partial class OctaneClient : IClient
     
     public async Task Download(string url,(long start, long end) piece, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
+        await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
         LogSendingRequestForRangePieces(piece.start, piece.end);
         var stopwatch = new Stopwatch();
-        
         var uri = new Uri(url, UriKind.Absolute);
         using var message = await SendRangeRequestAsync(uri, piece, headers, cancellationToken).ConfigureAwait(false);
         
         #region Variable Declaration
         var programBps = _config.BytesPerSecond / _config.Parts;
         #endregion
-        
-        if (pauseToken.IsPaused)
-        {
-            await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
-        }
         
         stopwatch.Start();
         if (message.IsSuccessStatusCode)
@@ -161,11 +156,11 @@ public partial class OctaneClient : IClient
             
             if (_config.LowMemoryMode)
             {
-                await LowMemoryDownload(piece, cancellationToken, wrappedStream, child);
+                await LowMemoryDownload(piece, cancellationToken, wrappedStream, child, pauseToken);
             }
             else
             {
-                await RegularDownload(piece, cancellationToken, wrappedStream, child);
+                await RegularDownload(piece, cancellationToken, wrappedStream, child, pauseToken);
             }
         }
         else
@@ -182,7 +177,7 @@ public partial class OctaneClient : IClient
         LogPieceExecutionTimeElapsedMilliseconds(NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end), stopwatch.ElapsedMilliseconds);
     }
 
-    private async Task RegularDownload((long start, long end) piece, CancellationToken cancellationToken, Stream wrappedStream, ChildProgressBar? child)
+    private async Task RegularDownload((long start, long end) piece, CancellationToken cancellationToken, Stream wrappedStream, ChildProgressBar? child, PauseToken pauseToken)
     {
         int readBufferSize = Math.Max(_config.BufferSize, 256 * 1024);
         var readBuffer = _memPool.Rent(readBufferSize);
@@ -203,6 +198,7 @@ public partial class OctaneClient : IClient
             while (true)
             {
                 var bytesRead = await wrappedStream.ReadAsync(readBuffer.AsMemory(), cancellationToken);
+                await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
                 if (bytesRead == 0)
                 {
                     break;
@@ -227,7 +223,7 @@ public partial class OctaneClient : IClient
         }
     }
 
-    private async Task LowMemoryDownload((long start, long end) piece, CancellationToken cancellationToken, Stream wrappedStream, ChildProgressBar? child)
+    private async Task LowMemoryDownload((long start, long end) piece, CancellationToken cancellationToken, Stream wrappedStream, ChildProgressBar? child, PauseToken pauseToken)
     {
         if (_config.BytesPerSecond > 1)
         {
@@ -252,13 +248,18 @@ public partial class OctaneClient : IClient
             try
             {
                 var pipe = new Pipe(_pipeOptions);
-                var writing = FillPipeAsync(wrappedStream, pipe.Writer, cancellationToken);
-                var reading = ReadPipeToFileAsync(pipe.Reader, piece, child, accessorPtr, cancellationToken);
+                var writing = FillPipeAsync(wrappedStream, pipe.Writer, cancellationToken, pauseToken);
+                var reading = ReadPipeToFileAsync(pipe.Reader, piece, child, accessorPtr, cancellationToken, pauseToken);
                 await Task.WhenAll(reading, writing);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 LogError(ex);
+                throw;
             }
         }
         finally{
@@ -270,7 +271,7 @@ public partial class OctaneClient : IClient
         }
     }
 
-    private async Task FillPipeAsync(Stream stream, PipeWriter writer, CancellationToken token)
+    private async Task FillPipeAsync(Stream stream, PipeWriter writer, CancellationToken token, PauseToken pauseToken)
     {
         int bufferSize = Math.Max(_config.BufferSize, 512 * 1024);
 
@@ -279,7 +280,8 @@ public partial class OctaneClient : IClient
             while (true)
             {
                 var memory = writer.GetMemory(bufferSize);
-                int bytesRead = await stream.ReadAsync(memory, token);
+                var bytesRead = await stream.ReadAsync(memory, token);
+                await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
                 if (bytesRead == 0)
                 {
                     break;
@@ -299,7 +301,7 @@ public partial class OctaneClient : IClient
         }
     }
     
-    private async Task ReadPipeToFileAsync(PipeReader reader, (long start, long end) piece, ChildProgressBar? child, IntPtr accessorPtr, CancellationToken token)
+    private async Task ReadPipeToFileAsync(PipeReader reader, (long start, long end) piece, ChildProgressBar? child, IntPtr accessorPtr, CancellationToken token, PauseToken pauseToken)
     {
         long accessorLength = piece.end - piece.start + 1;
         long writeOffset = 0;
@@ -312,6 +314,8 @@ public partial class OctaneClient : IClient
             {
                 if (!reader.TryRead(out ReadResult result))
                     result = await reader.ReadAsync(token);
+
+                await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
 
                 ReadOnlySequence<byte> buffer = result.Buffer;
 

@@ -76,25 +76,28 @@ public class DefaultClient : IClient
     private async Task CopyMessageContentToStreamWithProgressAsync(
         HttpResponseMessage message, 
         Stream stream, 
-        IProgress<long> progress)
+        IProgress<long> progress,
+        PauseToken pauseToken,
+        CancellationToken cancellationToken)
     {
         using var contentStream = await message.Content.ReadAsStreamAsync();
 
         var pipe = new Pipe(_pipeOptions);
-        var fillTask = FillPipeAsync(contentStream, pipe.Writer);
-        var readTask = ReadPipeAsync(pipe.Reader, stream, progress);
+        var fillTask = FillPipeAsync(contentStream, pipe.Writer, pauseToken, cancellationToken);
+        var readTask = ReadPipeAsync(pipe.Reader, stream, progress, pauseToken, cancellationToken);
         
         await Task.WhenAll(fillTask, readTask);
     }
 
-    private async Task FillPipeAsync(Stream source, PipeWriter writer)
+    private async Task FillPipeAsync(Stream source, PipeWriter writer, PauseToken pauseToken, CancellationToken cancellationToken)
     { 
         int bufferSize = Math.Max(1024*512, _config.BufferSize);
 
         while (true)
         {
             Memory<byte> memory = writer.GetMemory(bufferSize);
-            int bytesRead = await source.ReadAsync(memory);
+            int bytesRead = await source.ReadAsync(memory, cancellationToken);
+            await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
 
             if (bytesRead == 0)
             {
@@ -111,13 +114,14 @@ public class DefaultClient : IClient
         }
     }
 
-    private async Task ReadPipeAsync(PipeReader reader, Stream destination, IProgress<long> progress)
+    private async Task ReadPipeAsync(PipeReader reader, Stream destination, IProgress<long> progress, PauseToken pauseToken, CancellationToken cancellationToken)
     {
         long totalBytesWritten = 0;
 
         while (true)
         {
-            ReadResult result = await reader.ReadAsync();
+            ReadResult result = await reader.ReadAsync(cancellationToken);
+            await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
             ReadOnlySequence<byte> buffer = result.Buffer;
 
             foreach (var segment in buffer)
@@ -138,10 +142,7 @@ public class DefaultClient : IClient
     
     public async Task Download(string url, (long, long) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
-        if (pauseToken.IsPaused)
-        {
-            await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
-        }
+        await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
         if (headers != null)
@@ -155,10 +156,7 @@ public class DefaultClient : IClient
         var message = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
         
-        if (pauseToken.IsPaused)
-        {
-            await pauseToken.WaitWhilePausedAsync().ConfigureAwait(false);
-        }
+        await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
 
         long totalWritten = 0;
         
@@ -173,7 +171,7 @@ public class DefaultClient : IClient
             }
         });
         using var stream = _mmf.CreateViewStream();
-        await CopyMessageContentToStreamWithProgressAsync(message, stream, progress);
+        await CopyMessageContentToStreamWithProgressAsync(message, stream, progress, pauseToken, cancellationToken);
     }
 
     public void Dispose()
