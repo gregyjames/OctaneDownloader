@@ -53,7 +53,7 @@ public class PauseTokenSource
     public void Pause()
     {
         _log.LogInformation("Download task was paused...");
-        Interlocked.CompareExchange(ref _paused, new TaskCompletionSource<bool>(), null);
+        Interlocked.CompareExchange(ref _paused, new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously), null);
     }
 
     public void Resume()
@@ -74,7 +74,12 @@ public class PauseTokenSource
 
     public Task WaitWhilePausedAsync()
     {
-        _log.LogInformation("Waiting for download task to resume...");
-        return _paused?.Task ?? CompletedTask;
+        var task = _paused?.Task;
+        if (task != null && !task.IsCompleted)
+        {
+            _log.LogInformation("Waiting for download task to resume...");
+            return task;
+        }
+        return CompletedTask;
     }
 }
