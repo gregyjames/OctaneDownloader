@@ -252,9 +252,14 @@ public partial class OctaneClient : IClient
                 var reading = ReadPipeToFileAsync(pipe.Reader, piece, child, accessorPtr, cancellationToken);
                 await Task.WhenAll(reading, writing);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 LogError(ex);
+                throw;
             }
         }
         finally{
