@@ -63,15 +63,44 @@ namespace OctaneTestProject
             using var ms = new MemoryStream();
             var ts = new ThrottleStream(ms, 1024, _factory);
             ts.SetBps(2048);
-            // No direct way to check, but should not throw
             Assert.Pass();
+        }
+
+        [Test]
+        public async Task ReadAsync_LargeBuffer_ShouldLimitToTokenBurstSize()
+        {
+            // Token bucket strictly limits burst to TokenLimit (which is maxBps).
+            // A request for 2000 bytes should short-read up to 500 bytes.
+            var data = new byte[2000];
+            using var ms = new MemoryStream(data);
+            var ts = new ThrottleStream(ms, 500, _factory);
+            
+            var buffer = new byte[2000];
+            var bytesRead = await ts.ReadAsync(buffer, 0, buffer.Length);
+            
+            Assert.That(bytesRead, Is.EqualTo(500));
+        }
+
+        [Test]
+        public async Task WriteAsync_LargeBuffer_ShouldCancelProperlyWhenThrottled()
+        {
+            using var ms = new MemoryStream();
+            var ts = new ThrottleStream(ms, 100, _factory); // 100 bps
+            
+            var buffer = new byte[1000]; // Would take 10 seconds to write
+            using var cts = new CancellationTokenSource(200); // Cancel after 200ms
+            
+            Assert.CatchAsync<OperationCanceledException>((AsyncTestDelegate)(async () =>
+            {
+                await ts.WriteAsync(buffer, 0, buffer.Length, cts.Token);
+            }));
         }
 
         [Test]
         public void WriteAndRead_ShouldThrottleAndWorkCorrectly()
         {
             using var ms = new MemoryStream();
-            var ts = new ThrottleStream(ms, 1024 * 1024, _factory); // High BPS to avoid actual throttling delay
+            var ts = new ThrottleStream(ms, 1024 * 1024, _factory); // High BPS
             var data = new byte[] {1, 2, 3, 4, 5};
             ts.Write(data, 0, data.Length);
             ts.Flush();
@@ -109,8 +138,7 @@ namespace OctaneTestProject
             var ms = new MemoryStream();
             var ts = new ThrottleStream(ms, 1024, _factory);
             await ts.DisposeAsync();
-            Action testDelegate = () => ms.WriteByte(1);
-            Assert.Throws<ObjectDisposedException>(testDelegate);
+            Assert.Throws<ObjectDisposedException>((Action)(() => ms.WriteByte(1)));
         }
 
         [Test]
@@ -119,8 +147,7 @@ namespace OctaneTestProject
             var ms = new MemoryStream();
             var ts = new ThrottleStream(ms, 1024, _factory);
             ts.Dispose();
-            Action testDelegate = () => ms.WriteByte(1);
-            Assert.Throws<ObjectDisposedException>(testDelegate);
+            Assert.Throws<ObjectDisposedException>((Action)(() => ms.WriteByte(1)));
         }
     }
-} 
+}
