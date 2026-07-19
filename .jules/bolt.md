@@ -13,3 +13,7 @@
 ## 2025-05-16 — [Allocation-Free Rendering with ZLinq]
 **Learning:** High-frequency UI rendering (like a CLI progress bar) should avoid standard LINQ operations (.Where, .Select, .ToList) and anonymous objects to minimize GC pressure. While manual loops are effective, libraries like `ZLinq` provide allocation-free LINQ-like extensions using value-typed enumerators, allowing for both readability and performance.
 **Action:** Use `ZLinq` or manual loops to avoid heap allocations in hot paths like render ticks.
+
+## 2025-05-17 — [Reusing Shared Sockets & Stream CopyToAsync]
+**Learning:** Disposing short-lived `HttpClient` instances inside static paths (`NetworkAnalyzer`, `HttpDownloader`) is an anti-pattern that causes high TCP/TLS handshake overhead and runs a high risk of socket exhaustion under concurrency. Reusing a thread-safe static `HttpClient` (configured with `SocketsHttpHandler` and a managed `PooledConnectionLifetime` on modern .NET) avoids handshake delays. Additionally, using `CopyToAsync(Stream.Null)` for stream throughput discard removes byte-rental and manual read loop overhead completely.
+**Action:** Pool and reuse `HttpClient` for static diagnostic calls, and utilize framework-optimized `CopyToAsync(Stream.Null)` for zero-allocation stream discards.

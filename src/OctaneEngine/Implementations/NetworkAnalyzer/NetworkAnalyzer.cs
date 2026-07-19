@@ -7,7 +7,8 @@ using System.Threading.Tasks;
 using Cysharp.Text;
 using OctaneEngineCore.Interfaces.NetworkAnalyzer;
 
-//[assembly: InternalsVisibleTo("OctaneTestProject, PublicKey=0024000004800000940000000602000000240000525341310004000001000100714997d77c6a386e69a9d7a09bfdce9a5fb18bc3a5f0771d8102819aa00689d635299e27f1ec7a9838e51160cae5b38035f995737386d0367745a9a0bb68e8f31e43d6448a980402f8452787b56c7bcefe556ddd048e0eb59c919521ac2ae0b05e9a2ddbf2dc10b8e02e3f70d969055597ddef49e5e2d1ad8e9ee4f7226fd5ca", AllInternalsVisible = true)]
+[assembly: InternalsVisibleTo("OctaneTestProject")]
+[assembly: InternalsVisibleTo("OctaneTestProject, PublicKey=0024000004800000940000000602000000240000525341310004000001000100714997d77c6a386e69a9d7a09bfdce9a5fb18bc3a5f0771d8102819aa00689d635299e27f1ec7a9838e51160cae5b38035f995737386d0367745a9a0bb68e8f31e43d6448a980402f8452787b56c7bcefe556ddd048e0eb59c919521ac2ae0b05e9a2ddbf2dc10b8e02e3f70d969055597ddef49e5e2d1ad8e9ee4f7226fd5ca", AllInternalsVisible = true)]
 
 namespace OctaneEngineCore.Implementations.NetworkAnalyzer;
 
@@ -21,19 +22,56 @@ public enum TestFileSize
 internal static class NetworkAnalyzer
 {
     private static readonly string[] Sizes = { "B", "KB", "MB", "GB", "TB" };
+    internal static readonly HttpClient SharedClient;
+
+    static NetworkAnalyzer()
+    {
+#if !NETSTANDARD
+        var handler = new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+            MaxConnectionsPerServer = 100
+        };
+        SharedClient = new HttpClient(handler);
+#else
+        var handler = new HttpClientHandler
+        {
+            MaxConnectionsPerServer = 100
+        };
+        SharedClient = new HttpClient(handler);
+#endif
+    }
 
     public static string PrettySize(long len)
     {
+        if (len <= 0)
+            return "0 B";
+
+        double size = len;
         int order = 0;
-        while (len >= 1024 && order < Sizes.Length - 1)
+
+        if (size >= 1099511627776L) // 1 TB
         {
-            order++;
-            len = len >> 10;
+            order = 4;
+            size /= 1099511627776.0;
         }
-            
-        string result = ZString.Format("{0:0.##} {1}", len, Sizes[order]); 
-            
-        return result;
+        else if (size >= 1073741824L) // 1 GB
+        {
+            order = 3;
+            size /= 1073741824.0;
+        }
+        else if (size >= 1048576L) // 1 MB
+        {
+            order = 2;
+            size /= 1048576.0;
+        }
+        else if (size >= 1024L) // 1 KB
+        {
+            order = 1;
+            size /= 1024.0;
+        }
+
+        return ZString.Format("{0:0.##} {1}", size, Sizes[order]);
     }
     
     public static (string,int) GetTestFile(TestFileSize size)
@@ -66,28 +104,15 @@ internal static class NetworkAnalyzer
     internal static async Task<int> GetNetworkSpeed((string,int) testFile, IHttpDownloader downloader)
     {
         // Measure the network speed by downloading a test file from a fast server
-        using var client = new HttpClient();
         var sw = Stopwatch.StartNew();
 
         // Use streaming to avoid large heap allocations (LOH) when downloading test files
-        using var response = await client.GetAsync(testFile.Item1, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await SharedClient.GetAsync(testFile.Item1, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        using var stream = await response.Content.ReadAsStreamAsync();
+        using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 
-        // Optimization: Increased buffer size from 8KB to 1MB to reduce system call overhead
-        // and improve throughput during network speed testing.
-        var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(1024 * 1024);
-        try
-        {
-            while (await stream.ReadAsync(buffer, 0, buffer.Length) > 0)
-            {
-                // Discard data
-            }
-        }
-        finally
-        {
-            System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
-        }
+        // Optimization: Use Stream.CopyToAsync with a 1MB buffer to discard data efficiently with minimal allocations.
+        await stream.CopyToAsync(System.IO.Stream.Null, 1024 * 1024).ConfigureAwait(false);
 
         sw.Stop();
         // Time to download the test file in seconds.
