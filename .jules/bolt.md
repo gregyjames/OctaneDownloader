@@ -13,3 +13,7 @@
 ## 2025-05-16 — [Allocation-Free Rendering with ZLinq]
 **Learning:** High-frequency UI rendering (like a CLI progress bar) should avoid standard LINQ operations (.Where, .Select, .ToList) and anonymous objects to minimize GC pressure. While manual loops are effective, libraries like `ZLinq` provide allocation-free LINQ-like extensions using value-typed enumerators, allowing for both readability and performance.
 **Action:** Use `ZLinq` or manual loops to avoid heap allocations in hot paths like render ticks.
+
+## 2025-05-17 — [O(1) Precision Formatting vs. Iterative Bit-shifting]
+**Learning:** Formatting file sizes with iterative loop bit-shifting (`len >> 10`) loses decimal accuracy for sizes that aren't exact powers of 2 (e.g. 1500 bytes becomes '1 KB' instead of '1.46 KB'). Replacing this with branch-based, O(1) mathematical division using floating-point math preserves double precision while simultaneously reducing execution complexity and removing loop overhead.
+**Action:** Avoid loop-based bit-shifting for size formatting when decimal precision is needed. Use explicit division branches with `double` scaling instead.
