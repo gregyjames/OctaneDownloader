@@ -26,6 +26,20 @@ namespace OctaneTestProject
         }
 
         [Test]
+        public void InspectAppendOverloads()
+        {
+            var type = typeof(Cysharp.Text.Utf8ValueStringBuilder);
+            foreach (var method in type.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                if (method.Name == "Append")
+                {
+                    System.Console.WriteLine($"METHOD: {method}");
+                }
+            }
+        }
+
+
+        [Test]
         public void PrettySize_Generate55TestCases()
         {
             // We will verify 55 distinct inputs to comprehensively cover B, KB, MB, GB, TB
@@ -40,7 +54,7 @@ namespace OctaneTestProject
             // 2. Kilobytes range (11 cases: 1024 to 1024 + 10*100 bytes)
             for (int i = 0; i < 11; i++)
             {
-                long bytes = 1024L + i * 100L;
+                long bytes = 1024L + (i * 100L);
                 double expectedValue = bytes / 1024.0;
                 string expectedStr = $"{expectedValue:0.##} KB";
                 Assert.That(NetworkAnalyzer.PrettySize(bytes), Is.EqualTo(expectedStr));
@@ -49,7 +63,7 @@ namespace OctaneTestProject
             // 3. Megabytes range (11 cases: 1024*1024 to 1024*1024 + 10*100000 bytes)
             for (int i = 0; i < 11; i++)
             {
-                long bytes = 1048576L + i * 100000L;
+                long bytes = 1048576L + (i * 100000L);
                 double expectedValue = bytes / 1048576.0;
                 string expectedStr = $"{expectedValue:0.##} MB";
                 Assert.That(NetworkAnalyzer.PrettySize(bytes), Is.EqualTo(expectedStr));
@@ -58,7 +72,7 @@ namespace OctaneTestProject
             // 4. Gigabytes range (11 cases: 1024*1024*1024 to 1024*1024*1024 + 10*100000000 bytes)
             for (int i = 0; i < 11; i++)
             {
-                long bytes = 1073741824L + i * 100000000L;
+                long bytes = 1073741824L + (i * 100000000L);
                 double expectedValue = bytes / 1073741824.0;
                 string expectedStr = $"{expectedValue:0.##} GB";
                 Assert.That(NetworkAnalyzer.PrettySize(bytes), Is.EqualTo(expectedStr));
@@ -67,7 +81,7 @@ namespace OctaneTestProject
             // 5. Terabytes range (11 cases: 1024*1024*1024*1024 to 1024*1024*1024*1024 + 10*100000000000 bytes)
             for (int i = 0; i < 11; i++)
             {
-                long bytes = 1099511627776L + i * 100000000000L;
+                long bytes = 1099511627776L + (i * 100000000000L);
                 double expectedValue = bytes / 1099511627776.0;
                 string expectedStr = $"{expectedValue:0.##} TB";
                 Assert.That(NetworkAnalyzer.PrettySize(bytes), Is.EqualTo(expectedStr));
