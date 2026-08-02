@@ -13,3 +13,7 @@
 ## 2025-05-16 — [Allocation-Free Rendering with ZLinq]
 **Learning:** High-frequency UI rendering (like a CLI progress bar) should avoid standard LINQ operations (.Where, .Select, .ToList) and anonymous objects to minimize GC pressure. While manual loops are effective, libraries like `ZLinq` provide allocation-free LINQ-like extensions using value-typed enumerators, allowing for both readability and performance.
 **Action:** Use `ZLinq` or manual loops to avoid heap allocations in hot paths like render ticks.
+
+## 2025-05-17 — [Strong-Named Assembly Internals and Locale-Safe Formatting]
+**Learning:** When adding `InternalsVisibleTo` attributes to a signed assembly (or conditionally signed), you must specify the full `PublicKey` value, otherwise the compiler throws CS0626. Additionally, double-precision decimal formatting (like file size displays) is highly culture-dependent; using `CultureInfo.InvariantCulture` is required to ensure consistent formatting across environments.
+**Action:** Always include the public key in `InternalsVisibleTo` if there is any chance the assembly is signed, and always pass `CultureInfo.InvariantCulture` when formatting double decimal points.
