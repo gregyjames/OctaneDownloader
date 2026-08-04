@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
+        <!-- Public NetworkAnalyzer simplifies access from OctaneTestProject without InternalsVisibleTo key mismatch in CI -->
         <LangVersion>preview</LangVersion>
         <NeutralLanguage>en-US</NeutralLanguage>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
