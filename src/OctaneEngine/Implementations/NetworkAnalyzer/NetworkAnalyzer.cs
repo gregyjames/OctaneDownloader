@@ -7,7 +7,8 @@ using System.Threading.Tasks;
 using Cysharp.Text;
 using OctaneEngineCore.Interfaces.NetworkAnalyzer;
 
-//[assembly: InternalsVisibleTo("OctaneTestProject, PublicKey=0024000004800000940000000602000000240000525341310004000001000100714997d77c6a386e69a9d7a09bfdce9a5fb18bc3a5f0771d8102819aa00689d635299e27f1ec7a9838e51160cae5b38035f995737386d0367745a9a0bb68e8f31e43d6448a980402f8452787b56c7bcefe556ddd048e0eb59c919521ac2ae0b05e9a2ddbf2dc10b8e02e3f70d969055597ddef49e5e2d1ad8e9ee4f7226fd5ca", AllInternalsVisible = true)]
+[assembly: InternalsVisibleTo("OctaneTestProject, PublicKey=0024000004800000940000000602000000240000525341310004000001000100714997d77c6a386e69a9d7a09bfdce9a5fb18bc3a5f0771d8102819aa00689d635299e27f1ec7a9838e51160cae5b38035f995737386d0367745a9a0bb68e8f31e43d6448a980402f8452787b56c7bcefe556ddd048e0eb59c919521ac2ae0b05e9a2ddbf2dc10b8e02e3f70d969055597ddef49e5e2d1ad8e9ee4f7226fd5ca", AllInternalsVisible = true)]
+[assembly: InternalsVisibleTo("OctaneTestProject")]
 
 namespace OctaneEngineCore.Implementations.NetworkAnalyzer;
 
@@ -24,16 +25,36 @@ internal static class NetworkAnalyzer
 
     public static string PrettySize(long len)
     {
-        int order = 0;
-        while (len >= 1024 && order < Sizes.Length - 1)
+        if (len < 0)
         {
-            order++;
-            len = len >> 10;
+            return "0 B";
         }
-            
-        string result = ZString.Format("{0:0.##} {1}", len, Sizes[order]); 
-            
-        return result;
+
+        double size = len;
+        int order = 0;
+
+        if (len >= 1099511627776L) // 1 TB
+        {
+            size = (double)len / 1099511627776L;
+            order = 4;
+        }
+        else if (len >= 1073741824L) // 1 GB
+        {
+            size = (double)len / 1073741824L;
+            order = 3;
+        }
+        else if (len >= 1048576L) // 1 MB
+        {
+            size = (double)len / 1048576L;
+            order = 2;
+        }
+        else if (len >= 1024L) // 1 KB
+        {
+            size = (double)len / 1024L;
+            order = 1;
+        }
+
+        return size.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " " + Sizes[order];
     }
     
     public static (string,int) GetTestFile(TestFileSize size)

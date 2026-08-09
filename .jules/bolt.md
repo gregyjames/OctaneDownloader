@@ -13,3 +13,7 @@
 ## 2025-05-16 — [Allocation-Free Rendering with ZLinq]
 **Learning:** High-frequency UI rendering (like a CLI progress bar) should avoid standard LINQ operations (.Where, .Select, .ToList) and anonymous objects to minimize GC pressure. While manual loops are effective, libraries like `ZLinq` provide allocation-free LINQ-like extensions using value-typed enumerators, allowing for both readability and performance.
 **Action:** Use `ZLinq` or manual loops to avoid heap allocations in hot paths like render ticks.
+
+## 2026-07-20 — [Branch-Based O(1) Size Formatting]
+**Learning:** Integer bit-shifting in file size formatting (e.g., `len >> 10`) causes truncation bugs, rendering decimal formatting useless. A branch-based O(1) threshold formula with double-precision division resolves the truncation while running in constant time. Additionally, to test internal components of signed C# assemblies, adding an unsigned `[assembly: InternalsVisibleTo("OctaneTestProject")]` attribute allows unsigned local test projects to build cleanly.
+**Action:** Always use floating-point division when decimal formatting is expected, and provide multiple `InternalsVisibleTo` attributes if target signing differs between test and core projects.
