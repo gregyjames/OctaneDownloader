@@ -41,7 +41,10 @@ public readonly struct PauseToken
 
     public Task WaitWhilePausedAsync(CancellationToken token = default)
     {
-        var task = _tokenSource?.WaitWhilePausedAsync();
+        if (_tokenSource == null || !_tokenSource.IsPaused)
+            return Task.CompletedTask;
+
+        var task = _tokenSource.WaitWhilePausedAsync();
         
         // If there's no source, or the source returned a completed task (i.e. not paused)
         if (task == null || task.IsCompleted)
