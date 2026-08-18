@@ -36,6 +36,5 @@ namespace OctaneTestProject
                 Assert.That(actual, Does.Contain(" ") & (Does.Contain("B") | Does.Contain("KB") | Does.Contain("MB") | Does.Contain("GB") | Does.Contain("TB")));
             }
         }
-
     }
 }
