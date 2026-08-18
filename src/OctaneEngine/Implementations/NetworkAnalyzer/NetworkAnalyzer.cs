@@ -34,31 +34,55 @@ internal static class NetworkAnalyzer
             return "0 B";
         }
 
-        double size = len;
-        int order = 0;
+        if (len < BytesPerKb)
+        {
+            return ZString.Concat(len, " B");
+        }
+
+        long bytesPerUnit;
+        int order;
 
         if (len >= BytesPerTb)
         {
-            size = (double)len / BytesPerTb;
+            bytesPerUnit = BytesPerTb;
             order = 4;
         }
         else if (len >= BytesPerGb)
         {
-            size = (double)len / BytesPerGb;
+            bytesPerUnit = BytesPerGb;
             order = 3;
         }
         else if (len >= BytesPerMb)
         {
-            size = (double)len / BytesPerMb;
+            bytesPerUnit = BytesPerMb;
             order = 2;
         }
-        else if (len >= BytesPerKb)
+        else
         {
-            size = (double)len / BytesPerKb;
+            bytesPerUnit = BytesPerKb;
             order = 1;
         }
 
-        return size.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " " + Sizes[order];
+        long whole = len / bytesPerUnit;
+        long remainder = len % bytesPerUnit;
+
+        if (remainder == 0)
+        {
+            return ZString.Concat(whole, " ", Sizes[order]);
+        }
+
+        long frac = (remainder * 100) / bytesPerUnit;
+        if (frac == 0)
+        {
+            return ZString.Concat(whole, " ", Sizes[order]);
+        }
+
+        if (frac % 10 == 0)
+        {
+            return ZString.Concat(whole, ".", frac / 10, " ", Sizes[order]);
+        }
+
+        return ZString.Concat(whole, ".", frac < 10 ? "0" : "", frac, " ", Sizes[order]);
     }
     
     public static (string,int) GetTestFile(TestFileSize size)
