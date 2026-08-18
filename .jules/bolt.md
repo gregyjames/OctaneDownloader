@@ -13,3 +13,7 @@
 ## 2025-05-16 — [Allocation-Free Rendering with ZLinq]
 **Learning:** High-frequency UI rendering (like a CLI progress bar) should avoid standard LINQ operations (.Where, .Select, .ToList) and anonymous objects to minimize GC pressure. While manual loops are effective, libraries like `ZLinq` provide allocation-free LINQ-like extensions using value-typed enumerators, allowing for both readability and performance.
 **Action:** Use `ZLinq` or manual loops to avoid heap allocations in hot paths like render ticks.
+
+## 2025-05-17 — [Hot-Path Pause Checks and ConfigureAwait]
+**Learning:** In high-throughput streaming loops where pause tokens are checked on every buffer read/write, delegating or instantiating task objects when unpaused adds allocation and call stack overhead. Early-exiting on `!_tokenSource.IsPaused` avoids Task creation and volatile state checks. Additionally, missing `.ConfigureAwait(false)` on hot stream operations causes unnecessary context synchronization across thread pool continuations.
+**Action:** Always short-circuit unpaused `PauseToken` checks and ensure `.ConfigureAwait(false)` is used on every await statement in library streaming pipelines.
