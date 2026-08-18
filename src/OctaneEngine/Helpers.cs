@@ -24,7 +24,10 @@ public static partial class Helpers
             long thisPartSize = basePartSize + (i < remainder ? 1 : 0);
             long end = start + thisPartSize - 1; // inclusive
             pieces.Add((start, end));
-            logger.LogTrace($"Piece with range ({start},{end}) added to tasks queue.");
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                logger.LogTrace($"Piece with range ({start},{end}) added to tasks queue.");
+            }
             start = end + 1;
         }
         return pieces;

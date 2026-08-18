@@ -1,0 +1,187 @@
+// Validating benchmarks:
+// ***** BenchmarkRunner: Start   *****
+// ***** Found 1 benchmark(s) in total *****
+// ***** Building 1 exe(s) in Parallel: Start   *****
+// start dotnet  restore --nodeReuse:false /p:UseSharedCompilation=false /p:Deterministic=true /p:Optimize=true /p:ArtifactsPath="/app/artifacts/bin/BenchmarkOctaneProject/release/BenchmarkOctaneProject-DefaultJob-1/" /p:OutDir="/app/artifacts/bin/BenchmarkOctaneProject/release/BenchmarkOctaneProject-DefaultJob-1/bin/Release/net8.0/" /p:OutputPath="/app/artifacts/bin/BenchmarkOctaneProject/release/BenchmarkOctaneProject-DefaultJob-1/bin/Release/net8.0/" /p:PublishDir="/app/artifacts/bin/BenchmarkOctaneProject/release/BenchmarkOctaneProject-DefaultJob-1/publish/" in /app/artifacts/bin/BenchmarkOctaneProject/release/BenchmarkOctaneProject-DefaultJob-1
+// command took 3.99 sec and exited with 0
+// start dotnet  build -c Release --no-restore --nodeReuse:false /p:UseSharedCompilation=false /p:Deterministic=true /p:Optimize=true /p:ArtifactsPath="/app/artifacts/bin/BenchmarkOctaneProject/release/BenchmarkOctaneProject-DefaultJob-1/" /p:OutDir="/app/artifacts/bin/BenchmarkOctaneProject/release/BenchmarkOctaneProject-DefaultJob-1/bin/Release/net8.0/" /p:OutputPath="/app/artifacts/bin/BenchmarkOctaneProject/release/BenchmarkOctaneProject-DefaultJob-1/bin/Release/net8.0/" /p:PublishDir="/app/artifacts/bin/BenchmarkOctaneProject/release/BenchmarkOctaneProject-DefaultJob-1/publish/" --output "/app/artifacts/bin/BenchmarkOctaneProject/release/BenchmarkOctaneProject-DefaultJob-1/bin/Release/net8.0/" in /app/artifacts/bin/BenchmarkOctaneProject/release/BenchmarkOctaneProject-DefaultJob-1
+// command took 18.9 sec and exited with 0
+// ***** Done, took 00:00:23 (23 sec)   *****
+// Found 1 benchmarks:
+//   DownloadBenchmark.DownloadFileBenchmark: DefaultJob
+
+// **************************
+// Benchmark: DownloadBenchmark.DownloadFileBenchmark: DefaultJob
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet BenchmarkOctaneProject-DefaultJob-1.dll --anonymousPipes 115 116 --benchmarkName BenchmarkOctaneProject.DownloadBenchmark.DownloadFileBenchmark --job Default --benchmarkId 0 in /app/artifacts/bin/BenchmarkOctaneProject/release/BenchmarkOctaneProject-DefaultJob-1/bin/Release/net8.0
+// Failed to set up high priority (Permission denied). In order to run benchmarks with high priority, make sure you have the right permissions.
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.15.8
+// Runtime=.NET 8.0.24 (8.0.24, 8.0.2426.7010), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL VectorSize=256
+// Job: DefaultJob
+
+OverheadJitting  1: 1 op, 227985.00 ns, 227.9850 us/op
+WorkloadJitting  1: 1 op, 273415070.00 ns, 273.4151 ms/op
+
+WorkloadPilot    1: 2 op, 196744226.00 ns, 98.3721 ms/op
+WorkloadPilot    2: 3 op, 347080019.00 ns, 115.6933 ms/op
+WorkloadPilot    3: 4 op, 509833251.00 ns, 127.4583 ms/op
+
+WorkloadWarmup   1: 4 op, 484853486.00 ns, 121.2134 ms/op
+WorkloadWarmup   2: 4 op, 495211141.00 ns, 123.8028 ms/op
+WorkloadWarmup   3: 4 op, 442464815.00 ns, 110.6162 ms/op
+WorkloadWarmup   4: 4 op, 434015794.00 ns, 108.5039 ms/op
+WorkloadWarmup   5: 4 op, 390707645.00 ns, 97.6769 ms/op
+WorkloadWarmup   6: 4 op, 425807165.00 ns, 106.4518 ms/op
+WorkloadWarmup   7: 4 op, 439760821.00 ns, 109.9402 ms/op
+WorkloadWarmup   8: 4 op, 411353715.00 ns, 102.8384 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 4 op, 405077476.00 ns, 101.2694 ms/op
+WorkloadActual   2: 4 op, 413794408.00 ns, 103.4486 ms/op
+WorkloadActual   3: 4 op, 388988583.00 ns, 97.2471 ms/op
+WorkloadActual   4: 4 op, 370515268.00 ns, 92.6288 ms/op
+WorkloadActual   5: 4 op, 411497150.00 ns, 102.8743 ms/op
+WorkloadActual   6: 4 op, 431831588.00 ns, 107.9579 ms/op
+WorkloadActual   7: 4 op, 448149809.00 ns, 112.0375 ms/op
+WorkloadActual   8: 4 op, 404150938.00 ns, 101.0377 ms/op
+WorkloadActual   9: 4 op, 381646631.00 ns, 95.4117 ms/op
+WorkloadActual  10: 4 op, 410921949.00 ns, 102.7305 ms/op
+WorkloadActual  11: 4 op, 384491524.00 ns, 96.1229 ms/op
+WorkloadActual  12: 4 op, 387779747.00 ns, 96.9449 ms/op
+WorkloadActual  13: 4 op, 392505631.00 ns, 98.1264 ms/op
+WorkloadActual  14: 4 op, 395189269.00 ns, 98.7973 ms/op
+WorkloadActual  15: 4 op, 387674176.00 ns, 96.9185 ms/op
+WorkloadActual  16: 4 op, 372737621.00 ns, 93.1844 ms/op
+WorkloadActual  17: 4 op, 392842607.00 ns, 98.2107 ms/op
+WorkloadActual  18: 4 op, 393095838.00 ns, 98.2740 ms/op
+WorkloadActual  19: 4 op, 389290514.00 ns, 97.3226 ms/op
+WorkloadActual  20: 4 op, 396567031.00 ns, 99.1418 ms/op
+WorkloadActual  21: 4 op, 412048234.00 ns, 103.0121 ms/op
+WorkloadActual  22: 4 op, 399589410.00 ns, 99.8974 ms/op
+WorkloadActual  23: 4 op, 394744306.00 ns, 98.6861 ms/op
+WorkloadActual  24: 4 op, 397877015.00 ns, 99.4693 ms/op
+WorkloadActual  25: 4 op, 386734909.00 ns, 96.6837 ms/op
+WorkloadActual  26: 4 op, 383447962.00 ns, 95.8620 ms/op
+WorkloadActual  27: 4 op, 397721233.00 ns, 99.4303 ms/op
+WorkloadActual  28: 4 op, 369821803.00 ns, 92.4555 ms/op
+WorkloadActual  29: 4 op, 365490796.00 ns, 91.3727 ms/op
+WorkloadActual  30: 4 op, 403009263.00 ns, 100.7523 ms/op
+WorkloadActual  31: 4 op, 376797508.00 ns, 94.1994 ms/op
+WorkloadActual  32: 4 op, 384834858.00 ns, 96.2087 ms/op
+WorkloadActual  33: 4 op, 380958928.00 ns, 95.2397 ms/op
+WorkloadActual  34: 4 op, 391402939.00 ns, 97.8507 ms/op
+WorkloadActual  35: 4 op, 380897806.00 ns, 95.2245 ms/op
+WorkloadActual  36: 4 op, 376335069.00 ns, 94.0838 ms/op
+WorkloadActual  37: 4 op, 384458842.00 ns, 96.1147 ms/op
+
+// AfterActualRun
+WorkloadResult   1: 4 op, 405077476.00 ns, 101.2694 ms/op
+WorkloadResult   2: 4 op, 413794408.00 ns, 103.4486 ms/op
+WorkloadResult   3: 4 op, 388988583.00 ns, 97.2471 ms/op
+WorkloadResult   4: 4 op, 370515268.00 ns, 92.6288 ms/op
+WorkloadResult   5: 4 op, 411497150.00 ns, 102.8743 ms/op
+WorkloadResult   6: 4 op, 404150938.00 ns, 101.0377 ms/op
+WorkloadResult   7: 4 op, 381646631.00 ns, 95.4117 ms/op
+WorkloadResult   8: 4 op, 410921949.00 ns, 102.7305 ms/op
+WorkloadResult   9: 4 op, 384491524.00 ns, 96.1229 ms/op
+WorkloadResult  10: 4 op, 387779747.00 ns, 96.9449 ms/op
+WorkloadResult  11: 4 op, 392505631.00 ns, 98.1264 ms/op
+WorkloadResult  12: 4 op, 395189269.00 ns, 98.7973 ms/op
+WorkloadResult  13: 4 op, 387674176.00 ns, 96.9185 ms/op
+WorkloadResult  14: 4 op, 372737621.00 ns, 93.1844 ms/op
+WorkloadResult  15: 4 op, 392842607.00 ns, 98.2107 ms/op
+WorkloadResult  16: 4 op, 393095838.00 ns, 98.2740 ms/op
+WorkloadResult  17: 4 op, 389290514.00 ns, 97.3226 ms/op
+WorkloadResult  18: 4 op, 396567031.00 ns, 99.1418 ms/op
+WorkloadResult  19: 4 op, 412048234.00 ns, 103.0121 ms/op
+WorkloadResult  20: 4 op, 399589410.00 ns, 99.8974 ms/op
+WorkloadResult  21: 4 op, 394744306.00 ns, 98.6861 ms/op
+WorkloadResult  22: 4 op, 397877015.00 ns, 99.4693 ms/op
+WorkloadResult  23: 4 op, 386734909.00 ns, 96.6837 ms/op
+WorkloadResult  24: 4 op, 383447962.00 ns, 95.8620 ms/op
+WorkloadResult  25: 4 op, 397721233.00 ns, 99.4303 ms/op
+WorkloadResult  26: 4 op, 369821803.00 ns, 92.4555 ms/op
+WorkloadResult  27: 4 op, 365490796.00 ns, 91.3727 ms/op
+WorkloadResult  28: 4 op, 403009263.00 ns, 100.7523 ms/op
+WorkloadResult  29: 4 op, 376797508.00 ns, 94.1994 ms/op
+WorkloadResult  30: 4 op, 384834858.00 ns, 96.2087 ms/op
+WorkloadResult  31: 4 op, 380958928.00 ns, 95.2397 ms/op
+WorkloadResult  32: 4 op, 391402939.00 ns, 97.8507 ms/op
+WorkloadResult  33: 4 op, 380897806.00 ns, 95.2245 ms/op
+WorkloadResult  34: 4 op, 376335069.00 ns, 94.0838 ms/op
+WorkloadResult  35: 4 op, 384458842.00 ns, 96.1147 ms/op
+// GC:  0 0 0 83993352 4
+// Threading:  32 0 4
+
+// AfterAll
+// Benchmark Process 33229 has exited with code 0.
+
+Mean = 97.607 ms, StdErr = 0.528 ms (0.54%), N = 35, StdDev = 3.124 ms
+Min = 91.373 ms, Q1 = 95.637 ms, Median = 97.323 ms, Q3 = 99.450 ms, Max = 103.449 ms
+IQR = 3.813 ms, LowerFence = 89.917 ms, UpperFence = 105.169 ms
+ConfidenceInterval = [95.705 ms; 99.508 ms] (CI 99.9%), Margin = 1.901 ms (1.95% of Mean)
+Skewness = 0.06, Kurtosis = 2.27, MValue = 2
+
+// ** Remained 0 (0.0 %) benchmark(s) to run. Estimated finish 2026-08-18 23:34 (0h 0m from now) **
+// ***** BenchmarkRunner: Finish  *****
+
+// * Export *
+  BenchmarkDotNet.Artifacts/results/BenchmarkOctaneProject.DownloadBenchmark-report.csv
+  BenchmarkDotNet.Artifacts/results/BenchmarkOctaneProject.DownloadBenchmark-report-github.md
+  BenchmarkDotNet.Artifacts/results/BenchmarkOctaneProject.DownloadBenchmark-report.html
+
+// * Detailed results *
+DownloadBenchmark.DownloadFileBenchmark: DefaultJob
+Runtime = .NET 8.0.24 (8.0.24, 8.0.2426.7010), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 97.607 ms, StdErr = 0.528 ms (0.54%), N = 35, StdDev = 3.124 ms
+Min = 91.373 ms, Q1 = 95.637 ms, Median = 97.323 ms, Q3 = 99.450 ms, Max = 103.449 ms
+IQR = 3.813 ms, LowerFence = 89.917 ms, UpperFence = 105.169 ms
+ConfidenceInterval = [95.705 ms; 99.508 ms] (CI 99.9%), Margin = 1.901 ms (1.95% of Mean)
+Skewness = 0.06, Kurtosis = 2.27, MValue = 2
+-------------------- Histogram --------------------
+[ 90.119 ms ;  93.045 ms) | @@@
+[ 93.045 ms ;  95.815 ms) | @@@@@@
+[ 95.815 ms ;  98.321 ms) | @@@@@@@@@@@@@
+[ 98.321 ms ; 101.115 ms) | @@@@@@@@
+[101.115 ms ; 103.612 ms) | @@@@@
+---------------------------------------------------
+
+// * Summary *
+
+BenchmarkDotNet v0.15.8, Linux Ubuntu 24.04.4 LTS (Noble Numbat)
+Intel Xeon Processor 2.30GHz, 1 CPU, 4 logical and 4 physical cores
+.NET SDK 10.0.103
+  [Host]     : .NET 8.0.24 (8.0.24, 8.0.2426.7010), X64 RyuJIT x86-64-v3
+  DefaultJob : .NET 8.0.24 (8.0.24, 8.0.2426.7010), X64 RyuJIT x86-64-v3
+
+
+| Method                | Mean     | Error    | StdDev   | Allocated |
+|---------------------- |---------:|---------:|---------:|----------:|
+| DownloadFileBenchmark | 97.61 ms | 1.901 ms | 3.124 ms |  20.03 MB |
+
+// * Hints *
+Outliers
+  DownloadBenchmark.DownloadFileBenchmark: Default -> 2 outliers were removed (107.96 ms, 112.04 ms)
+
+// * Legends *
+  Mean      : Arithmetic mean of all measurements
+  Error     : Half of 99.9% confidence interval
+  StdDev    : Standard deviation of all measurements
+  Allocated : Allocated memory per single operation (managed only, inclusive, 1KB = 1024B)
+  1 ms      : 1 Millisecond (0.001 sec)
+
+// * Diagnostic Output - MemoryDiagnoser *
+
+
+// ***** BenchmarkRunner: End *****
+Run time: 00:00:20 (20.52 sec), executed benchmarks: 1
+
+Global total time: 00:00:43 (43.77 sec), executed benchmarks: 1
+// * Artifacts cleanup *
+Artifacts cleanup is finished
