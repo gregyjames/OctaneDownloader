@@ -197,14 +197,14 @@ public partial class OctaneClient : IClient
 
             while (true)
             {
-                var bytesRead = await wrappedStream.ReadAsync(readBuffer.AsMemory(), cancellationToken);
+                var bytesRead = await wrappedStream.ReadAsync(readBuffer.AsMemory(), cancellationToken).ConfigureAwait(false);
                 await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
                 if (bytesRead == 0)
                 {
                     break;
                 }
 
-                await stream.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken);
+                await stream.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
                 bytesReadOverall += bytesRead;
                         
                 if(child != null && (bytesReadOverall - lastProgressUpdate >= progressUpdateInterval))
@@ -216,8 +216,8 @@ public partial class OctaneClient : IClient
         }
         finally
         {
-            await stream.DisposeAsync();
-            await wrappedStream.DisposeAsync();
+            await stream.DisposeAsync().ConfigureAwait(false);
+            await wrappedStream.DisposeAsync().ConfigureAwait(false);
             _memPool.Return(readBuffer);
             LogBufferReturnedToMemoryPool();
         }
@@ -250,7 +250,7 @@ public partial class OctaneClient : IClient
                 var pipe = new Pipe(_pipeOptions);
                 var writing = FillPipeAsync(wrappedStream, pipe.Writer, cancellationToken, pauseToken);
                 var reading = ReadPipeToFileAsync(pipe.Reader, piece, child, accessorPtr, cancellationToken, pauseToken);
-                await Task.WhenAll(reading, writing);
+                await Task.WhenAll(reading, writing).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -267,7 +267,7 @@ public partial class OctaneClient : IClient
                 accessor.SafeMemoryMappedViewHandle.ReleasePointer();
             }
 
-            await wrappedStream.DisposeAsync();
+            await wrappedStream.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -280,7 +280,7 @@ public partial class OctaneClient : IClient
             while (true)
             {
                 var memory = writer.GetMemory(bufferSize);
-                var bytesRead = await stream.ReadAsync(memory, token);
+                var bytesRead = await stream.ReadAsync(memory, token).ConfigureAwait(false);
                 await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
                 if (bytesRead == 0)
                 {
@@ -288,7 +288,7 @@ public partial class OctaneClient : IClient
                 } // End of stream 
 
                 writer.Advance(bytesRead);
-                var result = await writer.FlushAsync(token);
+                var result = await writer.FlushAsync(token).ConfigureAwait(false);
                 if (result.IsCompleted || result.IsCanceled)
                 {
                     break;
@@ -297,7 +297,7 @@ public partial class OctaneClient : IClient
         }
         finally
         {
-            await writer.CompleteAsync();
+            await writer.CompleteAsync().ConfigureAwait(false);
         }
     }
     
@@ -313,7 +313,7 @@ public partial class OctaneClient : IClient
             while (true)
             {
                 if (!reader.TryRead(out ReadResult result))
-                    result = await reader.ReadAsync(token);
+                    result = await reader.ReadAsync(token).ConfigureAwait(false);
 
                 await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
 
@@ -397,7 +397,7 @@ public partial class OctaneClient : IClient
         }
         finally
         {
-            await reader.CompleteAsync();
+            await reader.CompleteAsync().ConfigureAwait(false);
         }
     }
 
