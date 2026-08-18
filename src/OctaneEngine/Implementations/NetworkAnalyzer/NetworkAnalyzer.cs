@@ -22,6 +22,10 @@ public enum TestFileSize
 internal static class NetworkAnalyzer
 {
     private static readonly string[] Sizes = { "B", "KB", "MB", "GB", "TB" };
+    private const long BytesPerKb = 1024L;
+    private const long BytesPerMb = 1048576L;
+    private const long BytesPerGb = 1073741824L;
+    private const long BytesPerTb = 1099511627776L;
 
     public static string PrettySize(long len)
     {
@@ -33,24 +37,24 @@ internal static class NetworkAnalyzer
         double size = len;
         int order = 0;
 
-        if (len >= 1099511627776L) // 1 TB
+        if (len >= BytesPerTb)
         {
-            size = (double)len / 1099511627776L;
+            size = (double)len / BytesPerTb;
             order = 4;
         }
-        else if (len >= 1073741824L) // 1 GB
+        else if (len >= BytesPerGb)
         {
-            size = (double)len / 1073741824L;
+            size = (double)len / BytesPerGb;
             order = 3;
         }
-        else if (len >= 1048576L) // 1 MB
+        else if (len >= BytesPerMb)
         {
-            size = (double)len / 1048576L;
+            size = (double)len / BytesPerMb;
             order = 2;
         }
-        else if (len >= 1024L) // 1 KB
+        else if (len >= BytesPerKb)
         {
-            size = (double)len / 1024L;
+            size = (double)len / BytesPerKb;
             order = 1;
         }
 
