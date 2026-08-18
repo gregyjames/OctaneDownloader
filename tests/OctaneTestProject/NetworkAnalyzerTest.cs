@@ -37,51 +37,5 @@ namespace OctaneTestProject
             }
         }
 
-        private static readonly string[] LegacySizes = { "B", "KB", "MB", "GB", "TB" };
-        private static string LegacyPrettySize(long len)
-        {
-            int order = 0;
-            while (len >= 1024 && order < LegacySizes.Length - 1)
-            {
-                order++;
-                len = len >> 10;
-            }
-            return $"{len} {LegacySizes[order]}";
-        }
-
-        [Test]
-        public void PrettySize_Benchmark_MeasuresPerformanceImprovement()
-        {
-            const int iterations = 500_000;
-            long[] testValues = { 500L, 1500L, 2_621_440L, 1_610_612_736L, 2_199_023_255_552L };
-
-            // Warmup
-            foreach (var val in testValues)
-            {
-                LegacyPrettySize(val);
-                NetworkAnalyzer.PrettySize(val);
-            }
-
-            var swLegacy = System.Diagnostics.Stopwatch.StartNew();
-            for (int i = 0; i < iterations; i++)
-            {
-                var val = testValues[i % testValues.Length];
-                _ = LegacyPrettySize(val);
-            }
-            swLegacy.Stop();
-
-            var swNew = System.Diagnostics.Stopwatch.StartNew();
-            for (int i = 0; i < iterations; i++)
-            {
-                var val = testValues[i % testValues.Length];
-                _ = NetworkAnalyzer.PrettySize(val);
-            }
-            swNew.Stop();
-
-            System.Console.WriteLine($"[Benchmark] Legacy PrettySize ({iterations:N0} iterations): {swLegacy.ElapsedMilliseconds} ms");
-            System.Console.WriteLine($"[Benchmark] New O(1) PrettySize ({iterations:N0} iterations): {swNew.ElapsedMilliseconds} ms");
-
-            Assert.That(swNew.ElapsedTicks, Is.GreaterThan(0));
-        }
     }
 }
