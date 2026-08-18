@@ -152,7 +152,7 @@ public partial class Engine: IEngine, IDisposable
     {
         var client = _clientFactory.CreateClient("OctaneClient");
         using var request = new HttpRequestMessage(HttpMethod.Head, url);
-        var response = await client.SendAsync(request).ConfigureAwait(false);
+        var response = await client.SendAsync(request);
         var responseLength = response.Content.Headers.ContentLength ?? 0;
         var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
         LogRangeSupportedRange(rangeSupported);
@@ -208,7 +208,7 @@ public partial class Engine: IEngine, IDisposable
             var octaneClient = _client ?? new OctaneClient(_config, client, _factory);
             var defaultClient = _defaultClient ?? new DefaultClient(client, _config);
 
-            (var length, clientType) = await getFileSizeAndRangeSupport(request.Url).ConfigureAwait(false);
+            (var length, clientType) = await getFileSizeAndRangeSupport(request.Url);
             
             #region Varible Initilization
             filename = request.OutFile ?? Path.GetFileName(new Uri(request.Url).LocalPath);

@@ -80,13 +80,13 @@ public class DefaultClient : IClient
         PauseToken pauseToken,
         CancellationToken cancellationToken)
     {
-        using var contentStream = await message.Content.ReadAsStreamAsync().ConfigureAwait(false);
+        using var contentStream = await message.Content.ReadAsStreamAsync();
 
         var pipe = new Pipe(_pipeOptions);
         var fillTask = FillPipeAsync(contentStream, pipe.Writer, pauseToken, cancellationToken);
         var readTask = ReadPipeAsync(pipe.Reader, stream, progress, pauseToken, cancellationToken);
         
-        await Task.WhenAll(fillTask, readTask).ConfigureAwait(false);
+        await Task.WhenAll(fillTask, readTask);
     }
 
     private async Task FillPipeAsync(Stream source, PipeWriter writer, PauseToken pauseToken, CancellationToken cancellationToken)
@@ -96,7 +96,7 @@ public class DefaultClient : IClient
         while (true)
         {
             Memory<byte> memory = writer.GetMemory(bufferSize);
-            int bytesRead = await source.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
+            int bytesRead = await source.ReadAsync(memory, cancellationToken);
             await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
 
             if (bytesRead == 0)
@@ -106,7 +106,7 @@ public class DefaultClient : IClient
             
             writer.Advance(bytesRead);
             
-            FlushResult flushResult = await writer.FlushAsync().ConfigureAwait(false);
+            FlushResult flushResult = await writer.FlushAsync();
             if (flushResult.IsCompleted)
             {
                 break;
@@ -120,13 +120,13 @@ public class DefaultClient : IClient
 
         while (true)
         {
-            ReadResult result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            ReadResult result = await reader.ReadAsync(cancellationToken);
             await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
             ReadOnlySequence<byte> buffer = result.Buffer;
 
             foreach (var segment in buffer)
             {
-                await destination.WriteAsync(segment).ConfigureAwait(false);
+                await destination.WriteAsync(segment);
                 totalBytesWritten += segment.Length;
             }
             
@@ -171,7 +171,7 @@ public class DefaultClient : IClient
             }
         });
         using var stream = _mmf.CreateViewStream();
-        await CopyMessageContentToStreamWithProgressAsync(message, stream, progress, pauseToken, cancellationToken).ConfigureAwait(false);
+        await CopyMessageContentToStreamWithProgressAsync(message, stream, progress, pauseToken, cancellationToken);
     }
 
     public void Dispose()
