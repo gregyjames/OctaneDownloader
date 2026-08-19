@@ -137,7 +137,7 @@ public class DefaultClient : IClient
 #if NET6_0_OR_GREATER
                 if (_fileHandle != null)
                 {
-                    await RandomAccess.WriteAsync(_fileHandle, segment.ToArray().AsMemory(), totalBytesWritten, cancellationToken).ConfigureAwait(false);
+                    await RandomAccess.WriteAsync(_fileHandle, segment, totalBytesWritten, cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
