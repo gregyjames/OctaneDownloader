@@ -38,7 +38,7 @@ namespace OctaneEngineCore.Clients;
 
 public class DefaultClient : IClient
 {
-    private IFileWriter _writer;
+    private IFileWriter? _writer;
     private ProgressBar _pBar;
     private readonly HttpClient _httpClient;
     private readonly OctaneConfiguration _config;
@@ -171,14 +171,18 @@ await destination.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
                 _pBar?.Tick();
             }
         });
-await using var chunkWriter = _writer.CreateChunkWriter(0, 0);
+if (_writer == null)
+        {
+            throw new InvalidOperationException("Writer not initialized before download.");
+        }
+
+        await using var chunkWriter = _writer.CreateChunkWriter(0, 0);
         await CopyMessageContentToStreamWithProgressAsync(message, chunkWriter, progress, pauseToken, cancellationToken).ConfigureAwait(false);
     }
 
     public void Dispose()
     {
         _httpClient?.Dispose();
-        _writer?.Dispose();
         _pBar?.Dispose();
     }
 }
