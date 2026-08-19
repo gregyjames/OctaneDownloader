@@ -386,6 +386,49 @@ namespace OctaneTestProject
             Assert.That(ex, Is.Not.Null);
             Assert.That(ex!.Message, Does.Contain("Invalid or missing Content-Range in response"));
         }
+
+        [Test]
+        public async Task ErrorHandling_416RangeNotSatisfiable_ShouldThrowHttpRequestException()
+        {
+            const string url = @"https://mockurl.com/file.png";
+
+            var handler = new MockHttpMessageHandlerCustom((request, ct) =>
+            {
+                var response = new HttpResponseMessage();
+                if (request.Method == HttpMethod.Head)
+                {
+                    response.StatusCode = System.Net.HttpStatusCode.OK;
+                    response.Content = new ByteArrayContent(Array.Empty<byte>());
+                    response.Content.Headers.ContentLength = _mockData.Length;
+                    response.Headers.AcceptRanges.Add("bytes");
+                    return response;
+                }
+
+                response.StatusCode = System.Net.HttpStatusCode.RequestedRangeNotSatisfiable;
+                response.Content = new ByteArrayContent(Array.Empty<byte>());
+                return response;
+            });
+
+            using var httpClient = new HttpClient(handler);
+            var config = new OctaneConfiguration
+            {
+                Parts = 1,
+                BufferSize = 8192,
+                ShowProgress = false,
+                NumRetries = 1,
+                BytesPerSecond = 1
+            };
+
+            var client = new OctaneClient(config, httpClient, _factory);
+
+            var ex = Assert.ThrowsAsync<HttpRequestException>((Func<Task>)(async () =>
+            {
+                await client.Download(url, (0, _mockData.Length - 1), null, CancellationToken.None, _pauseTokenSource.Token);
+            }));
+
+            Assert.That(ex, Is.Not.Null);
+            Assert.That(ex!.Message, Does.Contain("Download failed with status code: RequestedRangeNotSatisfiable"));
+        }
     }
 
     internal class MockHttpMessageHandlerCustom : HttpMessageHandler

@@ -140,8 +140,10 @@ public partial class OctaneClient : IClient
         #endregion
         
         stopwatch.Start();
-        if (message.IsSuccessStatusCode)
+        if (!message.IsSuccessStatusCode)
         {
+            throw new HttpRequestException($"Download failed with status code: {message.StatusCode}");
+        }
             if (message.StatusCode != System.Net.HttpStatusCode.PartialContent)
             {
                 throw new InvalidOperationException($"Expected HTTP 206 Partial Content, but received {(int)message.StatusCode}.");
@@ -206,11 +208,7 @@ public partial class OctaneClient : IClient
                 await RegularDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
             }
 #endif
-        }
-        else
-        {
-            LogHttpRequestReturnedSuccessStatusCodeCode((int)message.StatusCode, NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end));
-        }
+
         
         // Only tick the progress bar if ShowProgress is enabled
         if (_config.ShowProgress)
