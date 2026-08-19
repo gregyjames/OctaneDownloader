@@ -169,9 +169,23 @@ public partial class OctaneClient : IClient
             }
         #endif
             
-        #if NET6_0_OR_GREATER
-            await RegularDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
-        #else
+#if NET6_0_OR_GREATER
+            if (_fileHandle != null)
+            {
+                await RegularDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
+            }
+            else
+            {
+                if (_config.LowMemoryMode)
+                {
+                    await LowMemoryDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    await RegularDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
+                }
+            }
+#else
             if (_config.LowMemoryMode)
             {
                 await LowMemoryDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
@@ -180,7 +194,7 @@ public partial class OctaneClient : IClient
             {
                 await RegularDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
             }
-        #endif
+#endif
         }
         else
         {
@@ -207,11 +221,16 @@ public partial class OctaneClient : IClient
             LogBufferRentedOfSize(_config.BufferSize, piece.start, piece.end);
         }
 
-        #if NET6_0_OR_GREATER
-            long fileOffset = piece.start;
-        #else
-            var stream = _mmf.CreateViewStream(piece.start, piece.end - piece.start + 1);
-        #endif
+        long fileOffset = piece.start;
+        Stream? stream = null;
+#if NET6_0_OR_GREATER
+        if (_fileHandle == null)
+        {
+            stream = _mmf!.CreateViewStream(piece.start, piece.end - piece.start + 1);
+        }
+#else
+        stream = _mmf!.CreateViewStream(piece.start, piece.end - piece.start + 1);
+#endif
                 
         try
         {
@@ -227,12 +246,19 @@ public partial class OctaneClient : IClient
                     break;
                 }
 
-                #if NET6_0_OR_GREATER
-                    await RandomAccess.WriteAsync(_fileHandle!, readBuffer.AsMemory(0, bytesRead), fileOffset, cancellationToken).ConfigureAwait(false);
+#if NET6_0_OR_GREATER
+                if (_fileHandle != null)
+                {
+                    await RandomAccess.WriteAsync(_fileHandle, readBuffer.AsMemory(0, bytesRead), fileOffset, cancellationToken).ConfigureAwait(false);
                     fileOffset += bytesRead;
-                #else
-                    await stream.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
-                #endif
+                }
+                else
+                {
+                    await stream!.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+                }
+#else
+                await stream!.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+#endif
                 
                 bytesReadOverall += bytesRead;
                         
@@ -245,11 +271,10 @@ public partial class OctaneClient : IClient
         }
         finally
         {
-            #if NET6_0_OR_GREATER
-                // RandomAccess doesn't need to dispose a view stream
-            #else
+            if (stream != null)
+            {
                 await stream.DisposeAsync().ConfigureAwait(false);
-            #endif
+            }
             
             await wrappedStream.DisposeAsync().ConfigureAwait(false);
             _memPool.Return(readBuffer);
