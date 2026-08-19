@@ -386,7 +386,6 @@ public partial class OctaneClient : IClient
         }
     }
 
-
     private unsafe long WriteSpan(ReadOnlySpan<byte> span, IntPtr accessorPtr, long writeOffset, long accessorLength, ChildProgressBar? child, ref long lastTick)
     {
         long remaining = accessorLength - writeOffset;
