@@ -243,6 +243,7 @@ public partial class Engine: IEngine, IDisposable
                 if (clientType == ClientType.Octane)
                 {
                     var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger);
+                    octaneClient = new OctaneClient(_config, client, _factory);
 #if NET6_0_OR_GREATER
                     octaneClient.SetFileHandle(fileHandle);
 #else
@@ -293,8 +294,10 @@ public partial class Engine: IEngine, IDisposable
                 {
                     LogUsingDefaultClientToDownloadFile();
 #if NET6_0_OR_GREATER
+                    defaultClient = new DefaultClient(client, _config);
                     defaultClient.SetFileHandle(fileHandle);
 #else
+                    defaultClient = new DefaultClient(client, _config);
                     defaultClient.SetMmf(mmf);
 #endif
                     try
