@@ -192,7 +192,6 @@ public partial class OctaneClient : IClient
     {
         int readBufferSize = Math.Max(_config.BufferSize, 256 * 1024);
         var readBuffer = _memPool.Rent(readBufferSize);
-        long bytesReadOverall = 0;
         
         if(_log.IsEnabled(LogLevel.Debug))
         {
@@ -201,46 +200,52 @@ public partial class OctaneClient : IClient
                 
         try
         {
-            int progressUpdateInterval = readBufferSize * 4;
-            long lastProgressUpdate = 0L;
-
             long expectedLength = piece.end - piece.start + 1;
-
-            while (true)
-            {
-                var bytesRead = await wrappedStream.ReadAsync(readBuffer.AsMemory(), cancellationToken).ConfigureAwait(false);
-                await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
-                if (bytesRead == 0)
-                {
-                    break;
-                }
-
-                if (bytesReadOverall + bytesRead > expectedLength)
-                {
-                    throw new InvalidOperationException("Received data exceeds the requested piece size.");
-                }
-
-                await chunkWriter.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
-                
-                bytesReadOverall += bytesRead;
-                        
-                if(child != null && (bytesReadOverall - lastProgressUpdate >= progressUpdateInterval))
-                {
-                    child.Tick(bytesReadOverall);
-                    lastProgressUpdate = bytesReadOverall;
-                }
-            }
-
-            if (bytesReadOverall < expectedLength)
-            {
-                throw new InvalidOperationException("Response stream ended before the requested piece was fully downloaded.");
-            }
+            await CopyStreamToWriterAsync(wrappedStream, chunkWriter, readBuffer, expectedLength, child, pauseToken, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
             await wrappedStream.DisposeAsync().ConfigureAwait(false);
             _memPool.Return(readBuffer);
             LogBufferReturnedToMemoryPool();
+        }
+    }
+
+    private async Task CopyStreamToWriterAsync(Stream source, IChunkWriter destination, byte[] buffer, long expectedLength, ChildProgressBar? child, PauseToken pauseToken, CancellationToken cancellationToken)
+    {
+        long bytesReadOverall = 0;
+        int progressUpdateInterval = buffer.Length * 4;
+        long lastProgressUpdate = 0L;
+
+        while (true)
+        {
+            var bytesRead = await source.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false);
+            await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+            
+            if (bytesRead == 0)
+            {
+                break;
+            }
+
+            if (bytesReadOverall + bytesRead > expectedLength)
+            {
+                throw new InvalidOperationException("Received data exceeds the requested piece size.");
+            }
+
+            await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+            
+            bytesReadOverall += bytesRead;
+                    
+            if (child != null && (bytesReadOverall - lastProgressUpdate >= progressUpdateInterval))
+            {
+                child.Tick(bytesReadOverall);
+                lastProgressUpdate = bytesReadOverall;
+            }
+        }
+
+        if (bytesReadOverall < expectedLength)
+        {
+            throw new InvalidOperationException("Response stream ended before the requested piece was fully downloaded.");
         }
     }
 
