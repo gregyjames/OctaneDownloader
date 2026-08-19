@@ -20,8 +20,8 @@ public static class ClientModule
             client.DefaultRequestHeaders.Add("Accept", "*/*");
             client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate, br");
 #if NET6_0_OR_GREATER
-            client.DefaultRequestVersion = System.Net.HttpVersion.Version20;
-            client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+            client.DefaultRequestVersion = System.Net.HttpVersion.Version30;
+            client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
 #endif
         })
         .ConfigurePrimaryHttpMessageHandler(sp =>
