@@ -30,7 +30,7 @@ public static partial class Helpers
         return pieces;
     }
 
-    internal static Exception GetFirstRealException(Exception exception)
+    internal static Exception? GetFirstRealException(Exception? exception)
     {
         if (exception == null)
         {
@@ -39,7 +39,7 @@ public static partial class Helpers
 
         var current = exception;
 
-        while (true)
+        while (current != null)
         {
             if (current is AggregateException aggEx)
             {
@@ -47,16 +47,15 @@ public static partial class Helpers
                 var flattened = aggEx.Flatten();
 
                 // If after flattening there are no inner exceptions, we're done
-                if (flattened?.InnerExceptions?.Count == 0)
+                if (flattened.InnerExceptions == null || flattened.InnerExceptions.Count == 0)
                 {
                     break;
                 }
 
                 // Take the *first* of the flattened exceptions
-                // (If you want to handle multiple, you'd iterate or choose otherwise)
-                current = flattened?.InnerExceptions[0];
+                current = flattened.InnerExceptions[0];
             }
-            else if (current?.InnerException != null)
+            else if (current.InnerException != null)
             {
                 // Move to the next inner exception until there's none
                 current = current.InnerException;
