@@ -32,12 +32,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using OctaneEngineCore.ShellProgressBar;
 using OctaneEngineCore;
+using OctaneEngineCore.Streams;
 
 namespace OctaneEngineCore.Clients;
 
 public class DefaultClient : IClient
 {
-    private MemoryMappedFile _mmf;
+    private IFileWriter _writer;
     private ProgressBar _pBar;
     private readonly HttpClient _httpClient;
     private readonly OctaneConfiguration _config;
@@ -63,18 +64,10 @@ public class DefaultClient : IClient
         return false;
     }
 
-    public void SetMmf(MemoryMappedFile file)
+    public void SetWriter(IFileWriter writer)
     {
-        _mmf = file;
+        _writer = writer;
     }
-
-#if NET6_0_OR_GREATER
-    private Microsoft.Win32.SafeHandles.SafeFileHandle? _fileHandle;
-    public void SetFileHandle(Microsoft.Win32.SafeHandles.SafeFileHandle file)
-    {
-        _fileHandle = file;
-    }
-#endif
 
     public void SetProgressbar(ProgressBar bar)
     {
@@ -83,7 +76,7 @@ public class DefaultClient : IClient
     
     private async Task CopyMessageContentToStreamWithProgressAsync(
         HttpResponseMessage message, 
-        Stream stream, 
+        IChunkWriter chunkWriter, 
         IProgress<long> progress,
         PauseToken pauseToken,
         CancellationToken cancellationToken)
@@ -92,7 +85,7 @@ public class DefaultClient : IClient
 
         var pipe = new Pipe(_pipeOptions);
         var fillTask = FillPipeAsync(contentStream, pipe.Writer, pauseToken, cancellationToken);
-        var readTask = ReadPipeAsync(pipe.Reader, stream, progress, pauseToken, cancellationToken);
+        var readTask = ReadPipeAsync(pipe.Reader, chunkWriter, progress, pauseToken, cancellationToken);
         
         await Task.WhenAll(fillTask, readTask).ConfigureAwait(false);
     }
@@ -122,7 +115,7 @@ public class DefaultClient : IClient
         }
     }
 
-    private async Task ReadPipeAsync(PipeReader reader, Stream destination, IProgress<long> progress, PauseToken pauseToken, CancellationToken cancellationToken)
+    private async Task ReadPipeAsync(PipeReader reader, IChunkWriter destination, IProgress<long> progress, PauseToken pauseToken, CancellationToken cancellationToken)
     {
         long totalBytesWritten = 0;
 
@@ -134,18 +127,7 @@ public class DefaultClient : IClient
 
             foreach (var segment in buffer)
             {
-#if NET6_0_OR_GREATER
-                if (_fileHandle != null)
-                {
-                    await RandomAccess.WriteAsync(_fileHandle, segment, totalBytesWritten, cancellationToken).ConfigureAwait(false);
-                }
-                else
-                {
-                    await destination.WriteAsync(segment).ConfigureAwait(false);
-                }
-#else
-                await destination.WriteAsync(segment).ConfigureAwait(false);
-#endif
+await destination.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
                 totalBytesWritten += segment.Length;
             }
             
@@ -189,19 +171,14 @@ public class DefaultClient : IClient
                 _pBar?.Tick();
             }
         });
-#if NET6_0_OR_GREATER
-        using var stream = _mmf?.CreateViewStream(); // Allow null for _mmf if using _fileHandle
-        await CopyMessageContentToStreamWithProgressAsync(message, stream ?? Stream.Null, progress, pauseToken, cancellationToken).ConfigureAwait(false);
-#else
-        using var stream = _mmf.CreateViewStream();
-        await CopyMessageContentToStreamWithProgressAsync(message, stream, progress, pauseToken, cancellationToken).ConfigureAwait(false);
-#endif
+await using var chunkWriter = _writer.CreateChunkWriter(0, 0);
+        await CopyMessageContentToStreamWithProgressAsync(message, chunkWriter, progress, pauseToken, cancellationToken).ConfigureAwait(false);
     }
 
     public void Dispose()
     {
         _httpClient?.Dispose();
-        _mmf?.Dispose();
+        _writer?.Dispose();
         _pBar?.Dispose();
     }
 }

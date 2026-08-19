@@ -37,6 +37,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OctaneEngineCore.Clients;
+using OctaneEngineCore.Streams;
 using OctaneEngineCore.Implementations.NetworkAnalyzer;
 using OctaneEngineCore.Interfaces;
 using OctaneEngineCore.ShellProgressBar;
@@ -241,9 +242,9 @@ public partial class Engine: IEngine, IDisposable
                     var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger);
                     var octaneClient = _client ?? new OctaneClient(_config, client, _factory);
 #if NET6_0_OR_GREATER
-                    octaneClient.SetFileHandle(fileHandle);
+                    octaneClient.SetWriter(new RandomAccessFileWriter(fileHandle));
 #else
-                    octaneClient.SetMmf(mmf);
+                    octaneClient.SetWriter(new MemoryMappedFileWriter(mmf));
 #endif
                     LogUsingOctaneClientToDownloadFile();
                     var options = new ParallelOptions()
@@ -290,9 +291,9 @@ public partial class Engine: IEngine, IDisposable
                     LogUsingDefaultClientToDownloadFile();
                     var defaultClient = _defaultClient ?? new DefaultClient(client, _config);
 #if NET6_0_OR_GREATER
-                    defaultClient.SetFileHandle(fileHandle);
+                    defaultClient.SetWriter(new RandomAccessFileWriter(fileHandle));
 #else
-                    defaultClient.SetMmf(mmf);
+                    defaultClient.SetWriter(new MemoryMappedFileWriter(mmf));
 #endif
                     try
                     {

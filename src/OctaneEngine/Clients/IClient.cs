@@ -34,10 +34,7 @@ namespace OctaneEngineCore.Clients;
 public interface IClient
 {
     public bool IsRangeSupported();
-#if NET6_0_OR_GREATER
-    public void SetFileHandle(Microsoft.Win32.SafeHandles.SafeFileHandle fileHandle);
-#endif
-    public void SetMmf(MemoryMappedFile file);
+    public void SetWriter(OctaneEngineCore.Streams.IFileWriter writer);
     public void SetProgressbar(ProgressBar bar);
     internal Task Download(string url, (long start, long end) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken);
 }

@@ -26,7 +26,6 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.MemoryMappedFiles;
 using System.IO.Pipelines;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
@@ -47,10 +46,7 @@ public partial class OctaneClient : IClient
     private readonly ILogger<IClient> _log;
     private readonly ILoggerFactory _loggerFactory;
     private ArrayPool<byte> _memPool = ArrayPool<byte>.Shared;
-    private MemoryMappedFile? _mmf;
-#if NET6_0_OR_GREATER
-    private Microsoft.Win32.SafeHandles.SafeFileHandle? _fileHandle;
-#endif
+    private IFileWriter? _writer;
     private ProgressBar? _progressBar;
     private readonly PipeOptions _pipeOptions;
     private readonly long _tickStep;
@@ -86,10 +82,7 @@ public partial class OctaneClient : IClient
     
     public bool IsRangeSupported() => true;
 
-#if NET6_0_OR_GREATER
-    public void SetFileHandle(Microsoft.Win32.SafeHandles.SafeFileHandle file) => _fileHandle = file;
-#endif
-    public void SetMmf(MemoryMappedFile file) => _mmf = file;
+    public void SetWriter(IFileWriter writer) => _writer = writer;
     public void SetProgressbar(ProgressBar bar) => _progressBar = bar;
     private async ValueTask<HttpResponseMessage> SendRangeRequestAsync(
         Uri uri, 
@@ -144,70 +137,47 @@ public partial class OctaneClient : IClient
         {
             throw new HttpRequestException($"Download failed with status code: {message.StatusCode}");
         }
-            if (message.StatusCode != System.Net.HttpStatusCode.PartialContent)
-            {
-                throw new InvalidOperationException($"Expected HTTP 206 Partial Content, but received {(int)message.StatusCode}.");
-            }
+        if (message.StatusCode != System.Net.HttpStatusCode.PartialContent)
+        {
+            throw new InvalidOperationException($"Expected HTTP 206 Partial Content, but received {(int)message.StatusCode}.");
+        }
             
-            var contentRange = message.Content.Headers.ContentRange;
-            if (contentRange == null || contentRange.From != piece.start || contentRange.To != piece.end)
-            {
-                throw new InvalidOperationException("Invalid or missing Content-Range in response.");
-            }
+        var contentRange = message.Content.Headers.ContentRange;
+        if (contentRange == null || contentRange.From != piece.start || contentRange.To != piece.end)
+        {
+            throw new InvalidOperationException("Invalid or missing Content-Range in response.");
+        }
 
-            LogHttpRequestReturnedSuccessStatus((int)message.StatusCode, piece.start, piece.end);
-            using var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            var wrappedStream = _config.BytesPerSecond <= 1 ? networkStream : new ThrottleStream(_loggerFactory);
+        LogHttpRequestReturnedSuccessStatus((int)message.StatusCode, piece.start, piece.end);
+        using var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var wrappedStream = _config.BytesPerSecond <= 1 ? networkStream : new ThrottleStream(_loggerFactory);
 
-            if (wrappedStream is ThrottleStream throttleStream)
-            {
-                throttleStream.SetStreamParent(networkStream);
-                throttleStream.SetBps(programBps);
-            }
+        if (wrappedStream is ThrottleStream throttleStream)
+        {
+            throttleStream.SetStreamParent(networkStream);
+            throttleStream.SetBps(programBps);
+        }
 
-            // Only create child progress bar if ShowProgress is enabled, and we have a progress bar
-            using var child = (_config.ShowProgress && _progressBar != null) 
-                ? _progressBar.Spawn(piece.end - piece.start, "Downloading part...", ChildProgressBarOptions)
-                : null;
+        // Only create child progress bar if ShowProgress is enabled, and we have a progress bar
+        using var child = (_config.ShowProgress && _progressBar != null) 
+            ? _progressBar.Spawn(piece.end - piece.start, "Downloading part...", ChildProgressBarOptions)
+            : null;
 
-        #if NET6_0_OR_GREATER
-            if (_fileHandle == null && _mmf == null)
-            {
-                throw new InvalidOperationException("File Handle and MMF not initialized before download.");
-            }
-        #else
-            if (_mmf == null)
-            {
-                throw new InvalidOperationException("MMF not initialized before download.");
-            }
-        #endif
-            
-#if NET6_0_OR_GREATER
-            if (_fileHandle != null)
-            {
-                await RegularDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
-            }
-            else
-            {
-                if (_config.LowMemoryMode)
-                {
-                    await LowMemoryDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
-                }
-                else
-                {
-                    await RegularDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
-                }
-            }
-#else
-            if (_config.LowMemoryMode)
-            {
-                await LowMemoryDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
-            }
-            else
-            {
-                await RegularDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
-            }
-#endif
+        if (_writer == null)
+        {
+            throw new InvalidOperationException("Writer not initialized before download.");
+        }
+
+        await using var chunkWriter = _writer.CreateChunkWriter(piece.start, piece.end - piece.start + 1);
+
+        if (_config.LowMemoryMode && chunkWriter is IMemoryMappedChunkWriter mmChunkWriter)
+        {
+            await LowMemoryDownload(piece, cancellationToken, wrappedStream, child, pauseToken, mmChunkWriter).ConfigureAwait(false);
+        }
+        else
+        {
+            await RegularDownload(piece, cancellationToken, wrappedStream, child, pauseToken, chunkWriter).ConfigureAwait(false);
+        }
         
         // Only tick the progress bar if ShowProgress is enabled
         if (_config.ShowProgress)
@@ -218,7 +188,7 @@ public partial class OctaneClient : IClient
         LogPieceExecutionTimeElapsedMilliseconds(NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end), stopwatch.ElapsedMilliseconds);
     }
 
-    private async Task RegularDownload((long start, long end) piece, CancellationToken cancellationToken, Stream wrappedStream, ChildProgressBar? child, PauseToken pauseToken)
+    private async Task RegularDownload((long start, long end) piece, CancellationToken cancellationToken, Stream wrappedStream, ChildProgressBar? child, PauseToken pauseToken, IChunkWriter chunkWriter)
     {
         int readBufferSize = Math.Max(_config.BufferSize, 256 * 1024);
         var readBuffer = _memPool.Rent(readBufferSize);
@@ -228,17 +198,6 @@ public partial class OctaneClient : IClient
         {
             LogBufferRentedOfSize(_config.BufferSize, piece.start, piece.end);
         }
-
-        long fileOffset = piece.start;
-        Stream? stream = null;
-#if NET6_0_OR_GREATER
-        if (_fileHandle == null)
-        {
-            stream = _mmf!.CreateViewStream(piece.start, piece.end - piece.start + 1);
-        }
-#else
-        stream = _mmf!.CreateViewStream(piece.start, piece.end - piece.start + 1);
-#endif
                 
         try
         {
@@ -261,19 +220,7 @@ public partial class OctaneClient : IClient
                     throw new InvalidOperationException("Received data exceeds the requested piece size.");
                 }
 
-#if NET6_0_OR_GREATER
-                if (_fileHandle != null)
-                {
-                    await RandomAccess.WriteAsync(_fileHandle, readBuffer.AsMemory(0, bytesRead), fileOffset, cancellationToken).ConfigureAwait(false);
-                    fileOffset += bytesRead;
-                }
-                else
-                {
-                    await stream!.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
-                }
-#else
-                await stream!.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
-#endif
+                await chunkWriter.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
                 
                 bytesReadOverall += bytesRead;
                         
@@ -291,27 +238,20 @@ public partial class OctaneClient : IClient
         }
         finally
         {
-            if (stream != null)
-            {
-                await stream.DisposeAsync().ConfigureAwait(false);
-            }
-            
             await wrappedStream.DisposeAsync().ConfigureAwait(false);
             _memPool.Return(readBuffer);
             LogBufferReturnedToMemoryPool();
         }
     }
 
-    private async Task LowMemoryDownload((long start, long end) piece, CancellationToken cancellationToken, Stream wrappedStream, ChildProgressBar? child, PauseToken pauseToken)
+    private async Task LowMemoryDownload((long start, long end) piece, CancellationToken cancellationToken, Stream wrappedStream, ChildProgressBar? child, PauseToken pauseToken, IMemoryMappedChunkWriter chunkWriter)
     {
         if (_config.BytesPerSecond > 1)
         {
             throw new ArgumentException("Low memory mode cannot be used while bytes per second is enabled (greater than 1).");
         }
-                
-        long accessorLength = piece.end - piece.start + 1;
 
-        using var accessor = _mmf.CreateViewAccessor(piece.start, accessorLength);
+        using var accessor = chunkWriter.CreateViewAccessor();
         IntPtr accessorPtr = IntPtr.Zero;
 
         try
