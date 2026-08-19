@@ -68,6 +68,14 @@ public class DefaultClient : IClient
         _mmf = file;
     }
 
+#if NET6_0_OR_GREATER
+    private Microsoft.Win32.SafeHandles.SafeFileHandle? _fileHandle;
+    public void SetFileHandle(Microsoft.Win32.SafeHandles.SafeFileHandle file)
+    {
+        _fileHandle = file;
+    }
+#endif
+
     public void SetProgressbar(ProgressBar bar)
     {
         _pBar = bar;
@@ -126,7 +134,18 @@ public class DefaultClient : IClient
 
             foreach (var segment in buffer)
             {
+#if NET6_0_OR_GREATER
+                if (_fileHandle != null)
+                {
+                    await RandomAccess.WriteAsync(_fileHandle, segment.ToArray().AsMemory(), totalBytesWritten, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    await destination.WriteAsync(segment).ConfigureAwait(false);
+                }
+#else
                 await destination.WriteAsync(segment).ConfigureAwait(false);
+#endif
                 totalBytesWritten += segment.Length;
             }
             
@@ -170,8 +189,13 @@ public class DefaultClient : IClient
                 _pBar?.Tick();
             }
         });
+#if NET6_0_OR_GREATER
+        using var stream = _mmf?.CreateViewStream(); // Allow null for _mmf if using _fileHandle
+        await CopyMessageContentToStreamWithProgressAsync(message, stream ?? Stream.Null, progress, pauseToken, cancellationToken).ConfigureAwait(false);
+#else
         using var stream = _mmf.CreateViewStream();
         await CopyMessageContentToStreamWithProgressAsync(message, stream, progress, pauseToken, cancellationToken).ConfigureAwait(false);
+#endif
     }
 
     public void Dispose()

@@ -227,13 +227,27 @@ public partial class Engine: IEngine, IDisposable
                 
             stopwatch.Start();
             
+#if NET6_0_OR_GREATER
+            if (File.Exists(filename))
+            {
+                File.Delete(filename);
+            }
+            using (Microsoft.Win32.SafeHandles.SafeFileHandle fileHandle = File.OpenHandle(filename, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, FileOptions.Asynchronous, preallocationSize: length))
+            {
+                RandomAccess.SetLength(fileHandle, length);
+#else
             using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, length, MemoryMappedFileAccess.ReadWrite))
             {
+#endif
                 //Check if range is supported
                 if (clientType == ClientType.Octane)
                 {
                     var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger);
+#if NET6_0_OR_GREATER
+                    octaneClient.SetFileHandle(fileHandle);
+#else
                     octaneClient.SetMmf(mmf);
+#endif
                     LogUsingOctaneClientToDownloadFile();
                     var options = new ParallelOptions()
                     {
@@ -278,7 +292,11 @@ public partial class Engine: IEngine, IDisposable
                 else
                 {
                     LogUsingDefaultClientToDownloadFile();
+#if NET6_0_OR_GREATER
+                    defaultClient.SetFileHandle(fileHandle);
+#else
                     defaultClient.SetMmf(mmf);
+#endif
                     try
                     {
                         await defaultClient.Download(request.Url, (0, 0), request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);

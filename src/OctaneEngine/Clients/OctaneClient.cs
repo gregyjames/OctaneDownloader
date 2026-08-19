@@ -48,6 +48,9 @@ public partial class OctaneClient : IClient
     private readonly ILoggerFactory _loggerFactory;
     private ArrayPool<byte> _memPool = ArrayPool<byte>.Shared;
     private MemoryMappedFile? _mmf;
+#if NET6_0_OR_GREATER
+    private Microsoft.Win32.SafeHandles.SafeFileHandle? _fileHandle;
+#endif
     private ProgressBar? _progressBar;
     private readonly PipeOptions _pipeOptions;
     private readonly long _tickStep;
@@ -83,6 +86,9 @@ public partial class OctaneClient : IClient
     
     public bool IsRangeSupported() => true;
 
+#if NET6_0_OR_GREATER
+    public void SetFileHandle(Microsoft.Win32.SafeHandles.SafeFileHandle file) => _fileHandle = file;
+#endif
     public void SetMmf(MemoryMappedFile file) => _mmf = file;
     public void SetProgressbar(ProgressBar bar) => _progressBar = bar;
     private async ValueTask<HttpResponseMessage> SendRangeRequestAsync(
@@ -95,9 +101,11 @@ public partial class OctaneClient : IClient
         {
             Method = HttpMethod.Get,
             #if NET6_0_OR_GREATER
-                VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher,
+                VersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
+                Version = System.Net.HttpVersion.Version30,
+            #else
+                Version = Polyfills.HttpVersion20,
             #endif
-            Version = Polyfills.HttpVersion20,
             RequestUri = uri,
             Headers =
             {
@@ -149,19 +157,30 @@ public partial class OctaneClient : IClient
                 ? _progressBar.Spawn(piece.end - piece.start, "Downloading part...", ChildProgressBarOptions)
                 : null;
 
-            if (_mmf is null)
+        #if NET6_0_OR_GREATER
+            if (_fileHandle == null && _mmf == null)
+            {
+                throw new InvalidOperationException("File Handle and MMF not initialized before download.");
+            }
+        #else
+            if (_mmf == null)
             {
                 throw new InvalidOperationException("MMF not initialized before download.");
             }
+        #endif
             
+        #if NET6_0_OR_GREATER
+            await RegularDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
+        #else
             if (_config.LowMemoryMode)
             {
-                await LowMemoryDownload(piece, cancellationToken, wrappedStream, child, pauseToken);
+                await LowMemoryDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
             }
             else
             {
-                await RegularDownload(piece, cancellationToken, wrappedStream, child, pauseToken);
+                await RegularDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
             }
+        #endif
         }
         else
         {
@@ -188,7 +207,11 @@ public partial class OctaneClient : IClient
             LogBufferRentedOfSize(_config.BufferSize, piece.start, piece.end);
         }
 
-        var stream = _mmf.CreateViewStream(piece.start, piece.end - piece.start + 1);
+        #if NET6_0_OR_GREATER
+            long fileOffset = piece.start;
+        #else
+            var stream = _mmf.CreateViewStream(piece.start, piece.end - piece.start + 1);
+        #endif
                 
         try
         {
@@ -204,7 +227,13 @@ public partial class OctaneClient : IClient
                     break;
                 }
 
-                await stream.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+                #if NET6_0_OR_GREATER
+                    await RandomAccess.WriteAsync(_fileHandle!, readBuffer.AsMemory(0, bytesRead), fileOffset, cancellationToken).ConfigureAwait(false);
+                    fileOffset += bytesRead;
+                #else
+                    await stream.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+                #endif
+                
                 bytesReadOverall += bytesRead;
                         
                 if(child != null && (bytesReadOverall - lastProgressUpdate >= progressUpdateInterval))
@@ -216,7 +245,12 @@ public partial class OctaneClient : IClient
         }
         finally
         {
-            await stream.DisposeAsync().ConfigureAwait(false);
+            #if NET6_0_OR_GREATER
+                // RandomAccess doesn't need to dispose a view stream
+            #else
+                await stream.DisposeAsync().ConfigureAwait(false);
+            #endif
+            
             await wrappedStream.DisposeAsync().ConfigureAwait(false);
             _memPool.Return(readBuffer);
             LogBufferReturnedToMemoryPool();
