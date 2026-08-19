@@ -345,52 +345,13 @@ public partial class OctaneClient : IClient
 
                 if (buffer.IsSingleSegment)
                 {
-                    var span = buffer.First.Span;
-                    int safe = (int)Math.Min(span.Length, accessorLength - writeOffset);
-                    unsafe
-                    {
-                        byte* src = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(span));
-                        Unsafe.CopyBlockUnaligned((byte*)accessorPtr + writeOffset, src, (uint)safe);
-                    }
-
-                    writeOffset += safe;
-                    
-                    if (writeOffset - lastTick >= _tickStep || writeOffset == accessorLength)
-                    {
-                        child?.Tick((int)Math.Min(writeOffset, int.MaxValue));
-                        lastTick = writeOffset;
-                    }
+                    writeOffset = WriteSpan(buffer.First.Span, accessorPtr, writeOffset, accessorLength, child, ref lastTick);
                 }
                 else
                 {
                     foreach (var segment in buffer)
                     {
-                        var span = segment.Span;
-                        int bytesToWrite = span.Length;
-
-                        long remaining = accessorLength - writeOffset;
-                        if (remaining <= 0)
-                        {
-                            break;
-                        }
-
-                        int safeBytesToWrite = (int)Math.Min(bytesToWrite, remaining);
-
-                        unsafe
-                        {
-                            byte* dest = (byte*)accessorPtr + writeOffset;
-                            byte* src = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(span));
-                            Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
-                        }
-
-                        writeOffset += safeBytesToWrite;
-
-                        if (writeOffset - lastTick >= _tickStep || writeOffset == accessorLength)
-                        {
-                            child?.Tick((int)writeOffset);
-                            lastTick = writeOffset;
-                        }
-
+                        writeOffset = WriteSpan(segment.Span, accessorPtr, writeOffset, accessorLength, child, ref lastTick);
                         if (writeOffset >= accessorLength)
                         {
                             break;
@@ -423,6 +384,29 @@ public partial class OctaneClient : IClient
         {
             await reader.CompleteAsync().ConfigureAwait(false);
         }
+    }
+
+
+    private unsafe long WriteSpan(ReadOnlySpan<byte> span, IntPtr accessorPtr, long writeOffset, long accessorLength, ChildProgressBar? child, ref long lastTick)
+    {
+        long remaining = accessorLength - writeOffset;
+        if (remaining <= 0) return writeOffset;
+
+        int safeBytesToWrite = (int)Math.Min(span.Length, remaining);
+
+        byte* dest = (byte*)accessorPtr + writeOffset;
+        byte* src = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(span));
+        Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
+
+        writeOffset += safeBytesToWrite;
+
+        if (writeOffset - lastTick >= _tickStep || writeOffset == accessorLength)
+        {
+            child?.Tick((int)Math.Min(writeOffset, int.MaxValue));
+            lastTick = writeOffset;
+        }
+        
+        return writeOffset;
     }
 
     [LoggerMessage(LogLevel.Trace, "Sending request for range ({pieceItem1},{pieceItem2})...")]
