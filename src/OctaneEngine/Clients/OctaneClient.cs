@@ -208,7 +208,6 @@ public partial class OctaneClient : IClient
                 await RegularDownload(piece, cancellationToken, wrappedStream, child, pauseToken).ConfigureAwait(false);
             }
 #endif
-
         
         // Only tick the progress bar if ShowProgress is enabled
         if (_config.ShowProgress)
