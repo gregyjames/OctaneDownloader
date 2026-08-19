@@ -204,10 +204,6 @@ public partial class Engine: IEngine, IDisposable
         {
             client = _clientFactory.CreateClient("OctaneClient");
             
-            // Thread-safe local variable resolution to support concurrency
-            var octaneClient = _client ?? new OctaneClient(_config, client, _factory);
-            var defaultClient = _defaultClient ?? new DefaultClient(client, _config);
-
             (var length, clientType) = await getFileSizeAndRangeSupport(request.Url).ConfigureAwait(false);
             
             #region Varible Initilization
@@ -243,7 +239,7 @@ public partial class Engine: IEngine, IDisposable
                 if (clientType == ClientType.Octane)
                 {
                     var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger);
-                    octaneClient = new OctaneClient(_config, client, _factory);
+                    var octaneClient = _client ?? new OctaneClient(_config, client, _factory);
 #if NET6_0_OR_GREATER
                     octaneClient.SetFileHandle(fileHandle);
 #else
@@ -262,7 +258,6 @@ public partial class Engine: IEngine, IDisposable
                     {
                         pbar = new ProgressBar(pieces.Count * 2, "Downloading file...");
                         octaneClient.SetProgressbar(pbar);
-                        defaultClient.SetProgressbar(pbar);
                     }
 
                     try
@@ -282,7 +277,7 @@ public partial class Engine: IEngine, IDisposable
                     catch (AggregateException aggEx)
                     {
                         // Attempts to preserve the stack trace while only throwing the inner exception
-                        var innerCause = Helpers.GetFirstRealException(aggEx);
+                        var innerCause = Helpers.GetFirstRealException(aggEx) ?? aggEx;
                         ExceptionDispatchInfo.Capture(innerCause).Throw();
                     }
                     catch (Exception)
@@ -293,11 +288,10 @@ public partial class Engine: IEngine, IDisposable
                 else
                 {
                     LogUsingDefaultClientToDownloadFile();
+                    var defaultClient = _defaultClient ?? new DefaultClient(client, _config);
 #if NET6_0_OR_GREATER
-                    defaultClient = new DefaultClient(client, _config);
                     defaultClient.SetFileHandle(fileHandle);
 #else
-                    defaultClient = new DefaultClient(client, _config);
                     defaultClient.SetMmf(mmf);
 #endif
                     try

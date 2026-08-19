@@ -68,6 +68,7 @@ public class PauseTokenTests
         });
 
         await handshakeTcs.Task; 
+        await Task.Delay(20); // ensure the background thread has entered token.WaitWhilePausedAsync() and attached its continuation
         
         var resumeThreadId = Environment.CurrentManagedThreadId;
         source.Resume();
