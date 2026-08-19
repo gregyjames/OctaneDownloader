@@ -229,9 +229,13 @@ public partial class Engine: IEngine, IDisposable
             {
                 File.Delete(filename);
             }
-            using (Microsoft.Win32.SafeHandles.SafeFileHandle fileHandle = File.OpenHandle(filename, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, FileOptions.Asynchronous, preallocationSize: length))
+            using (var mmf = _config.LowMemoryMode ? MemoryMappedFile.CreateFromFile(filename, FileMode.CreateNew, null, length, MemoryMappedFileAccess.ReadWrite) : null)
+            using (var fileHandle = !_config.LowMemoryMode ? File.OpenHandle(filename, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, FileOptions.Asynchronous, preallocationSize: length) : null)
             {
-                RandomAccess.SetLength(fileHandle, length);
+                if (fileHandle != null)
+                {
+                    RandomAccess.SetLength(fileHandle, length);
+                }
 #else
             using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, length, MemoryMappedFileAccess.ReadWrite))
             {
@@ -242,7 +246,7 @@ public partial class Engine: IEngine, IDisposable
                     var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger);
                     var octaneClient = _client ?? new OctaneClient(_config, client, _factory);
 #if NET6_0_OR_GREATER
-                    octaneClient.SetWriter(new RandomAccessFileWriter(fileHandle));
+                    octaneClient.SetWriter(_config.LowMemoryMode ? new MemoryMappedFileWriter(mmf!) : new RandomAccessFileWriter(fileHandle!));
 #else
                     octaneClient.SetWriter(new MemoryMappedFileWriter(mmf));
 #endif
@@ -291,7 +295,7 @@ public partial class Engine: IEngine, IDisposable
                     LogUsingDefaultClientToDownloadFile();
                     var defaultClient = _defaultClient ?? new DefaultClient(client, _config);
 #if NET6_0_OR_GREATER
-                    defaultClient.SetWriter(new RandomAccessFileWriter(fileHandle));
+                    defaultClient.SetWriter(_config.LowMemoryMode ? new MemoryMappedFileWriter(mmf!) : new RandomAccessFileWriter(fileHandle!));
 #else
                     defaultClient.SetWriter(new MemoryMappedFileWriter(mmf));
 #endif
