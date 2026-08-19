@@ -142,6 +142,17 @@ public partial class OctaneClient : IClient
         stopwatch.Start();
         if (message.IsSuccessStatusCode)
         {
+            if (message.StatusCode != System.Net.HttpStatusCode.PartialContent)
+            {
+                throw new InvalidOperationException($"Expected HTTP 206 Partial Content, but received {(int)message.StatusCode}.");
+            }
+            
+            var contentRange = message.Content.Headers.ContentRange;
+            if (contentRange == null || contentRange.From != piece.start || contentRange.To != piece.end)
+            {
+                throw new InvalidOperationException("Invalid or missing Content-Range in response.");
+            }
+
             LogHttpRequestReturnedSuccessStatus((int)message.StatusCode, piece.start, piece.end);
             using var networkStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             var wrappedStream = _config.BytesPerSecond <= 1 ? networkStream : new ThrottleStream(_loggerFactory);
@@ -237,6 +248,8 @@ public partial class OctaneClient : IClient
             int progressUpdateInterval = readBufferSize * 4;
             long lastProgressUpdate = 0L;
 
+            long expectedLength = piece.end - piece.start + 1;
+
             while (true)
             {
                 var bytesRead = await wrappedStream.ReadAsync(readBuffer.AsMemory(), cancellationToken).ConfigureAwait(false);
@@ -244,6 +257,11 @@ public partial class OctaneClient : IClient
                 if (bytesRead == 0)
                 {
                     break;
+                }
+
+                if (bytesReadOverall + bytesRead > expectedLength)
+                {
+                    throw new InvalidOperationException("Received data exceeds the requested piece size.");
                 }
 
 #if NET6_0_OR_GREATER
@@ -267,6 +285,11 @@ public partial class OctaneClient : IClient
                     child.Tick(bytesReadOverall);
                     lastProgressUpdate = bytesReadOverall;
                 }
+            }
+
+            if (bytesReadOverall < expectedLength)
+            {
+                throw new InvalidOperationException("Response stream ended before the requested piece was fully downloaded.");
             }
         }
         finally
