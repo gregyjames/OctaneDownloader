@@ -32,12 +32,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using OctaneEngineCore.ShellProgressBar;
 using OctaneEngineCore;
+using OctaneEngineCore.Streams;
 
 namespace OctaneEngineCore.Clients;
 
 public class DefaultClient : IClient
 {
-    private MemoryMappedFile _mmf;
+    private IFileWriter? _writer;
     private ProgressBar _pBar;
     private readonly HttpClient _httpClient;
     private readonly OctaneConfiguration _config;
@@ -63,9 +64,9 @@ public class DefaultClient : IClient
         return false;
     }
 
-    public void SetMmf(MemoryMappedFile file)
+    public void SetWriter(IFileWriter writer)
     {
-        _mmf = file;
+        _writer = writer;
     }
 
     public void SetProgressbar(ProgressBar bar)
@@ -75,7 +76,7 @@ public class DefaultClient : IClient
     
     private async Task CopyMessageContentToStreamWithProgressAsync(
         HttpResponseMessage message, 
-        Stream stream, 
+        IChunkWriter chunkWriter, 
         IProgress<long> progress,
         PauseToken pauseToken,
         CancellationToken cancellationToken)
@@ -84,7 +85,7 @@ public class DefaultClient : IClient
 
         var pipe = new Pipe(_pipeOptions);
         var fillTask = FillPipeAsync(contentStream, pipe.Writer, pauseToken, cancellationToken);
-        var readTask = ReadPipeAsync(pipe.Reader, stream, progress, pauseToken, cancellationToken);
+        var readTask = ReadPipeAsync(pipe.Reader, chunkWriter, progress, pauseToken, cancellationToken);
         
         await Task.WhenAll(fillTask, readTask).ConfigureAwait(false);
     }
@@ -114,7 +115,7 @@ public class DefaultClient : IClient
         }
     }
 
-    private async Task ReadPipeAsync(PipeReader reader, Stream destination, IProgress<long> progress, PauseToken pauseToken, CancellationToken cancellationToken)
+    private async Task ReadPipeAsync(PipeReader reader, IChunkWriter destination, IProgress<long> progress, PauseToken pauseToken, CancellationToken cancellationToken)
     {
         long totalBytesWritten = 0;
 
@@ -126,7 +127,7 @@ public class DefaultClient : IClient
 
             foreach (var segment in buffer)
             {
-                await destination.WriteAsync(segment).ConfigureAwait(false);
+await destination.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
                 totalBytesWritten += segment.Length;
             }
             
@@ -170,14 +171,18 @@ public class DefaultClient : IClient
                 _pBar?.Tick();
             }
         });
-        using var stream = _mmf.CreateViewStream();
-        await CopyMessageContentToStreamWithProgressAsync(message, stream, progress, pauseToken, cancellationToken).ConfigureAwait(false);
+if (_writer == null)
+        {
+            throw new InvalidOperationException("Writer not initialized before download.");
+        }
+
+        await using var chunkWriter = _writer.CreateChunkWriter(0, 0);
+        await CopyMessageContentToStreamWithProgressAsync(message, chunkWriter, progress, pauseToken, cancellationToken).ConfigureAwait(false);
     }
 
     public void Dispose()
     {
         _httpClient?.Dispose();
-        _mmf?.Dispose();
         _pBar?.Dispose();
     }
 }

@@ -68,6 +68,11 @@ public class PauseTokenTests
         });
 
         await handshakeTcs.Task; 
+        // Wait deterministically until the async state machine yields on the await
+        while (waitTask.Status == TaskStatus.Running)
+        {
+            await Task.Yield();
+        }
         
         var resumeThreadId = Environment.CurrentManagedThreadId;
         source.Resume();

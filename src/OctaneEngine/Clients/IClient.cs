@@ -34,7 +34,7 @@ namespace OctaneEngineCore.Clients;
 public interface IClient
 {
     public bool IsRangeSupported();
-    public void SetMmf(MemoryMappedFile file);
+    public void SetWriter(OctaneEngineCore.Streams.IFileWriter writer);
     public void SetProgressbar(ProgressBar bar);
     internal Task Download(string url, (long start, long end) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken);
 }

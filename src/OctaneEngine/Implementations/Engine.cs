@@ -37,6 +37,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OctaneEngineCore.Clients;
+using OctaneEngineCore.Streams;
 using OctaneEngineCore.Implementations.NetworkAnalyzer;
 using OctaneEngineCore.Interfaces;
 using OctaneEngineCore.ShellProgressBar;
@@ -204,10 +205,6 @@ public partial class Engine: IEngine, IDisposable
         {
             client = _clientFactory.CreateClient("OctaneClient");
             
-            // Thread-safe local variable resolution to support concurrency
-            var octaneClient = _client ?? new OctaneClient(_config, client, _factory);
-            var defaultClient = _defaultClient ?? new DefaultClient(client, _config);
-
             (var length, clientType) = await getFileSizeAndRangeSupport(request.Url).ConfigureAwait(false);
             
             #region Varible Initilization
@@ -227,13 +224,32 @@ public partial class Engine: IEngine, IDisposable
                 
             stopwatch.Start();
             
+#if NET6_0_OR_GREATER
+            if (File.Exists(filename))
+            {
+                File.Delete(filename);
+            }
+            using (var mmf = _config.LowMemoryMode ? MemoryMappedFile.CreateFromFile(filename, FileMode.CreateNew, null, length, MemoryMappedFileAccess.ReadWrite) : null)
+            using (var fileHandle = !_config.LowMemoryMode ? File.OpenHandle(filename, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, FileOptions.Asynchronous, preallocationSize: length) : null)
+            {
+                if (fileHandle != null)
+                {
+                    RandomAccess.SetLength(fileHandle, length);
+                }
+#else
             using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, length, MemoryMappedFileAccess.ReadWrite))
             {
+#endif
                 //Check if range is supported
                 if (clientType == ClientType.Octane)
                 {
                     var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger);
-                    octaneClient.SetMmf(mmf);
+                    var octaneClient = _client ?? new OctaneClient(_config, client, _factory);
+#if NET6_0_OR_GREATER
+                    octaneClient.SetWriter(_config.LowMemoryMode ? new MemoryMappedFileWriter(mmf!) : new RandomAccessFileWriter(fileHandle!));
+#else
+                    octaneClient.SetWriter(new MemoryMappedFileWriter(mmf));
+#endif
                     LogUsingOctaneClientToDownloadFile();
                     var options = new ParallelOptions()
                     {
@@ -247,7 +263,6 @@ public partial class Engine: IEngine, IDisposable
                     {
                         pbar = new ProgressBar(pieces.Count * 2, "Downloading file...");
                         octaneClient.SetProgressbar(pbar);
-                        defaultClient.SetProgressbar(pbar);
                     }
 
                     try
@@ -267,7 +282,7 @@ public partial class Engine: IEngine, IDisposable
                     catch (AggregateException aggEx)
                     {
                         // Attempts to preserve the stack trace while only throwing the inner exception
-                        var innerCause = Helpers.GetFirstRealException(aggEx);
+                        var innerCause = Helpers.GetFirstRealException(aggEx) ?? aggEx;
                         ExceptionDispatchInfo.Capture(innerCause).Throw();
                     }
                     catch (Exception)
@@ -278,7 +293,12 @@ public partial class Engine: IEngine, IDisposable
                 else
                 {
                     LogUsingDefaultClientToDownloadFile();
-                    defaultClient.SetMmf(mmf);
+                    var defaultClient = _defaultClient ?? new DefaultClient(client, _config);
+#if NET6_0_OR_GREATER
+                    defaultClient.SetWriter(_config.LowMemoryMode ? new MemoryMappedFileWriter(mmf!) : new RandomAccessFileWriter(fileHandle!));
+#else
+                    defaultClient.SetWriter(new MemoryMappedFileWriter(mmf));
+#endif
                     try
                     {
                         await defaultClient.Download(request.Url, (0, 0), request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);
