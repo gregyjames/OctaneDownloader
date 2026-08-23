@@ -252,9 +252,10 @@ public partial class Engine: IEngine, IDisposable
 
                     try
                     {
+                        var requestUri = new Uri(request.Url, UriKind.Absolute);
                         await pieces.ForEachAsync(options, async (piece, token) =>
                         {
-                            await octaneClient.Download(request.Url, piece, request.Headers ?? [], cancellation_token, pause_token.Token);
+                            await octaneClient.Download(requestUri, piece, request.Headers, cancellation_token, pause_token.Token);
 
                             Interlocked.Increment(ref tasksDone);
                                 
@@ -281,7 +282,7 @@ public partial class Engine: IEngine, IDisposable
                     defaultClient.SetMmf(mmf);
                     try
                     {
-                        await defaultClient.Download(request.Url, (0, 0), request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);
+                        await defaultClient.Download(request.Url, (0, 0), request.Headers, cancellation_token, pause_token.Token).ConfigureAwait(false);
                         success = true;
                     }
                     catch (Exception)

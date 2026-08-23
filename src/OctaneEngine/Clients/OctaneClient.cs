@@ -119,12 +119,16 @@ public partial class OctaneClient : IClient
         return response;
     }
     
-    public async Task Download(string url,(long start, long end) piece, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
+    public Task Download(string url, (long start, long end) piece, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
+    {
+        return Download(new Uri(url, UriKind.Absolute), piece, headers, cancellationToken, pauseToken);
+    }
+
+    public async Task Download(Uri uri, (long start, long end) piece, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
         LogSendingRequestForRangePieces(piece.start, piece.end);
         var stopwatch = new Stopwatch();
-        var uri = new Uri(url, UriKind.Absolute);
         using var message = await SendRangeRequestAsync(uri, piece, headers, cancellationToken).ConfigureAwait(false);
         
         #region Variable Declaration
@@ -204,7 +208,7 @@ public partial class OctaneClient : IClient
                     break;
                 }
 
-                await stream.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+                stream.Write(readBuffer, 0, bytesRead);
                 bytesReadOverall += bytesRead;
                         
                 if(child != null && (bytesReadOverall - lastProgressUpdate >= progressUpdateInterval))
