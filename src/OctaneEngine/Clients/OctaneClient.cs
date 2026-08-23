@@ -204,7 +204,9 @@ public partial class OctaneClient : IClient
                     break;
                 }
 
-                await stream.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+                // Writing to MemoryMappedViewStream is a synchronous memory copy operation into mapped view;
+                // using synchronous stream.Write eliminates ValueTask/Task allocations and state machine overhead.
+                stream.Write(readBuffer, 0, bytesRead);
                 bytesReadOverall += bytesRead;
                         
                 if(child != null && (bytesReadOverall - lastProgressUpdate >= progressUpdateInterval))

@@ -126,7 +126,21 @@ public class DefaultClient : IClient
 
             foreach (var segment in buffer)
             {
-                await destination.WriteAsync(segment).ConfigureAwait(false);
+                // Writing to MemoryMappedViewStream is a synchronous memory copy operation into mapped view;
+                // using synchronous stream.Write eliminates ValueTask/Task allocations and state machine overhead.
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP || NET5_0_OR_GREATER
+                destination.Write(segment.Span);
+#else
+                if (System.Runtime.InteropServices.MemoryMarshal.TryGetArray(segment, out var arraySegment))
+                {
+                    destination.Write(arraySegment.Array!, arraySegment.Offset, arraySegment.Count);
+                }
+                else
+                {
+                    var array = segment.ToArray();
+                    destination.Write(array, 0, array.Length);
+                }
+#endif
                 totalBytesWritten += segment.Length;
             }
             
