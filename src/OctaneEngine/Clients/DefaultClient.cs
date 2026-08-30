@@ -126,7 +126,13 @@ public class DefaultClient : IClient
 
             foreach (var segment in buffer)
             {
-                await destination.WriteAsync(segment).ConfigureAwait(false);
+                // Optimization: Write synchronously to MemoryMappedViewStream to eliminate ValueTask state machine allocations
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP || NET5_0_OR_GREATER
+                destination.Write(segment.Span);
+#else
+                var array = segment.ToArray();
+                destination.Write(array, 0, array.Length);
+#endif
                 totalBytesWritten += segment.Length;
             }
             
@@ -165,7 +171,8 @@ public class DefaultClient : IClient
             totalWritten += bytesWritten;
 
             // Only update progress bar if ShowProgress is enabled
-            if (_config.ShowProgress && totalWritten % ((piece.Item2-piece.Item1) / _config.BufferSize) == 0)
+            long divisor = _config.BufferSize > 0 ? (piece.Item2 - piece.Item1) / _config.BufferSize : 0;
+            if (_config.ShowProgress && divisor > 0 && totalWritten % divisor == 0)
             {
                 _pBar?.Tick();
             }

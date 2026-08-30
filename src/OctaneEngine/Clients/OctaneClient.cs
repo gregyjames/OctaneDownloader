@@ -204,7 +204,12 @@ public partial class OctaneClient : IClient
                     break;
                 }
 
-                await stream.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+                // Optimization: Write synchronously to MemoryMappedViewStream to eliminate ValueTask state machine allocations during download chunk loops
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP || NET5_0_OR_GREATER
+                stream.Write(readBuffer.AsSpan(0, bytesRead));
+#else
+                stream.Write(readBuffer, 0, bytesRead);
+#endif
                 bytesReadOverall += bytesRead;
                         
                 if(child != null && (bytesReadOverall - lastProgressUpdate >= progressUpdateInterval))
