@@ -24,16 +24,18 @@ internal static class NetworkAnalyzer
 
     public static string PrettySize(long len)
     {
+        if (len < 1024)
+            return ZString.Format("{0} B", len);
+
+        double bytes = len;
         int order = 0;
-        while (len >= 1024 && order < Sizes.Length - 1)
+        while (bytes >= 1024 && order < Sizes.Length - 1)
         {
             order++;
-            len = len >> 10;
+            bytes /= 1024;
         }
-            
-        string result = ZString.Format("{0:0.##} {1}", len, Sizes[order]); 
-            
-        return result;
+
+        return ZString.Format("{0:0.##} {1}", bytes, Sizes[order]);
     }
     
     public static (string,int) GetTestFile(TestFileSize size)
