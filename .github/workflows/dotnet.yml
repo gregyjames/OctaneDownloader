@@ -26,7 +26,7 @@ jobs:
       uses: NuGet/setup-nuget@v4
     - name: Restore NuGet
       if: steps.cacheStep.outputs.cache-hit != 'true'
-      run: nuget restore Octane.sln
+      run: dotnet restore Octane.slnx
     - name: Decode SNK and save
       shell: powershell
       run: |
