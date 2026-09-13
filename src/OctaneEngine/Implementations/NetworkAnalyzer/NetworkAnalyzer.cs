@@ -1,11 +1,11 @@
 using System;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Cysharp.Text;
 using OctaneEngineCore.Interfaces.NetworkAnalyzer;
 
 [assembly: InternalsVisibleTo("OctaneTestProject")]
@@ -28,23 +28,23 @@ internal static class NetworkAnalyzer
         MaxConnectionsPerServer = 100
     });
 
-    // O(1) branch-based size formatting with double precision and invariant culture
+    // O(1) branch-based size formatting with double precision using zero-allocation ZString
     public static string PrettySize(long len)
     {
         if (len < 1024)
-            return string.Format(CultureInfo.InvariantCulture, "{0} B", len);
+            return ZString.Format("{0} B", len);
 
         double size = len;
         if (len < 1048576L) // 1024 * 1024
-            return string.Format(CultureInfo.InvariantCulture, "{0:0.##} KB", size / 1024.0);
+            return ZString.Format("{0:0.##} KB", size / 1024.0);
 
         if (len < 1073741824L) // 1024 * 1024 * 1024
-            return string.Format(CultureInfo.InvariantCulture, "{0:0.##} MB", size / 1048576.0);
+            return ZString.Format("{0:0.##} MB", size / 1048576.0);
 
         if (len < 1099511627776L) // 1024 * 1024 * 1024 * 1024
-            return string.Format(CultureInfo.InvariantCulture, "{0:0.##} GB", size / 1073741824.0);
+            return ZString.Format("{0:0.##} GB", size / 1073741824.0);
 
-        return string.Format(CultureInfo.InvariantCulture, "{0:0.##} TB", size / 1099511627776.0);
+        return ZString.Format("{0:0.##} TB", size / 1099511627776.0);
     }
     
     public static (string,int) GetTestFile(TestFileSize size)
