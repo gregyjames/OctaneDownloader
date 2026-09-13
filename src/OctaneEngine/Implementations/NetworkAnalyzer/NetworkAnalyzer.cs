@@ -22,11 +22,18 @@ public enum TestFileSize
 
 internal static class NetworkAnalyzer
 {
+#if !NETSTANDARD
     internal static readonly HttpClient SharedClient = new(new SocketsHttpHandler
     {
         PooledConnectionLifetime = TimeSpan.FromMinutes(2),
         MaxConnectionsPerServer = 100
     });
+#else
+    internal static readonly HttpClient SharedClient = new(new HttpClientHandler
+    {
+        MaxConnectionsPerServer = 100
+    });
+#endif
 
     // O(1) branch-based size formatting with double precision using zero-allocation ZString
     public static string PrettySize(long len)
