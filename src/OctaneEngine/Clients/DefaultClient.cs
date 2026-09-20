@@ -126,7 +126,28 @@ public class DefaultClient : IClient
 
             foreach (var segment in buffer)
             {
-                await destination.WriteAsync(segment).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (destination is MemoryMappedViewStream viewStream)
+                {
+#if NETCOREAPP || NETSTANDARD2_1_OR_GREATER || NET5_0_OR_GREATER
+                    // MemoryMappedViewStream writes synchronously to memory-mapped RAM without disk I/O.
+                    viewStream.Write(segment.Span);
+#else
+                    if (System.Runtime.InteropServices.MemoryMarshal.TryGetArray(segment, out var arraySegment))
+                    {
+                        viewStream.Write(arraySegment.Array, arraySegment.Offset, arraySegment.Count);
+                    }
+                    else
+                    {
+                        var array = segment.ToArray();
+                        viewStream.Write(array, 0, array.Length);
+                    }
+#endif
+                }
+                else
+                {
+                    await destination.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
+                }
                 totalBytesWritten += segment.Length;
             }
             

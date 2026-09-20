@@ -204,7 +204,14 @@ public partial class OctaneClient : IClient
                     break;
                 }
 
-                await stream.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+#if NETCOREAPP || NETSTANDARD2_1_OR_GREATER || NET5_0_OR_GREATER
+                // MemoryMappedViewStream writes synchronously to memory-mapped RAM without disk I/O.
+                // Using synchronous Write avoids Task/ValueTask allocation and state machine overhead on every chunk.
+                stream.Write(readBuffer.AsSpan(0, bytesRead));
+#else
+                stream.Write(readBuffer, 0, bytesRead);
+#endif
                 bytesReadOverall += bytesRead;
                         
                 if(child != null && (bytesReadOverall - lastProgressUpdate >= progressUpdateInterval))
