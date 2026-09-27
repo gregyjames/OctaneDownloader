@@ -126,7 +126,10 @@ public class DefaultClient : IClient
 
             foreach (var segment in buffer)
             {
-                await destination.WriteAsync(segment).ConfigureAwait(false);
+                // destination is a MemoryMappedViewStream performing synchronous in-memory copying without disk I/O.
+                // Direct Write avoids Task state machine and polyfill allocations on every chunk.
+                cancellationToken.ThrowIfCancellationRequested();
+                destination.Write(segment.Span);
                 totalBytesWritten += segment.Length;
             }
             

@@ -204,7 +204,10 @@ public partial class OctaneClient : IClient
                     break;
                 }
 
-                await stream.WriteAsync(readBuffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+                // MemoryMappedViewStream performs synchronous in-memory copying without disk I/O.
+                // Direct Write avoids ValueTask task state machine allocations on every chunk.
+                cancellationToken.ThrowIfCancellationRequested();
+                stream.Write(readBuffer.AsSpan(0, bytesRead));
                 bytesReadOverall += bytesRead;
                         
                 if(child != null && (bytesReadOverall - lastProgressUpdate >= progressUpdateInterval))
