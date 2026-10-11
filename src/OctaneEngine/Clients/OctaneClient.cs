@@ -307,6 +307,27 @@ public partial class OctaneClient : IClient
         }
     }
     
+    private void WriteSpanToAccessor(ReadOnlySpan<byte> span, IntPtr accessorPtr, ref long writeOffset, long accessorLength, ref long lastTick, ChildProgressBar? child)
+    {
+        long remaining = accessorLength - writeOffset;
+        if (remaining <= 0) return;
+
+        int safe = (int)Math.Min(span.Length, remaining);
+        unsafe
+        {
+            var destSpan = new Span<byte>((byte*)accessorPtr + writeOffset, safe);
+            span.Slice(0, safe).CopyTo(destSpan);
+        }
+
+        writeOffset += safe;
+
+        if (writeOffset - lastTick >= _tickStep || writeOffset == accessorLength)
+        {
+            child?.Tick((int)Math.Min(writeOffset, int.MaxValue));
+            lastTick = writeOffset;
+        }
+    }
+
     private async Task ReadPipeToFileAsync(PipeReader reader, (long start, long end) piece, ChildProgressBar? child, IntPtr accessorPtr, CancellationToken token, PauseToken pauseToken)
     {
         long accessorLength = piece.end - piece.start + 1;
@@ -330,51 +351,13 @@ public partial class OctaneClient : IClient
 
                 if (buffer.IsSingleSegment)
                 {
-                    var span = buffer.First.Span;
-                    int safe = (int)Math.Min(span.Length, accessorLength - writeOffset);
-                    unsafe
-                    {
-                        var destSpan = new Span<byte>((byte*)accessorPtr + writeOffset, safe);
-                        span.Slice(0, safe).CopyTo(destSpan);
-                    }
-
-                    writeOffset += safe;
-                    
-                    if (writeOffset - lastTick >= _tickStep || writeOffset == accessorLength)
-                    {
-                        child?.Tick((int)Math.Min(writeOffset, int.MaxValue));
-                        lastTick = writeOffset;
-                    }
+                    WriteSpanToAccessor(buffer.First.Span, accessorPtr, ref writeOffset, accessorLength, ref lastTick, child);
                 }
                 else
                 {
                     foreach (var segment in buffer)
                     {
-                        var span = segment.Span;
-                        int bytesToWrite = span.Length;
-
-                        long remaining = accessorLength - writeOffset;
-                        if (remaining <= 0)
-                        {
-                            break;
-                        }
-
-                        int safeBytesToWrite = (int)Math.Min(bytesToWrite, remaining);
-
-                        unsafe
-                        {
-                            var destSpan = new Span<byte>((byte*)accessorPtr + writeOffset, safeBytesToWrite);
-                            span.Slice(0, safeBytesToWrite).CopyTo(destSpan);
-                        }
-
-                        writeOffset += safeBytesToWrite;
-
-                        if (writeOffset - lastTick >= _tickStep || writeOffset == accessorLength)
-                        {
-                            child?.Tick((int)writeOffset);
-                            lastTick = writeOffset;
-                        }
-
+                        WriteSpanToAccessor(segment.Span, accessorPtr, ref writeOffset, accessorLength, ref lastTick, child);
                         if (writeOffset >= accessorLength)
                         {
                             break;

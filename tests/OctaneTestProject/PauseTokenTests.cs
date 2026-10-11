@@ -62,6 +62,7 @@ public class PauseTokenTests
         {
             var task = token.WaitWhilePausedAsync();
             handshakeTcs.SetResult(true);
+            await Task.Delay(10); // Ensure the awaiter is attached to task before Resume is called
             await task;
             continuationThreadId = Environment.CurrentManagedThreadId;
             tcs.SetResult(true);
