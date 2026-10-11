@@ -198,7 +198,10 @@ public partial class OctaneClient : IClient
             while (true)
             {
                 var bytesRead = await wrappedStream.ReadAsync(readBuffer.AsMemory(), cancellationToken).ConfigureAwait(false);
-                await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+                if (pauseToken.IsPaused)
+                {
+                    await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+                }
                 if (bytesRead == 0)
                 {
                     break;
@@ -281,7 +284,10 @@ public partial class OctaneClient : IClient
             {
                 var memory = writer.GetMemory(bufferSize);
                 var bytesRead = await stream.ReadAsync(memory, token).ConfigureAwait(false);
-                await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
+                if (pauseToken.IsPaused)
+                {
+                    await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
+                }
                 if (bytesRead == 0)
                 {
                     break;
@@ -315,7 +321,10 @@ public partial class OctaneClient : IClient
                 if (!reader.TryRead(out ReadResult result))
                     result = await reader.ReadAsync(token).ConfigureAwait(false);
 
-                await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
+                if (pauseToken.IsPaused)
+                {
+                    await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
+                }
 
                 ReadOnlySequence<byte> buffer = result.Buffer;
 
@@ -325,8 +334,8 @@ public partial class OctaneClient : IClient
                     int safe = (int)Math.Min(span.Length, accessorLength - writeOffset);
                     unsafe
                     {
-                        byte* src = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(span));
-                        Unsafe.CopyBlockUnaligned((byte*)accessorPtr + writeOffset, src, (uint)safe);
+                        var destSpan = new Span<byte>((byte*)accessorPtr + writeOffset, safe);
+                        span.Slice(0, safe).CopyTo(destSpan);
                     }
 
                     writeOffset += safe;
@@ -354,9 +363,8 @@ public partial class OctaneClient : IClient
 
                         unsafe
                         {
-                            byte* dest = (byte*)accessorPtr + writeOffset;
-                            byte* src = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(span));
-                            Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
+                            var destSpan = new Span<byte>((byte*)accessorPtr + writeOffset, safeBytesToWrite);
+                            span.Slice(0, safeBytesToWrite).CopyTo(destSpan);
                         }
 
                         writeOffset += safeBytesToWrite;

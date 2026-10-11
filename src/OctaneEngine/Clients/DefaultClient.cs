@@ -97,7 +97,10 @@ public class DefaultClient : IClient
         {
             Memory<byte> memory = writer.GetMemory(bufferSize);
             int bytesRead = await source.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
-            await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+            if (pauseToken.IsPaused)
+            {
+                await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+            }
 
             if (bytesRead == 0)
             {
@@ -121,7 +124,10 @@ public class DefaultClient : IClient
         while (true)
         {
             ReadResult result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
-            await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+            if (pauseToken.IsPaused)
+            {
+                await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+            }
             ReadOnlySequence<byte> buffer = result.Buffer;
 
             foreach (var segment in buffer)
