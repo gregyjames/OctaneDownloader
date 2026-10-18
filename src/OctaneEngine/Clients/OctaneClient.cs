@@ -121,7 +121,10 @@ public partial class OctaneClient : IClient
     
     public async Task Download(string url,(long start, long end) piece, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
-        await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+        if (pauseToken.IsPaused)
+        {
+            await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+        }
         LogSendingRequestForRangePieces(piece.start, piece.end);
         var stopwatch = new Stopwatch();
         var uri = new Uri(url, UriKind.Absolute);
@@ -198,7 +201,10 @@ public partial class OctaneClient : IClient
             while (true)
             {
                 var bytesRead = await wrappedStream.ReadAsync(readBuffer.AsMemory(), cancellationToken).ConfigureAwait(false);
-                await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+                if (pauseToken.IsPaused)
+                {
+                    await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+                }
                 if (bytesRead == 0)
                 {
                     break;
@@ -281,7 +287,10 @@ public partial class OctaneClient : IClient
             {
                 var memory = writer.GetMemory(bufferSize);
                 var bytesRead = await stream.ReadAsync(memory, token).ConfigureAwait(false);
-                await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
+                if (pauseToken.IsPaused)
+                {
+                    await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
+                }
                 if (bytesRead == 0)
                 {
                     break;
@@ -315,7 +324,10 @@ public partial class OctaneClient : IClient
                 if (!reader.TryRead(out ReadResult result))
                     result = await reader.ReadAsync(token).ConfigureAwait(false);
 
-                await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
+                if (pauseToken.IsPaused)
+                {
+                    await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
+                }
 
                 ReadOnlySequence<byte> buffer = result.Buffer;
 

@@ -97,7 +97,10 @@ public class DefaultClient : IClient
         {
             Memory<byte> memory = writer.GetMemory(bufferSize);
             int bytesRead = await source.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
-            await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+            if (pauseToken.IsPaused)
+            {
+                await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+            }
 
             if (bytesRead == 0)
             {
@@ -121,7 +124,10 @@ public class DefaultClient : IClient
         while (true)
         {
             ReadResult result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
-            await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+            if (pauseToken.IsPaused)
+            {
+                await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+            }
             ReadOnlySequence<byte> buffer = result.Buffer;
 
             foreach (var segment in buffer)
@@ -142,7 +148,10 @@ public class DefaultClient : IClient
     
     public async Task Download(string url, (long, long) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
-        await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+        if (pauseToken.IsPaused)
+        {
+            await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+        }
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
         if (headers != null)
@@ -156,7 +165,10 @@ public class DefaultClient : IClient
         var message = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
         
-        await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+        if (pauseToken.IsPaused)
+        {
+            await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+        }
 
         long totalWritten = 0;
         
