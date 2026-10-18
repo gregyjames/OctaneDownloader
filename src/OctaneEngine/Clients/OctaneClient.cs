@@ -121,7 +121,10 @@ public partial class OctaneClient : IClient
     
     public async Task Download(string url,(long start, long end) piece, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
-        await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+        if (pauseToken.IsPaused)
+        {
+            await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+        }
         LogSendingRequestForRangePieces(piece.start, piece.end);
         var stopwatch = new Stopwatch();
         var uri = new Uri(url, UriKind.Absolute);
@@ -198,7 +201,10 @@ public partial class OctaneClient : IClient
             while (true)
             {
                 var bytesRead = await wrappedStream.ReadAsync(readBuffer.AsMemory(), cancellationToken).ConfigureAwait(false);
-                await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+                if (pauseToken.IsPaused)
+                {
+                    await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+                }
                 if (bytesRead == 0)
                 {
                     break;
@@ -281,7 +287,10 @@ public partial class OctaneClient : IClient
             {
                 var memory = writer.GetMemory(bufferSize);
                 var bytesRead = await stream.ReadAsync(memory, token).ConfigureAwait(false);
-                await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
+                if (pauseToken.IsPaused)
+                {
+                    await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
+                }
                 if (bytesRead == 0)
                 {
                     break;
@@ -301,80 +310,71 @@ public partial class OctaneClient : IClient
         }
     }
     
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void WriteSegmentToAccessor(ReadOnlySpan<byte> span, IntPtr accessorPtr, ref long writeOffset, ref long lastTick, long accessorLength, ChildProgressBar? child)
+    {
+        long remaining = accessorLength - writeOffset;
+        if (remaining <= 0)
+            return;
+
+        int safeBytesToWrite = (int)Math.Min(span.Length, remaining);
+
+        unsafe
+        {
+            byte* dest = (byte*)accessorPtr + writeOffset;
+            byte* src = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(span));
+            Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
+        }
+
+        writeOffset += safeBytesToWrite;
+
+        if (child != null && (writeOffset - lastTick >= _tickStep || writeOffset == accessorLength))
+        {
+            child.Tick((int)Math.Min(writeOffset, int.MaxValue));
+            lastTick = writeOffset;
+        }
+    }
+
+    private void WriteSequenceToAccessor(ReadOnlySequence<byte> buffer, IntPtr accessorPtr, ref long writeOffset, ref long lastTick, long accessorLength, ChildProgressBar? child)
+    {
+        if (buffer.IsSingleSegment)
+        {
+            WriteSegmentToAccessor(buffer.First.Span, accessorPtr, ref writeOffset, ref lastTick, accessorLength, child);
+        }
+        else
+        {
+            foreach (var segment in buffer)
+            {
+                WriteSegmentToAccessor(segment.Span, accessorPtr, ref writeOffset, ref lastTick, accessorLength, child);
+                if (writeOffset >= accessorLength)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
     private async Task ReadPipeToFileAsync(PipeReader reader, (long start, long end) piece, ChildProgressBar? child, IntPtr accessorPtr, CancellationToken token, PauseToken pauseToken)
     {
         long accessorLength = piece.end - piece.start + 1;
         long writeOffset = 0;
+        long lastTick = 0;
 
         try
         {
-            long lastTick = 0;
-
             while (true)
             {
                 if (!reader.TryRead(out ReadResult result))
                     result = await reader.ReadAsync(token).ConfigureAwait(false);
 
-                await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
-
-                ReadOnlySequence<byte> buffer = result.Buffer;
-
-                if (buffer.IsSingleSegment)
+                if (pauseToken.IsPaused)
                 {
-                    var span = buffer.First.Span;
-                    int safe = (int)Math.Min(span.Length, accessorLength - writeOffset);
-                    unsafe
-                    {
-                        byte* src = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(span));
-                        Unsafe.CopyBlockUnaligned((byte*)accessorPtr + writeOffset, src, (uint)safe);
-                    }
-
-                    writeOffset += safe;
-                    
-                    if (writeOffset - lastTick >= _tickStep || writeOffset == accessorLength)
-                    {
-                        child?.Tick((int)Math.Min(writeOffset, int.MaxValue));
-                        lastTick = writeOffset;
-                    }
-                }
-                else
-                {
-                    foreach (var segment in buffer)
-                    {
-                        var span = segment.Span;
-                        int bytesToWrite = span.Length;
-
-                        long remaining = accessorLength - writeOffset;
-                        if (remaining <= 0)
-                        {
-                            break;
-                        }
-
-                        int safeBytesToWrite = (int)Math.Min(bytesToWrite, remaining);
-
-                        unsafe
-                        {
-                            byte* dest = (byte*)accessorPtr + writeOffset;
-                            byte* src = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(span));
-                            Unsafe.CopyBlockUnaligned(dest, src, (uint)safeBytesToWrite);
-                        }
-
-                        writeOffset += safeBytesToWrite;
-
-                        if (writeOffset - lastTick >= _tickStep || writeOffset == accessorLength)
-                        {
-                            child?.Tick((int)writeOffset);
-                            lastTick = writeOffset;
-                        }
-
-                        if (writeOffset >= accessorLength)
-                        {
-                            break;
-                        }
-                    }
+                    await pauseToken.WaitWhilePausedAsync(token).ConfigureAwait(false);
                 }
 
-                reader.AdvanceTo(buffer.End);
+                WriteSequenceToAccessor(result.Buffer, accessorPtr, ref writeOffset, ref lastTick, accessorLength, child);
+
+                reader.AdvanceTo(result.Buffer.End);
 
                 if (result.IsCompleted || result.IsCanceled || writeOffset >= accessorLength)
                 {
