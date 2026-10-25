@@ -232,63 +232,13 @@ public partial class Engine: IEngine, IDisposable
                 //Check if range is supported
                 if (clientType == ClientType.Octane)
                 {
-                    var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger);
-                    octaneClient.SetMmf(mmf);
-                    LogUsingOctaneClientToDownloadFile();
-                    var options = new ParallelOptions()
-                    {
-                        MaxDegreeOfParallelism = _config.Parts,
-                        CancellationToken = cancellation_token,
-                        //TaskScheduler = TaskScheduler.Current
-                    };
-                    ProgressBar? pbar = null;
-                    
-                    if (_config.ShowProgress)
-                    {
-                        pbar = new ProgressBar(pieces.Count * 2, "Downloading file...");
-                        octaneClient.SetProgressbar(pbar);
-                        defaultClient.SetProgressbar(pbar);
-                    }
-
-                    try
-                    {
-                        await pieces.ForEachAsync(options, async (piece, token) =>
-                        {
-                            await octaneClient.Download(request.Url, piece, request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);
-
-                            Interlocked.Increment(ref tasksDone);
-                                
-                            pbar?.Tick();
-                            _config?.ProgressCallback?.Invoke((double)tasksDone / _config.Parts);
-                        }).ConfigureAwait(false);
-                            
-                        success = true;
-                    }
-                    catch (AggregateException aggEx)
-                    {
-                        // Attempts to preserve the stack trace while only throwing the inner exception
-                        var innerCause = Helpers.GetFirstRealException(aggEx);
-                        ExceptionDispatchInfo.Capture(innerCause).Throw();
-                    }
-                    catch (Exception)
-                    {
-                        throw;
-                    }
+                    await DownloadWithOctaneClientAsync(octaneClient, defaultClient, mmf, request, length, cancellation_token, pause_token).ConfigureAwait(false);
+                    success = true;
                 }
                 else
                 {
-                    LogUsingDefaultClientToDownloadFile();
-                    defaultClient.SetMmf(mmf);
-                    try
-                    {
-                        await defaultClient.Download(request.Url, (0, 0), request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);
-                        success = true;
-                    }
-                    catch (Exception)
-                    {
-                        success = false;
-                        throw;
-                    }
+                    await DownloadWithDefaultClientAsync(defaultClient, mmf, request, cancellation_token, pause_token).ConfigureAwait(false);
+                    success = true;
                 }
                     
                 stopwatch.Stop();
@@ -312,6 +262,56 @@ public partial class Engine: IEngine, IDisposable
             }
             Cleanup(stopwatch, _config, success);
         }
+    }
+
+    private async Task DownloadWithOctaneClientAsync(
+        OctaneClient octaneClient, DefaultClient defaultClient, MemoryMappedFile mmf,
+        OctaneRequest request, long length, CancellationToken cancellationToken, PauseTokenSource pauseToken)
+    {
+        var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger);
+        octaneClient.SetMmf(mmf);
+        LogUsingOctaneClientToDownloadFile();
+        var options = new ParallelOptions()
+        {
+            MaxDegreeOfParallelism = _config.Parts,
+            CancellationToken = cancellationToken,
+        };
+        ProgressBar? pbar = null;
+        int tasksDone = 0;
+
+        if (_config.ShowProgress)
+        {
+            pbar = new ProgressBar(pieces.Count * 2, "Downloading file...");
+            octaneClient.SetProgressbar(pbar);
+            defaultClient.SetProgressbar(pbar);
+        }
+
+        try
+        {
+            await pieces.ForEachAsync(options, async (piece, token) =>
+            {
+                await octaneClient.Download(request.Url, piece, request.Headers ?? [], cancellationToken, pauseToken.Token).ConfigureAwait(false);
+
+                Interlocked.Increment(ref tasksDone);
+
+                pbar?.Tick();
+                _config?.ProgressCallback?.Invoke((double)tasksDone / _config.Parts);
+            }).ConfigureAwait(false);
+        }
+        catch (AggregateException aggEx)
+        {
+            var innerCause = Helpers.GetFirstRealException(aggEx);
+            ExceptionDispatchInfo.Capture(innerCause).Throw();
+        }
+    }
+
+    private async Task DownloadWithDefaultClientAsync(
+        DefaultClient defaultClient, MemoryMappedFile mmf,
+        OctaneRequest request, CancellationToken cancellationToken, PauseTokenSource pauseToken)
+    {
+        LogUsingDefaultClientToDownloadFile();
+        defaultClient.SetMmf(mmf);
+        await defaultClient.Download(request.Url, (0, 0), request.Headers ?? [], cancellationToken, pauseToken.Token).ConfigureAwait(false);
     }
 
     public void Dispose()
