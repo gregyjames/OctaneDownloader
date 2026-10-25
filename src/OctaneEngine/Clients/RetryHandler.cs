@@ -1,7 +1,7 @@
-﻿/*
+/*
  * The MIT License (MIT)
  * Copyright (c) 2015 Greg James
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
@@ -52,26 +52,26 @@ internal partial class RetryHandler : DelegatingHandler
         HttpResponseMessage? response = null;
         for (var i = 0; i < _maxRetries; i++)
         {
-            response = await base.SendAsync(request, cancellationToken);
+            response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
             if (response.IsSuccessStatusCode)
                 return response;
-            
+
             var status = (int)response.StatusCode;
 
             // I consider these transient HTTP error codes
             bool shouldRetryWithBackoff = status is 408 or 429 or 500 or 502 or 503 or 504;
-            
+
             LogClientFailedSendingRequestRetryingAttemptAttemptMaxRetriesStatusStatusCode(i + 1, _maxRetries, response.StatusCode);
 
             if (shouldRetryWithBackoff)
             {
                 response.Dispose();
                 response = null;
-                
+
                 var delayTime = _retryCap <= -1 ? Math.Pow(2, i) : Math.Min(Math.Pow(2, i), _retryCap);
                 LogTransientStatusOfStatusCodeWaitingDelaySBeforeTryingAgain(status, delayTime);
                 var delay = TimeSpan.FromSeconds(delayTime);
-                await Task.Delay(delay, cancellationToken);
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
             }
         }
 

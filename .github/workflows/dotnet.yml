@@ -21,12 +21,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
     - name: Restore dependencies
-      run: dotnet restore
-    - name: Setup NuGet.exe for use with actions
-      uses: NuGet/setup-nuget@v4
-    - name: Restore NuGet
-      if: steps.cacheStep.outputs.cache-hit != 'true'
-      run: nuget restore Octane.sln
+      run: dotnet restore Octane.slnx
     - name: Decode SNK and save
       shell: powershell
       run: |

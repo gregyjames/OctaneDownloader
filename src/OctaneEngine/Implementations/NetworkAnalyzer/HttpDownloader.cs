@@ -11,6 +11,6 @@ public class HttpDownloader : IHttpDownloader
     public async Task<byte[]> GetByteArrayAsync(string url)
     {
         using var client = new HttpClient();
-        return await client.GetByteArrayAsync(url);
+        return await client.GetByteArrayAsync(url).ConfigureAwait(false);
     }
 }

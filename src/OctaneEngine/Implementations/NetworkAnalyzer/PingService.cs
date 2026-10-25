@@ -12,7 +12,7 @@ public class PingService : IPingService
     public async Task<IPingReply> SendPingAsync(string host)
     {
         using var ping = new Ping();
-        var reply = await ping.SendPingAsync(host);
+        var reply = await ping.SendPingAsync(host).ConfigureAwait(false);
         return new PingReplyWrapper(reply);
     }
 }
