@@ -122,10 +122,10 @@ public partial class Engine: IEngine, IDisposable
             throw new InvalidEnumArgumentException(nameof(sizeToUse), (int)sizeToUse,
                 typeof(TestFileSize));
         using var client = new HttpClient();
-        var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
         var size_of_file = response.Content.Headers.ContentLength ?? 0;
-        var networkSpeed = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.NetworkAnalyzer.GetTestFile(sizeToUse), new HttpDownloader());
-        var networkLatency = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkLatency(new PingService());
+        var networkSpeed = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.NetworkAnalyzer.GetTestFile(sizeToUse), new HttpDownloader()).ConfigureAwait(false);
+        var networkLatency = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkLatency(new PingService()).ConfigureAwait(false);
         int chunkSize = (int)Math.Ceiling(Math.Sqrt((double)networkSpeed * networkLatency));
         int numParts = (int)Math.Ceiling((double)size_of_file / chunkSize);
         numParts = Math.Min(numParts, Environment.ProcessorCount);
@@ -134,11 +134,11 @@ public partial class Engine: IEngine, IDisposable
         
     public async Task<string> GetCurrentNetworkLatency()
     {
-        return $"{await NetworkAnalyzer.NetworkAnalyzer.GetNetworkLatency(new PingService())}ms";
+        return $"{await NetworkAnalyzer.NetworkAnalyzer.GetNetworkLatency(new PingService()).ConfigureAwait(false)}ms";
     }
     public async Task<string> GetCurrentNetworkSpeed()
     {
-        var speed = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.NetworkAnalyzer.GetTestFile(TestFileSize.Medium), new HttpDownloader());
+        var speed = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkSpeed(NetworkAnalyzer.NetworkAnalyzer.GetTestFile(TestFileSize.Medium), new HttpDownloader()).ConfigureAwait(false);
         return $"{ Convert.ToInt32((speed) / 1000000)} Mb/s";
     }
     
@@ -254,7 +254,7 @@ public partial class Engine: IEngine, IDisposable
                     {
                         await pieces.ForEachAsync(options, async (piece, token) =>
                         {
-                            await octaneClient.Download(request.Url, piece, request.Headers ?? [], cancellation_token, pause_token.Token);
+                            await octaneClient.Download(request.Url, piece, request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);
 
                             Interlocked.Increment(ref tasksDone);
                                 

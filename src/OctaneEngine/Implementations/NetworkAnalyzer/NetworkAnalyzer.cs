@@ -52,7 +52,7 @@ internal static class NetworkAnalyzer
     {
         // Measure the network latency by pinging a fast server
         const string pingUrl = "www.google.com";
-        var reply = await service.SendPingAsync(pingUrl);
+        var reply = await service.SendPingAsync(pingUrl).ConfigureAwait(false);
         if (reply?.Status == IPStatus.Success)
         {
             var latency = (int)reply.RoundtripTime;
@@ -70,16 +70,16 @@ internal static class NetworkAnalyzer
         var sw = Stopwatch.StartNew();
 
         // Use streaming to avoid large heap allocations (LOH) when downloading test files
-        using var response = await client.GetAsync(testFile.Item1, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await client.GetAsync(testFile.Item1, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        using var stream = await response.Content.ReadAsStreamAsync();
+        using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 
         // Optimization: Increased buffer size from 8KB to 1MB to reduce system call overhead
         // and improve throughput during network speed testing.
         var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(1024 * 1024);
         try
         {
-            while (await stream.ReadAsync(buffer, 0, buffer.Length) > 0)
+            while (await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false) > 0)
             {
                 // Discard data
             }
@@ -98,11 +98,11 @@ internal static class NetworkAnalyzer
     }
     public static async Task<string> GetCurrentNetworkLatency(IPingService service)
     {
-        return $"{await GetNetworkLatency(service)}ms";
+        return $"{await GetNetworkLatency(service).ConfigureAwait(false)}ms";
     }
     public static async Task<string> GetCurrentNetworkSpeed(IHttpDownloader downloader)
     {
-        var speed = await GetNetworkSpeed(GetTestFile(TestFileSize.Medium), downloader);
+        var speed = await GetNetworkSpeed(GetTestFile(TestFileSize.Medium), downloader).ConfigureAwait(false);
         return $"{ Convert.ToInt32((speed) / 1000000)} Mb/s";
     }
 }
