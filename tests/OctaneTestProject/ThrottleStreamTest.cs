@@ -90,10 +90,10 @@ namespace OctaneTestProject
             var buffer = new byte[1000]; // Would take 10 seconds to write
             using var cts = new CancellationTokenSource(200); // Cancel after 200ms
             
-            Assert.CatchAsync<OperationCanceledException>((AsyncTestDelegate)(async () =>
+            Assert.CatchAsync<OperationCanceledException>(async () =>
             {
                 await ts.WriteAsync(buffer, 0, buffer.Length, cts.Token);
-            }));
+            });
         }
 
         [Test]
