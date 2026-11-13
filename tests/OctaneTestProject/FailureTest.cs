@@ -93,10 +93,10 @@ namespace OctaneTestProject
             engine.SetProgressCallback(Console.WriteLine);
             
             // We expect DownloadFile to throw an exception on network failure
-            Assert.ThrowsAsync<HttpRequestException>(new NUnit.Framework.AsyncTestDelegate(async () =>
+            Assert.ThrowsAsync<HttpRequestException>(async () =>
             {
                 await engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token);
-            }));
+            });
             
             Assert.That(doneCalled, Is.True, "Done callback should still be invoked on failure");
         }
