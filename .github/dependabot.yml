@@ -3,7 +3,7 @@ updates:
   - package-ecosystem: "nuget"
     directory: "/" # The location of our solution file
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     open-pull-requests-limit: 10
     groups:
       nuget-dependencies:
@@ -15,7 +15,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/" # The location of our .github/workflows directory
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     groups:
       action-dependencies:
         patterns:
