@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'v*.*.*' # Specify the tag pattern, e.g., 'v1.0.0'
+
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   deploy:
     name: Deploy
@@ -37,10 +42,13 @@ jobs:
       run: dotnet build src/OctaneEngine/OctaneEngine.csproj --no-restore --configuration Release /p:Version=$Env:VERSION /p:AssemblyVersion=$Env:VERSION
       env:
         SIGN_ASSEMBLY: true
+    - name: NuGet login (OIDC → temp API key)
+      uses: NuGet/login@v1
+      id: login
+      with:
+        user: gjames
     - name: Publish NuGet package
-      run: dotnet nuget push artifacts/**/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
-      env:
-        NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      run: dotnet nuget push artifacts/**/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
     - name: Delete SNK after build
       run: Remove-Item signing-key.snk
       shell: powershell
