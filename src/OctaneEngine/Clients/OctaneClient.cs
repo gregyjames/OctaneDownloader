@@ -91,11 +91,11 @@ public partial class OctaneClient : IClient
         Dictionary<string, string>? headers, 
         CancellationToken cancellationToken)
     {
-        HttpRequestMessage request = new()
+        using HttpRequestMessage request = new()
         {
             Method = HttpMethod.Get,
-            VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher,
-            Version = System.Net.HttpVersion.Version20,
+            VersionPolicy = _config.HttpVersionPolicy,
+            Version = _config.HttpVersion ?? System.Net.HttpVersion.Version11,
             RequestUri = uri,
             Headers =
             {

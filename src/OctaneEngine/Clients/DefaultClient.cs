@@ -144,7 +144,11 @@ public class DefaultClient : IClient
     {
         await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url))
+        {
+            Version = _config.HttpVersion ?? System.Net.HttpVersion.Version11,
+            VersionPolicy = _config.HttpVersionPolicy,
+        };
         if (headers != null)
         {
             foreach (var header in headers)

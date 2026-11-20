@@ -19,8 +19,8 @@ public static class ClientModule
             client.DefaultRequestHeaders.Add("User-Agent", "OctaneEngine/1.0");
             client.DefaultRequestHeaders.Add("Accept", "*/*");
             client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate, br");
-            client.DefaultRequestVersion = System.Net.HttpVersion.Version20;
-            client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+            client.DefaultRequestVersion = config.HttpVersion ?? System.Net.HttpVersion.Version11;
+            client.DefaultVersionPolicy = config.HttpVersionPolicy;
         })
         .ConfigurePrimaryHttpMessageHandler(sp =>
         {

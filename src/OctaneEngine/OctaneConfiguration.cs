@@ -24,6 +24,7 @@
 #nullable enable
 using System;
 using System.Net;
+using System.Net.Http;
 
 namespace OctaneEngineCore;
 
@@ -75,6 +76,19 @@ public class OctaneConfiguration
     public IWebProxy? Proxy { get; set; }
     
     /// <summary>
+    ///     The HTTP protocol version to use for download requests.
+    ///     Defaults to HTTP/1.1 so parallel range requests use separate TCP connections and congestion windows.
+    /// </summary>
+    public Version HttpVersion { get; set; } = System.Net.HttpVersion.Version11;
+
+    /// <summary>
+    ///     The HTTP version policy used when negotiating the HTTP protocol version.
+    ///     Defaults to <see cref="System.Net.Http.HttpVersionPolicy.RequestVersionOrLower"/> so HTTP/1.1 requests
+    ///     are not silently upgraded to HTTP/2 and multiplexed onto a single TCP connection.
+    /// </summary>
+    public HttpVersionPolicy HttpVersionPolicy { get; set; } = HttpVersionPolicy.RequestVersionOrLower;
+
+    /// <summary>
     ///     The Callback function to call when the download is finished.
     /// </summary>
     public Action<bool>? DoneCallback { get; set; }
@@ -87,7 +101,7 @@ public class OctaneConfiguration
     public override string ToString()
     {
         var s =
-            $"Parts: {Parts}, BufferSize: {BufferSize}, ShowProgress: {ShowProgress}, ProgressCallback: {ProgressCallback != null}, NumRetries: {NumRetries}, BytesPerSecond: {BytesPerSecond}, DoneCallback: {DoneCallback != null}, Proxy: {Proxy?.ToString() ?? "NULL"}, UseProxy: {UseProxy}";
+            $"Parts: {Parts}, BufferSize: {BufferSize}, ShowProgress: {ShowProgress}, ProgressCallback: {ProgressCallback != null}, NumRetries: {NumRetries}, BytesPerSecond: {BytesPerSecond}, DoneCallback: {DoneCallback != null}, Proxy: {Proxy?.ToString() ?? "NULL"}, UseProxy: {UseProxy}, HttpVersion: {HttpVersion}";
         return "{" + s + "}";
     }
 }

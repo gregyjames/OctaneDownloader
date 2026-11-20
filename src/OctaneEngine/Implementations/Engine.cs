@@ -151,7 +151,11 @@ public partial class Engine: IEngine, IDisposable
     private async Task<(long, ClientType)> getFileSizeAndRangeSupport(string url)
     {
         var client = _clientFactory.CreateClient("OctaneClient");
-        using var request = new HttpRequestMessage(HttpMethod.Head, url);
+        using var request = new HttpRequestMessage(HttpMethod.Head, url)
+        {
+            Version = _config.HttpVersion ?? System.Net.HttpVersion.Version11,
+            VersionPolicy = _config.HttpVersionPolicy,
+        };
         var response = await client.SendAsync(request).ConfigureAwait(false);
         var responseLength = response.Content.Headers.ContentLength ?? 0;
         var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
