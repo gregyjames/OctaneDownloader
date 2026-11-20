@@ -233,6 +233,9 @@ public partial class Engine: IEngine, IDisposable
 
             initialResponse.EnsureSuccessStatusCode();
 
+            // Reuse the final redirected URI (e.g. CDN edge URL) so subsequent chunks skip 301/302 redirect round-trips
+            var effectiveUri = initialResponse.RequestMessage?.RequestUri ?? uri;
+
             bool rangeSupported = initialResponse.StatusCode == HttpStatusCode.PartialContent
                                   && initialResponse.Content.Headers.ContentRange?.Length is > 0;
             clientType = rangeSupported ? ClientType.Octane : ClientType.Normal;
@@ -349,7 +352,7 @@ public partial class Engine: IEngine, IDisposable
                                     try
                                     {
                                         await octaneClient.Download(
-                                            uri,
+                                            effectiveUri,
                                             chunk.Piece,
                                             fileHandle,
                                             headers,
@@ -447,7 +450,7 @@ public partial class Engine: IEngine, IDisposable
                                         try
                                         {
                                             await octaneClient.Download(
-                                                uri,
+                                                effectiveUri,
                                                 (stealStart, candidate.Piece.end),
                                                 fileHandle,
                                                 headers,

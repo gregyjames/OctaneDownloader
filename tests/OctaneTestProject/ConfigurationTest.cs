@@ -650,5 +650,82 @@ namespace OctaneTestProject
             using var normalizedEngine = new Engine(invalidConfig, mockClient, _factory);
             Assert.That(invalidConfig.Parts, Is.InRange(4, 8));
         }
+
+        private sealed class RedirectingHandler : HttpMessageHandler
+        {
+            private readonly byte[] _data;
+            private readonly Uri _redirectTarget;
+            private int _originalHostRequests;
+            private int _redirectedHostRequests;
+            public int OriginalHostRequests => _originalHostRequests;
+            public int RedirectedHostRequests => _redirectedHostRequests;
+
+            public RedirectingHandler(byte[] data, Uri redirectTarget)
+            {
+                _data = data;
+                _redirectTarget = redirectTarget;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                if (request.RequestUri != _redirectTarget)
+                {
+                    Interlocked.Increment(ref _originalHostRequests);
+                    // Simulate HttpClientHandler following a 301 redirect by updating RequestMessage.RequestUri
+                    request.RequestUri = _redirectTarget;
+                }
+                else
+                {
+                    Interlocked.Increment(ref _redirectedHostRequests);
+                }
+
+                long start = 0;
+                long end = _data.Length - 1;
+                if (request.Headers.Range?.Ranges.GetEnumerator() is var e && e.MoveNext())
+                {
+                    start = e.Current.From ?? 0;
+                    end = Math.Min(e.Current.To ?? (_data.Length - 1), _data.Length - 1);
+                }
+
+                long length = end - start + 1;
+                var slice = new byte[length];
+                Array.Copy(_data, start, slice, 0, length);
+
+                var resp = new HttpResponseMessage(HttpStatusCode.PartialContent)
+                {
+                    RequestMessage = request,
+                    Content = new ByteArrayContent(slice)
+                };
+                resp.Content.Headers.ContentLength = length;
+                resp.Content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(start, end, _data.Length);
+                return Task.FromResult(resp);
+            }
+        }
+
+        [Test]
+        public void FastStart_ReusesRedirectedUri_ForSubsequentChunks()
+        {
+            const string originalUrl = @"https://origin.example.com/file.png";
+            var cdnUri = new Uri(@"https://cdn.example.com/edge/file.png");
+            using var handler = new RedirectingHandler(_mockData, cdnUri);
+            using var client = new HttpClient(handler);
+
+            var config = new OctaneConfiguration
+            {
+                Parts = 4,
+                BufferSize = 8192,
+                MinPartSize = 4 * 1024,
+                MaxChunkSize = 16 * 1024,
+                EnableTailHedging = false,
+                ShowProgress = false
+            };
+
+            var engine = new Engine(config, client, _factory);
+            engine.DownloadFile(new OctaneRequest(originalUrl, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
+
+            Assert.That(handler.OriginalHostRequests, Is.EqualTo(1), "Only the initial fast-start request should hit the redirector");
+            Assert.That(handler.RedirectedHostRequests, Is.EqualTo(6), "Remaining 6 chunks should go directly to the redirected CDN URI");
+            Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
+        }
     }
 }
