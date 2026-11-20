@@ -154,18 +154,53 @@ public partial class OctaneClient : IClient
             await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        LogSendingRequestForRangePieces(piece.start, piece.end);
-        using var message = await SendRangeRequestAsync(uri, piece, headers, cancellationToken).ConfigureAwait(false);
-        await WriteResponseAsync(message, piece, fileHandle, cancellationToken, pauseToken, chunkProgress).ConfigureAwait(false);
+        int maxRetries = Math.Max(0, _config.NumRetries);
+        int attempt = 0;
+        long totalCommitted = 0;
+
+        while (true)
+        {
+            var currentPiece = (start: piece.start + totalCommitted, end: piece.end);
+            if (currentPiece.start > currentPiece.end)
+            {
+                return;
+            }
+
+            try
+            {
+                LogSendingRequestForRangePieces(currentPiece.start, currentPiece.end);
+                using var message = await SendRangeRequestAsync(uri, currentPiece, headers, cancellationToken).ConfigureAwait(false);
+                await WriteResponseCoreAsync(message, currentPiece, fileHandle, cancellationToken, pauseToken, chunkProgress, totalCommitted).ConfigureAwait(false);
+                return;
+            }
+            catch (Exception ex) when (attempt < maxRetries && !cancellationToken.IsCancellationRequested && (ex is IOException || ex is HttpRequestException))
+            {
+                attempt++;
+                if (chunkProgress != null)
+                {
+                    totalCommitted = Math.Max(totalCommitted, chunkProgress.BytesCommitted);
+                }
+            }
+        }
     }
 
-    internal async Task WriteResponseAsync(
+    internal Task WriteResponseAsync(
         HttpResponseMessage message,
         (long start, long end) piece,
         SafeFileHandle fileHandle,
         CancellationToken cancellationToken,
         PauseToken pauseToken,
         InFlightChunk? chunkProgress = null)
+        => WriteResponseCoreAsync(message, piece, fileHandle, cancellationToken, pauseToken, chunkProgress, baseCommitted: 0);
+
+    private async Task WriteResponseCoreAsync(
+        HttpResponseMessage message,
+        (long start, long end) piece,
+        SafeFileHandle fileHandle,
+        CancellationToken cancellationToken,
+        PauseToken pauseToken,
+        InFlightChunk? chunkProgress,
+        long baseCommitted)
     {
         bool logInfo = _log.IsEnabled(LogLevel.Information);
         long startTimestamp = logInfo ? Stopwatch.GetTimestamp() : 0;
@@ -193,11 +228,11 @@ public partial class OctaneClient : IClient
 
                 if (_config.LowMemoryMode)
                 {
-                    await LowMemoryDownload(piece, fileHandle, cancellationToken, readStream, child, pauseToken, chunkProgress).ConfigureAwait(false);
+                    await LowMemoryDownload(piece, fileHandle, cancellationToken, readStream, child, pauseToken, chunkProgress, baseCommitted).ConfigureAwait(false);
                 }
                 else
                 {
-                    await RegularDownload(piece, fileHandle, cancellationToken, readStream, child, pauseToken, chunkProgress).ConfigureAwait(false);
+                    await RegularDownload(piece, fileHandle, cancellationToken, readStream, child, pauseToken, chunkProgress, baseCommitted).ConfigureAwait(false);
                 }
             }
             finally
@@ -233,7 +268,8 @@ public partial class OctaneClient : IClient
         Stream sourceStream,
         ChildProgressBar? child,
         PauseToken pauseToken,
-        InFlightChunk? chunkProgress)
+        InFlightChunk? chunkProgress,
+        long baseCommitted = 0)
     {
         int readBufferSize = _regularBufferSize;
         long pieceLength = piece.end - piece.start + 1;
@@ -291,7 +327,7 @@ public partial class OctaneClient : IClient
                     await pendingWrite.ConfigureAwait(false);
                     hasPendingWrite = false;
                     bytesCommitted += pendingBytes;
-                    chunkProgress?.ReportBytesCommitted(bytesCommitted);
+                    chunkProgress?.ReportBytesCommitted(baseCommitted + bytesCommitted);
                 }
 
                 // Swap buffers so the next network read overlaps with this disk write
@@ -316,7 +352,7 @@ public partial class OctaneClient : IClient
                 await pendingWrite.ConfigureAwait(false);
                 hasPendingWrite = false;
                 bytesCommitted += pendingBytes;
-                chunkProgress?.ReportBytesCommitted(bytesCommitted);
+                chunkProgress?.ReportBytesCommitted(baseCommitted + bytesCommitted);
             }
         }
         finally
@@ -327,7 +363,7 @@ public partial class OctaneClient : IClient
                 {
                     await pendingWrite.ConfigureAwait(false);
                     bytesCommitted += pendingBytes;
-                    chunkProgress?.ReportBytesCommitted(bytesCommitted);
+                    chunkProgress?.ReportBytesCommitted(baseCommitted + bytesCommitted);
                 }
                 catch
                 {
@@ -348,7 +384,8 @@ public partial class OctaneClient : IClient
         Stream sourceStream,
         ChildProgressBar? child,
         PauseToken pauseToken,
-        InFlightChunk? chunkProgress)
+        InFlightChunk? chunkProgress,
+        long baseCommitted = 0)
     {
         int readBufferSize = _lowMemoryBufferSize;
         long pieceLength = piece.end - piece.start + 1;
@@ -381,7 +418,7 @@ public partial class OctaneClient : IClient
 
                 await RandomAccess.WriteAsync(fileHandle, readBuffer.AsMemory(0, bytesRead), piece.start + bytesReadOverall, cancellationToken).ConfigureAwait(false);
                 bytesReadOverall += bytesRead;
-                chunkProgress?.ReportBytesCommitted(bytesReadOverall);
+                chunkProgress?.ReportBytesCommitted(baseCommitted + bytesReadOverall);
 
                 if (child != null && (bytesReadOverall - lastProgressUpdate >= tickStep || bytesReadOverall >= pieceLength))
                 {

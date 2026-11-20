@@ -334,12 +334,8 @@ public partial class Engine: IEngine, IDisposable
                             prefetchedChunk?.Dispose();
                         }
 
-                        var workerTasks = new Task[workerCount];
-                        for (int w = 0; w < workerCount; w++)
+                        async Task RunWorkerAsync(bool handleInitialChunk)
                         {
-                            bool handleInitialChunk = (w == 0);
-                            workerTasks[w] = Task.Run(async () =>
-                            {
                                 InFlightChunk? prefetchedChunk = null;
                                 Task<HttpResponseMessage>? prefetchedResponseTask = null;
 
@@ -567,7 +563,12 @@ public partial class Engine: IEngine, IDisposable
                                         }
                                     }
                                 }
-                            }, cancellation_token);
+                        }
+
+                        var workerTasks = new Task[workerCount];
+                        for (int w = 0; w < workerCount; w++)
+                        {
+                            workerTasks[w] = RunWorkerAsync(w == 0);
                         }
 
                         await Task.WhenAll(workerTasks).ConfigureAwait(false);
