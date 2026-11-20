@@ -311,59 +311,157 @@ public partial class Engine: IEngine, IDisposable
                             }
                         }
 
+                        static async Task CleanupPrefetchAsync(InFlightChunk? prefetchedChunk, Task<HttpResponseMessage>? prefetchedResponseTask)
+                        {
+                            if (prefetchedChunk != null)
+                            {
+                                try { prefetchedChunk.Cts.Cancel(); } catch (ObjectDisposedException) { }
+                            }
+
+                            if (prefetchedResponseTask != null)
+                            {
+                                try
+                                {
+                                    var resp = await prefetchedResponseTask.ConfigureAwait(false);
+                                    resp.Dispose();
+                                }
+                                catch
+                                {
+                                    // Ignore errors/cancellations during cleanup
+                                }
+                            }
+
+                            prefetchedChunk?.Dispose();
+                        }
+
                         var workerTasks = new Task[workerCount];
                         for (int w = 0; w < workerCount; w++)
                         {
                             bool handleInitialChunk = (w == 0);
                             workerTasks[w] = Task.Run(async () =>
                             {
-                                if (handleInitialChunk)
+                                InFlightChunk? prefetchedChunk = null;
+                                Task<HttpResponseMessage>? prefetchedResponseTask = null;
+
+                                async Task WriteChunkWithPrefetchAsync(HttpResponseMessage response, InFlightChunk currentChunk)
                                 {
-                                    var initialChunk = new InFlightChunk((0, firstEnd), cancellation_token);
-                                    Volatile.Write(ref inFlightChunks[0], initialChunk);
-                                    try
+                                    var writeTask = octaneClient.WriteResponseAsync(
+                                        response,
+                                        currentChunk.Piece,
+                                        fileHandle,
+                                        currentChunk.Cts.Token,
+                                        pause_token.Token,
+                                        currentChunk);
+
+                                    long halfBytes = currentChunk.TotalBytes / 2;
+                                    if (halfBytes >= 128 * 1024 && Volatile.Read(ref nextPieceIndex) < remainingPieces.Count - 1)
                                     {
-                                        await octaneClient.WriteResponseAsync(
-                                            initialResponse,
-                                            (0, firstEnd),
-                                            fileHandle,
-                                            initialChunk.Cts.Token,
-                                            pause_token.Token,
-                                            initialChunk).ConfigureAwait(false);
-                                        CompleteChunk(initialChunk);
+                                        using var delayCts = CancellationTokenSource.CreateLinkedTokenSource(currentChunk.Cts.Token);
+                                        while (!writeTask.IsCompleted)
+                                        {
+                                            if (!pause_token.Token.IsPaused && currentChunk.BytesCommitted >= halfBytes)
+                                            {
+                                                int prefetchIdx = Interlocked.Increment(ref nextPieceIndex);
+                                                if (prefetchIdx < remainingPieces.Count)
+                                                {
+                                                    prefetchedChunk = new InFlightChunk(remainingPieces[prefetchIdx], cancellation_token);
+                                                    Volatile.Write(ref inFlightChunks[prefetchIdx + 1], prefetchedChunk);
+                                                    prefetchedResponseTask = octaneClient.SendRangeRequestAsync(
+                                                        effectiveUri,
+                                                        prefetchedChunk.Piece,
+                                                        headers,
+                                                        prefetchedChunk.Cts.Token).AsTask();
+                                                }
+                                                break;
+                                            }
+
+                                            var delayTask = Task.Delay(25, delayCts.Token);
+                                            var completed = await Task.WhenAny(writeTask, delayTask).ConfigureAwait(false);
+                                            if (completed == writeTask)
+                                            {
+                                                delayCts.Cancel();
+                                                break;
+                                            }
+                                        }
                                     }
-                                    catch (OperationCanceledException) when (initialChunk.IsCompleted && !cancellation_token.IsCancellationRequested)
-                                    {
-                                        // Hedged sibling already completed this chunk
-                                    }
+
+                                    await writeTask.ConfigureAwait(false);
                                 }
 
-                                while (true)
+                                try
                                 {
-                                    cancellation_token.ThrowIfCancellationRequested();
-                                    int idx = Interlocked.Increment(ref nextPieceIndex);
-                                    if (idx >= remainingPieces.Count)
+                                    if (handleInitialChunk)
                                     {
-                                        break;
+                                        var initialChunk = new InFlightChunk((0, firstEnd), cancellation_token);
+                                        Volatile.Write(ref inFlightChunks[0], initialChunk);
+                                        try
+                                        {
+                                            await WriteChunkWithPrefetchAsync(initialResponse, initialChunk).ConfigureAwait(false);
+                                            CompleteChunk(initialChunk);
+                                        }
+                                        catch (OperationCanceledException) when (initialChunk.IsCompleted && !cancellation_token.IsCancellationRequested)
+                                        {
+                                            // Hedged sibling already completed this chunk
+                                        }
                                     }
 
-                                    var chunk = new InFlightChunk(remainingPieces[idx], cancellation_token);
-                                    Volatile.Write(ref inFlightChunks[idx + 1], chunk);
-                                    try
+                                    while (true)
                                     {
-                                        await octaneClient.Download(
-                                            effectiveUri,
-                                            chunk.Piece,
-                                            fileHandle,
-                                            headers,
-                                            chunk.Cts.Token,
-                                            pause_token.Token,
-                                            chunk).ConfigureAwait(false);
-                                        CompleteChunk(chunk);
+                                        cancellation_token.ThrowIfCancellationRequested();
+
+                                        InFlightChunk chunk;
+                                        Task<HttpResponseMessage>? responseTask = null;
+
+                                        if (prefetchedChunk != null && prefetchedResponseTask != null)
+                                        {
+                                            chunk = prefetchedChunk;
+                                            responseTask = prefetchedResponseTask;
+                                            prefetchedChunk = null;
+                                            prefetchedResponseTask = null;
+                                        }
+                                        else
+                                        {
+                                            int idx = Interlocked.Increment(ref nextPieceIndex);
+                                            if (idx >= remainingPieces.Count)
+                                            {
+                                                break;
+                                            }
+
+                                            chunk = new InFlightChunk(remainingPieces[idx], cancellation_token);
+                                            Volatile.Write(ref inFlightChunks[idx + 1], chunk);
+                                        }
+
+                                        try
+                                        {
+                                            if (pause_token.Token.IsPaused)
+                                            {
+                                                await pause_token.Token.WaitWhilePausedAsync(chunk.Cts.Token).ConfigureAwait(false);
+                                            }
+
+                                            using var response = responseTask != null
+                                                ? await responseTask.ConfigureAwait(false)
+                                                : await octaneClient.SendRangeRequestAsync(
+                                                    effectiveUri,
+                                                    chunk.Piece,
+                                                    headers,
+                                                    chunk.Cts.Token).ConfigureAwait(false);
+
+                                            await WriteChunkWithPrefetchAsync(response, chunk).ConfigureAwait(false);
+                                            CompleteChunk(chunk);
+                                        }
+                                        catch (OperationCanceledException) when (chunk.IsCompleted && !cancellation_token.IsCancellationRequested)
+                                        {
+                                            // Hedged sibling already completed this chunk
+                                        }
                                     }
-                                    catch (OperationCanceledException) when (chunk.IsCompleted && !cancellation_token.IsCancellationRequested)
+                                }
+                                finally
+                                {
+                                    if (prefetchedChunk != null || prefetchedResponseTask != null)
                                     {
-                                        // Hedged sibling already completed this chunk
+                                        await CleanupPrefetchAsync(prefetchedChunk, prefetchedResponseTask).ConfigureAwait(false);
+                                        prefetchedChunk = null;
+                                        prefetchedResponseTask = null;
                                     }
                                 }
 

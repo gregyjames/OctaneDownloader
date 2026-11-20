@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -726,6 +727,201 @@ namespace OctaneTestProject
             Assert.That(handler.OriginalHostRequests, Is.EqualTo(1), "Only the initial fast-start request should hit the redirector");
             Assert.That(handler.RedirectedHostRequests, Is.EqualTo(6), "Remaining 6 chunks should go directly to the redirected CDN URI");
             Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
+        }
+        [Test]
+        public async Task OverlappedPrefetch_StartsNextChunkRequestBeforeCurrentChunkCompletes()
+        {
+            const int totalSize = 2 * 1024 * 1024; // 2 MB
+            const int chunkSize = 1024 * 1024;     // 1 MB (halfBytes = 512 KB)
+            var data = new byte[totalSize];
+            new Random(42).NextBytes(data);
+
+            var secondRequestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var handler = new PrefetchVerifyingHandler(data, secondRequestStarted);
+            using var client = new HttpClient(handler);
+
+            var config = new OctaneConfiguration
+            {
+                Parts = 1,
+                MaxChunkSize = chunkSize,
+                MinPartSize = 64 * 1024,
+                BufferSize = 256 * 1024,
+                EnableTailHedging = false,
+                LowMemoryMode = false
+            };
+
+            using var engine = new Engine(config, client, _factory);
+            await engine.DownloadFile(new OctaneRequest("https://mockurl.com/prefetch.bin", _outFile), _pauseTokenSource, _cancelTokenSource.Token);
+
+            Assert.That(secondRequestStarted.Task.IsCompletedSuccessfully, Is.True, "Next chunk should be prefetched before current chunk finishes.");
+            Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(data));
+        }
+
+        [Test]
+        public async Task OverlappedPrefetch_DisposesPrefetchedResponseOnCancellation()
+        {
+            const int totalSize = 2 * 1024 * 1024;
+            const int chunkSize = 1024 * 1024;
+            var data = new byte[totalSize];
+            new Random(43).NextBytes(data);
+
+            var secondRequestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var neverCompleteGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var cts = new CancellationTokenSource();
+            _ = secondRequestStarted.Task.ContinueWith(async _ =>
+            {
+                await Task.Delay(30);
+                cts.Cancel();
+            }, TaskScheduler.Default);
+            var handler = new PrefetchVerifyingHandler(data, secondRequestStarted, neverCompleteGate.Task);
+            using var client = new HttpClient(handler);
+
+            var config = new OctaneConfiguration
+            {
+                Parts = 1,
+                MaxChunkSize = chunkSize,
+                MinPartSize = 64 * 1024,
+                BufferSize = 256 * 1024,
+                EnableTailHedging = false,
+                LowMemoryMode = false
+            };
+
+            using var engine = new Engine(config, client, _factory);
+            await Assert.ThrowsAsync<TaskCanceledException>(async () =>
+                await engine.DownloadFile(new OctaneRequest("https://mockurl.com/prefetch-cancel.bin", _outFile), _pauseTokenSource, cts.Token));
+
+            Assert.That(handler.SecondResponseDisposed, Is.True, "Prefetched HttpResponseMessage must be disposed on cancellation.");
+        }
+
+        private sealed class PrefetchVerifyingHandler : HttpMessageHandler
+        {
+            private readonly byte[] _data;
+            private readonly TaskCompletionSource _secondRequestStarted;
+            private readonly Task _chunk1Gate;
+            private readonly ILogger _log;
+            private int _requestCount;
+            public int RequestCount => Volatile.Read(ref _requestCount);
+            public bool SecondResponseDisposed { get; private set; }
+
+            public PrefetchVerifyingHandler(byte[] data, TaskCompletionSource secondRequestStarted, Task chunk1Gate = null, ILogger log = null)
+            {
+                _data = data;
+                _secondRequestStarted = secondRequestStarted;
+                _chunk1Gate = chunk1Gate ?? secondRequestStarted.Task;
+                _log = log;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                var range = request.Headers.Range;
+                long start = 0;
+                long end = _data.Length - 1;
+                foreach (var r in range.Ranges)
+                {
+                    start = r.From ?? 0;
+                    end = r.To ?? (_data.Length - 1);
+                }
+
+                int reqNum = Interlocked.Increment(ref _requestCount);
+                int len = (int)(end - start + 1);
+                Stream stream;
+
+                if (reqNum == 1)
+                {
+                    // Deliver >50% immediately, then wait for gate before sending the rest
+                    stream = new GatedChunkStream(_data, (int)start, len, splitOffset: len * 3 / 4, _chunk1Gate);
+                }
+                else
+                {
+                    stream = new MemoryStream(_data, (int)start, len, writable: false);
+                }
+
+                var content = new TrackingStreamContent(stream, () =>
+                {
+                    if (reqNum >= 2)
+                    {
+                        SecondResponseDisposed = true;
+                    }
+                });
+                content.Headers.ContentLength = len;
+                content.Headers.ContentRange = new ContentRangeHeaderValue(start, end, _data.Length);
+
+                var response = new HttpResponseMessage(HttpStatusCode.PartialContent)
+                {
+                    Content = content,
+                    RequestMessage = request
+                };
+
+                if (reqNum >= 2)
+                {
+                    _secondRequestStarted.TrySetResult();
+                }
+
+                return Task.FromResult(response);
+            }
+        }
+
+        private sealed class TrackingStreamContent : StreamContent
+        {
+            private readonly Action _onDispose;
+            public TrackingStreamContent(Stream content, Action onDispose) : base(content) => _onDispose = onDispose;
+
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    _onDispose();
+                }
+                base.Dispose(disposing);
+            }
+        }
+
+        private sealed class GatedChunkStream : Stream
+        {
+            private readonly byte[] _data;
+            private readonly int _start;
+            private readonly int _length;
+            private readonly int _splitOffset;
+            private readonly Task _gate;
+            private int _pos;
+
+            public GatedChunkStream(byte[] data, int start, int length, int splitOffset, Task gate)
+            {
+                _data = data;
+                _start = start;
+                _length = length;
+                _splitOffset = splitOffset;
+                _gate = gate;
+            }
+
+            public override bool CanRead => true;
+            public override bool CanSeek => false;
+            public override bool CanWrite => false;
+            public override long Length => _length;
+            public override long Position { get => _pos; set => throw new NotSupportedException(); }
+
+            public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+            {
+                if (_pos >= _length)
+                    return 0;
+
+                if (_pos >= _splitOffset && !_gate.IsCompleted)
+                {
+                    await _gate.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(false);
+                }
+
+                int maxRead = _pos < _splitOffset ? _splitOffset - _pos : _length - _pos;
+                int toCopy = Math.Min(buffer.Length, maxRead);
+                _data.AsSpan(_start + _pos, toCopy).CopyTo(buffer.Span);
+                _pos += toCopy;
+                return toCopy;
+            }
+
+            public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+            public override void Flush() { }
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+            public override void SetLength(long value) => throw new NotSupportedException();
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
         }
     }
 }
