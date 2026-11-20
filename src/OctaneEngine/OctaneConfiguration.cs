@@ -49,6 +49,20 @@ public class OctaneConfiguration
     public long MaxChunkSize { get; set; } = 8 * 1024 * 1024; // 8 MB
 
     /// <summary>
+    ///     Enables speculative tail hedging: when the chunk queue is drained and workers become idle,
+    ///     an idle worker will race a duplicate request for a slow in-flight tail chunk after
+    ///     <see cref="TailHedgeDelayMs"/> milliseconds and cancel the slower sibling.
+    ///     Defaults to <c>true</c>.
+    /// </summary>
+    public bool EnableTailHedging { get; set; } = true;
+
+    /// <summary>
+    ///     Minimum elapsed time (in milliseconds) an in-flight tail chunk must be running before an idle
+    ///     worker launches a speculative hedged request for it. Defaults to 2000 ms.
+    /// </summary>
+    public int TailHedgeDelayMs { get; set; } = 2000;
+
+    /// <summary>
     ///     Determines whether to use a single small buffer per part (lowest memory usage)
     ///     or double-buffered overlapped I/O (maximum throughput).
     /// </summary>

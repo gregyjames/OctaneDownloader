@@ -147,6 +147,47 @@ public partial class Engine: IEngine, IDisposable
         Octane,
         Normal
     }
+
+    private sealed class InFlightChunk : IDisposable
+    {
+        public (long start, long end) Piece { get; }
+        public long StartTimestamp { get; }
+        public CancellationTokenSource Cts { get; }
+        private int _completed;
+        private int _hedged;
+
+        public InFlightChunk((long start, long end) piece, CancellationToken parentToken)
+        {
+            Piece = piece;
+            StartTimestamp = Stopwatch.GetTimestamp();
+            Cts = CancellationTokenSource.CreateLinkedTokenSource(parentToken);
+        }
+
+        public bool IsCompleted => Volatile.Read(ref _completed) != 0;
+        public bool IsHedged => Volatile.Read(ref _hedged) != 0;
+
+        public bool TryClaimHedge() => !IsCompleted && Interlocked.CompareExchange(ref _hedged, 1, 0) == 0;
+
+        public bool TryMarkCompleted()
+        {
+            if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                Cts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            return true;
+        }
+
+        public void Dispose() => Cts.Dispose();
+    }
     
     /// <summary>
     /// Sets the progress callback for when the progress bar isn't being used.
@@ -284,10 +325,23 @@ public partial class Engine: IEngine, IDisposable
                         defaultClient.SetProgressbar(pbar);
                     }
 
+                    var inFlightChunks = new InFlightChunk?[totalChunks];
+                    bool hedgeEnabled = _config.EnableTailHedging && _config.TailHedgeDelayMs >= 0 && _config.Parts > 1 && totalChunks > 1;
+
                     try
                     {
                         int workerCount = Math.Max(1, Math.Min(_config.Parts, totalChunks));
                         int nextPieceIndex = -1;
+
+                        void CompleteChunk(InFlightChunk chunk)
+                        {
+                            if (chunk.TryMarkCompleted())
+                            {
+                                int done = Interlocked.Increment(ref tasksDone);
+                                pbar?.Tick();
+                                _config?.ProgressCallback?.Invoke((double)done / totalChunks);
+                            }
+                        }
 
                         var workerTasks = new Task[workerCount];
                         for (int w = 0; w < workerCount; w++)
@@ -297,16 +351,22 @@ public partial class Engine: IEngine, IDisposable
                             {
                                 if (handleInitialChunk)
                                 {
-                                    await octaneClient.WriteResponseAsync(
-                                        initialResponse,
-                                        (0, firstEnd),
-                                        fileHandle,
-                                        cancellation_token,
-                                        pause_token.Token).ConfigureAwait(false);
-
-                                    int done = Interlocked.Increment(ref tasksDone);
-                                    pbar?.Tick();
-                                    _config?.ProgressCallback?.Invoke((double)done / totalChunks);
+                                    var initialChunk = new InFlightChunk((0, firstEnd), cancellation_token);
+                                    Volatile.Write(ref inFlightChunks[0], initialChunk);
+                                    try
+                                    {
+                                        await octaneClient.WriteResponseAsync(
+                                            initialResponse,
+                                            (0, firstEnd),
+                                            fileHandle,
+                                            initialChunk.Cts.Token,
+                                            pause_token.Token).ConfigureAwait(false);
+                                        CompleteChunk(initialChunk);
+                                    }
+                                    catch (OperationCanceledException) when (initialChunk.IsCompleted && !cancellation_token.IsCancellationRequested)
+                                    {
+                                        // Hedged sibling already completed this chunk
+                                    }
                                 }
 
                                 while (true)
@@ -318,17 +378,94 @@ public partial class Engine: IEngine, IDisposable
                                         break;
                                     }
 
-                                    await octaneClient.Download(
-                                        uri,
-                                        remainingPieces[idx],
-                                        fileHandle,
-                                        headers,
-                                        cancellation_token,
-                                        pause_token.Token).ConfigureAwait(false);
+                                    var chunk = new InFlightChunk(remainingPieces[idx], cancellation_token);
+                                    Volatile.Write(ref inFlightChunks[idx + 1], chunk);
+                                    try
+                                    {
+                                        await octaneClient.Download(
+                                            uri,
+                                            chunk.Piece,
+                                            fileHandle,
+                                            headers,
+                                            chunk.Cts.Token,
+                                            pause_token.Token).ConfigureAwait(false);
+                                        CompleteChunk(chunk);
+                                    }
+                                    catch (OperationCanceledException) when (chunk.IsCompleted && !cancellation_token.IsCancellationRequested)
+                                    {
+                                        // Hedged sibling already completed this chunk
+                                    }
+                                }
 
-                                    int done = Interlocked.Increment(ref tasksDone);
-                                    pbar?.Tick();
-                                    _config?.ProgressCallback?.Invoke((double)done / totalChunks);
+                                // Speculative tail hedging: once the queue is drained, race slow in-flight tail chunks
+                                if (hedgeEnabled)
+                                {
+                                    while (Volatile.Read(ref tasksDone) < totalChunks && !cancellation_token.IsCancellationRequested)
+                                    {
+                                        if (pause_token.Token.IsPaused)
+                                        {
+                                            await pause_token.Token.WaitWhilePausedAsync(cancellation_token).ConfigureAwait(false);
+                                            continue;
+                                        }
+
+                                        InFlightChunk? candidate = null;
+                                        long oldestStart = long.MaxValue;
+
+                                        for (int i = 0; i < totalChunks; i++)
+                                        {
+                                            var c = Volatile.Read(ref inFlightChunks[i]);
+                                            if (c != null && !c.IsCompleted && !c.IsHedged && c.StartTimestamp < oldestStart)
+                                            {
+                                                oldestStart = c.StartTimestamp;
+                                                candidate = c;
+                                            }
+                                        }
+
+                                        if (candidate == null)
+                                        {
+                                            break;
+                                        }
+
+                                        double elapsedMs = Stopwatch.GetElapsedTime(candidate.StartTimestamp).TotalMilliseconds;
+                                        int waitMs = _config.TailHedgeDelayMs - (int)elapsedMs;
+                                        if (waitMs > 0)
+                                        {
+                                            try
+                                            {
+                                                await Task.Delay(Math.Min(waitMs, 250), candidate.Cts.Token).ConfigureAwait(false);
+                                            }
+                                            catch (OperationCanceledException) when (candidate.IsCompleted && !cancellation_token.IsCancellationRequested)
+                                            {
+                                                continue;
+                                            }
+                                            continue;
+                                        }
+
+                                        if (pause_token.Token.IsPaused || !candidate.TryClaimHedge())
+                                        {
+                                            continue;
+                                        }
+
+                                        try
+                                        {
+                                            await octaneClient.Download(
+                                                uri,
+                                                candidate.Piece,
+                                                fileHandle,
+                                                headers,
+                                                candidate.Cts.Token,
+                                                pause_token.Token).ConfigureAwait(false);
+                                            CompleteChunk(candidate);
+                                        }
+                                        catch (OperationCanceledException) when (candidate.IsCompleted && !cancellation_token.IsCancellationRequested)
+                                        {
+                                            // Original worker won the race
+                                        }
+                                        catch when (!candidate.IsCompleted && !cancellation_token.IsCancellationRequested)
+                                        {
+                                            // Hedged attempt failed; allow original worker to finish normally
+                                        }
+                                    }
                                 }
                             }, cancellation_token);
                         }
@@ -348,6 +485,10 @@ public partial class Engine: IEngine, IDisposable
                     }
                     finally
                     {
+                        for (int i = 0; i < inFlightChunks.Length; i++)
+                        {
+                            inFlightChunks[i]?.Dispose();
+                        }
                         pbar?.Dispose();
                     }
                 }

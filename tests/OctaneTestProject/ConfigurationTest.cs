@@ -435,5 +435,62 @@ namespace OctaneTestProject
             Assert.That(nonRangeHandler.Captured.Count, Is.EqualTo(1));
             Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
         }
+
+        private sealed class StallingFirstAttemptHandler : DelegatingHandler
+        {
+            private int _stalledOnce;
+            public int HedgedRetryObserved { get; private set; }
+            private long _stalledRangeFrom = -1;
+
+            public StallingFirstAttemptHandler(HttpMessageHandler innerHandler) : base(innerHandler) { }
+
+            protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                long from = request.Headers.Range?.Ranges.GetEnumerator() is var e && e.MoveNext()
+                    ? (e.Current.From ?? 0)
+                    : 0;
+
+                // Stall the first attempt of a non-zero chunk for 5 seconds; let the hedged attempt succeed immediately
+                if (from > 0 && Interlocked.CompareExchange(ref _stalledOnce, 1, 0) == 0)
+                {
+                    Volatile.Write(ref _stalledRangeFrom, from);
+                    await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                }
+                else if (from > 0 && from == Volatile.Read(ref _stalledRangeFrom))
+                {
+                    HedgedRetryObserved = 1;
+                }
+
+                return await base.SendAsync(request, cancellationToken);
+            }
+        }
+
+        [Test]
+        public void TailHedging_RacesStalledChunk_AndCompletesQuickly()
+        {
+            const string url = @"https://mockurl.com/file.png";
+            using var stallingHandler = new StallingFirstAttemptHandler(new MockHttpMessageHandler(_mockData, supportsRange: true));
+            using var client = new HttpClient(stallingHandler);
+
+            var config = new OctaneConfiguration
+            {
+                Parts = 4,
+                BufferSize = 8192,
+                MinPartSize = 4 * 1024,
+                MaxChunkSize = 16 * 1024,
+                EnableTailHedging = true,
+                TailHedgeDelayMs = 50,
+                ShowProgress = false
+            };
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var engine = new Engine(config, client, _factory);
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
+            sw.Stop();
+
+            Assert.That(stallingHandler.HedgedRetryObserved, Is.EqualTo(1), "Expected an idle worker to hedge the stalled chunk");
+            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(2000), "Hedged download should beat the 5s stall");
+            Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
+        }
     }
 }
