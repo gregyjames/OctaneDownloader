@@ -21,12 +21,10 @@
  * SOFTWARE.
  */
 
-using System;
-using System.Buffers;
 using System.Collections.Generic;
-using System.IO.MemoryMappedFiles;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Win32.SafeHandles;
 using OctaneEngineCore.ShellProgressBar;
 
 namespace OctaneEngineCore.Clients;
@@ -34,7 +32,6 @@ namespace OctaneEngineCore.Clients;
 public interface IClient
 {
     public bool IsRangeSupported();
-    public void SetMmf(MemoryMappedFile file);
     public void SetProgressbar(ProgressBar bar);
-    internal Task Download(string url, (long start, long end) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken);
+    internal Task Download(string url, (long start, long end) piece, SafeFileHandle fileHandle, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken);
 }

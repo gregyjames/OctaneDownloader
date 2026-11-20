@@ -36,7 +36,8 @@ public class OctaneConfiguration
     public int Parts { get; set; } = Environment.ProcessorCount;
 
     /// <summary>
-    /// Determines whether to use a Stream (max performance/high memory) or accessor (lower memory use)
+    ///     Determines whether to use a single small buffer per part (lowest memory usage)
+    ///     or double-buffered overlapped I/O (maximum throughput).
     /// </summary>
     public bool LowMemoryMode { get; set; } = true;
 

@@ -25,124 +25,41 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.MemoryMappedFiles;
-using System.IO.Pipelines;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Win32.SafeHandles;
 using OctaneEngineCore.ShellProgressBar;
-using OctaneEngineCore;
 
 namespace OctaneEngineCore.Clients;
 
 public class DefaultClient : IClient
 {
-    private MemoryMappedFile _mmf;
-    private ProgressBar _pBar;
+    private ProgressBar? _pBar;
     private readonly HttpClient _httpClient;
     private readonly OctaneConfiguration _config;
-    private readonly PipeOptions _pipeOptions;
 
     public DefaultClient(HttpClient httpClient, OctaneConfiguration config)
     {
         _httpClient = httpClient;
         _config = config;
-        _pipeOptions = new PipeOptions(
-            pool: MemoryPool<byte>.Shared,           
-            readerScheduler: PipeScheduler.ThreadPool, 
-            writerScheduler: PipeScheduler.ThreadPool, 
-            pauseWriterThreshold: Math.Max(config.BufferSize * 4, 512 * 1024),
-            resumeWriterThreshold: Math.Max(config.BufferSize * 2, 256*1024),
-            minimumSegmentSize: Math.Max(config.BufferSize, 128*1024),
-            useSynchronizationContext: false
-        );
     }
 
-    public bool IsRangeSupported()
-    {
-        return false;
-    }
-
-    public void SetMmf(MemoryMappedFile file)
-    {
-        _mmf = file;
-    }
+    public bool IsRangeSupported() => false;
 
     public void SetProgressbar(ProgressBar bar)
     {
         _pBar = bar;
     }
-    
-    private async Task CopyMessageContentToStreamWithProgressAsync(
-        HttpResponseMessage message, 
-        Stream stream, 
-        IProgress<long> progress,
-        PauseToken pauseToken,
-        CancellationToken cancellationToken)
+
+    public async Task Download(string url, (long, long) piece, SafeFileHandle fileHandle, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
-        using var contentStream = await message.Content.ReadAsStreamAsync().ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(fileHandle);
 
-        var pipe = new Pipe(_pipeOptions);
-        var fillTask = FillPipeAsync(contentStream, pipe.Writer, pauseToken, cancellationToken);
-        var readTask = ReadPipeAsync(pipe.Reader, stream, progress, pauseToken, cancellationToken);
-        
-        await Task.WhenAll(fillTask, readTask).ConfigureAwait(false);
-    }
-
-    private async Task FillPipeAsync(Stream source, PipeWriter writer, PauseToken pauseToken, CancellationToken cancellationToken)
-    { 
-        int bufferSize = Math.Max(1024*512, _config.BufferSize);
-
-        while (true)
+        if (pauseToken.IsPaused)
         {
-            Memory<byte> memory = writer.GetMemory(bufferSize);
-            int bytesRead = await source.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
             await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
-
-            if (bytesRead == 0)
-            {
-                break;
-            }
-            
-            writer.Advance(bytesRead);
-            
-            FlushResult flushResult = await writer.FlushAsync().ConfigureAwait(false);
-            if (flushResult.IsCompleted)
-            {
-                break;
-            }
         }
-    }
-
-    private async Task ReadPipeAsync(PipeReader reader, Stream destination, IProgress<long> progress, PauseToken pauseToken, CancellationToken cancellationToken)
-    {
-        long totalBytesWritten = 0;
-
-        while (true)
-        {
-            ReadResult result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
-            await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
-            ReadOnlySequence<byte> buffer = result.Buffer;
-
-            foreach (var segment in buffer)
-            {
-                await destination.WriteAsync(segment).ConfigureAwait(false);
-                totalBytesWritten += segment.Length;
-            }
-            
-            progress?.Report(totalBytesWritten);
-            reader.AdvanceTo(buffer.End);
-
-            if (result.IsCompleted)
-            {
-                break;
-            }
-        }
-    }
-    
-    public async Task Download(string url, (long, long) piece, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken)
-    {
-        await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url))
         {
@@ -153,35 +70,59 @@ public class DefaultClient : IClient
         {
             foreach (var header in headers)
             {
-                request.Headers.Add(header.Key, header.Value);
+                request.Headers.TryAddWithoutValidation(header.Key, header.Value);
             }
         }
 
-        var message = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+        using var message = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
-        
-        await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+        message.EnsureSuccessStatusCode();
 
+        await using var contentStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+
+        int bufferSize = _config.LowMemoryMode
+            ? Math.Min(_config.BufferSize, 64 * 1024)
+            : Math.Max(_config.BufferSize, 256 * 1024);
+
+        var buffer = ArrayPool<byte>.Shared.Rent(bufferSize);
         long totalWritten = 0;
-        
-        var progress = new System.Progress<long>(bytesWritten =>
-        {
-            totalWritten += bytesWritten;
+        long lastProgressUpdate = 0;
+        long progressStep = Math.Max(bufferSize * 4L, 1024 * 1024L);
 
-            // Only update progress bar if ShowProgress is enabled
-            if (_config.ShowProgress && totalWritten % ((piece.Item2-piece.Item1) / _config.BufferSize) == 0)
+        try
+        {
+            while (true)
             {
-                _pBar?.Tick();
+                if (pauseToken.IsPaused)
+                {
+                    await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+                }
+
+                int bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, bufferSize), cancellationToken).ConfigureAwait(false);
+                if (bytesRead == 0)
+                {
+                    break;
+                }
+
+                await RandomAccess.WriteAsync(fileHandle, buffer.AsMemory(0, bytesRead), totalWritten, cancellationToken).ConfigureAwait(false);
+                totalWritten += bytesRead;
+
+                if (_config.ShowProgress && _pBar != null && totalWritten - lastProgressUpdate >= progressStep)
+                {
+                    _pBar.Tick();
+                    lastProgressUpdate = totalWritten;
+                }
             }
-        });
-        using var stream = _mmf.CreateViewStream();
-        await CopyMessageContentToStreamWithProgressAsync(message, stream, progress, pauseToken, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     public void Dispose()
     {
         _httpClient?.Dispose();
-        _mmf?.Dispose();
         _pBar?.Dispose();
     }
 }

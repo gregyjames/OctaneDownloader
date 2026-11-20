@@ -27,7 +27,6 @@ using System.Buffers;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.IO.MemoryMappedFiles;
 using System.Net;
 using System.Net.Http;
 using System.Runtime.ExceptionServices;
@@ -36,6 +35,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Win32.SafeHandles;
 using OctaneEngineCore.Clients;
 using OctaneEngineCore.Implementations.NetworkAnalyzer;
 using OctaneEngineCore.Interfaces;
@@ -156,7 +156,7 @@ public partial class Engine: IEngine, IDisposable
             Version = _config.HttpVersion ?? System.Net.HttpVersion.Version11,
             VersionPolicy = _config.HttpVersionPolicy,
         };
-        var response = await client.SendAsync(request).ConfigureAwait(false);
+        using var response = await client.SendAsync(request).ConfigureAwait(false);
         var responseLength = response.Content.Headers.ContentLength ?? 0;
         var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
         LogRangeSupportedRange(rangeSupported);
@@ -218,7 +218,6 @@ public partial class Engine: IEngine, IDisposable
             filename = request.OutFile ?? Path.GetFileName(new Uri(request.Url).LocalPath);
             var cancellation_token = token;
             var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
-            var memPool = ArrayPool<byte>.Shared;
             int tasksDone = 0;
             #endregion
             
@@ -227,23 +226,35 @@ public partial class Engine: IEngine, IDisposable
                 ServicePointHelper.ConfigureServicePoint(_config.Parts);
             #endregion
             
-            LogTotalSizeLength(NetworkAnalyzer.NetworkAnalyzer.PrettySize(length));
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                LogTotalSizeLength(NetworkAnalyzer.NetworkAnalyzer.PrettySize(length));
+            }
                 
             stopwatch.Start();
             
-            using (var mmf = MemoryMappedFile.CreateFromFile(filename, FileMode.OpenOrCreate, null, length, MemoryMappedFileAccess.ReadWrite))
+            using (SafeFileHandle fileHandle = File.OpenHandle(
+                       filename,
+                       FileMode.Create,
+                       FileAccess.Write,
+                       FileShare.None,
+                       FileOptions.Asynchronous | FileOptions.RandomAccess,
+                       preallocationSize: length > 0 ? length : 0))
             {
+                if (length > 0)
+                {
+                    RandomAccess.SetLength(fileHandle, length);
+                }
+
                 //Check if range is supported
                 if (clientType == ClientType.Octane)
                 {
                     var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger);
-                    octaneClient.SetMmf(mmf);
                     LogUsingOctaneClientToDownloadFile();
                     var options = new ParallelOptions()
                     {
                         MaxDegreeOfParallelism = _config.Parts,
                         CancellationToken = cancellation_token,
-                        //TaskScheduler = TaskScheduler.Current
                     };
                     ProgressBar? pbar = null;
                     
@@ -258,7 +269,7 @@ public partial class Engine: IEngine, IDisposable
                     {
                         await Parallel.ForEachAsync(pieces, options, async (piece, token) =>
                         {
-                            await octaneClient.Download(request.Url, piece, request.Headers ?? [], cancellation_token, pause_token.Token);
+                            await octaneClient.Download(request.Url, piece, fileHandle, request.Headers ?? [], cancellation_token, pause_token.Token);
 
                             Interlocked.Increment(ref tasksDone);
                                 
@@ -282,10 +293,9 @@ public partial class Engine: IEngine, IDisposable
                 else
                 {
                     LogUsingDefaultClientToDownloadFile();
-                    defaultClient.SetMmf(mmf);
                     try
                     {
-                        await defaultClient.Download(request.Url, (0, 0), request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);
+                        await defaultClient.Download(request.Url, (0, length), fileHandle, request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);
                         success = true;
                     }
                     catch (Exception)
