@@ -94,10 +94,8 @@ public partial class OctaneClient : IClient
         HttpRequestMessage request = new()
         {
             Method = HttpMethod.Get,
-            #if NET6_0_OR_GREATER
-                VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher,
-            #endif
-            Version = Polyfills.HttpVersion20,
+            VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher,
+            Version = System.Net.HttpVersion.Version20,
             RequestUri = uri,
             Headers =
             {

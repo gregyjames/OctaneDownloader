@@ -25,7 +25,7 @@
         <TieredCompilation>true</TieredCompilation>
         <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
         <TieredPGO>true</TieredPGO>
-        <TargetFrameworks>net10.0;netstandard2.0;netstandard2.1</TargetFrameworks>
+        <TargetFramework>net10.0</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>
@@ -47,7 +47,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="AsyncEnumerator" Condition="'$(TargetFramework)' == 'net461' OR '$(TargetFramework)' == 'net472'" />
         <PackageReference Include="CommunityToolkit.HighPerformance" />
         <PackageReference Include="Microsoft.Extensions.Configuration" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
@@ -56,13 +55,7 @@
         <PackageReference Include="Microsoft.Extensions.Http" />
         <PackageReference Include="Microsoft.Extensions.ObjectPool" />
         <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
-        <PackageReference Include="Polyfill">
-          <PrivateAssets>all</PrivateAssets>
-          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="System.Buffers" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
         <PackageReference Include="System.Reactive" />
-        <PackageReference Include="System.Text.Encoding.CodePages" Condition="'$(TargetFramework)' == 'netstandard2.0' OR '$(TargetFramework)' == 'netstandard2.1'" />
         <PackageReference Include="System.Threading.RateLimiting" />
         <PackageReference Include="ZLinq" />
         <PackageReference Include="ZString" />

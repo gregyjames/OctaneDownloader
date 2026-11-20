@@ -252,7 +252,7 @@ public partial class Engine: IEngine, IDisposable
 
                     try
                     {
-                        await pieces.ForEachAsync(options, async (piece, token) =>
+                        await Parallel.ForEachAsync(pieces, options, async (piece, token) =>
                         {
                             await octaneClient.Download(request.Url, piece, request.Headers ?? [], cancellation_token, pause_token.Token);
 

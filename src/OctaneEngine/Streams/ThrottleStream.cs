@@ -202,7 +202,6 @@ public partial class ThrottleStream : Stream
         }
     }
 
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP || NET5_0_OR_GREATER
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
     {
         LogThrottleStreamRead();
@@ -238,7 +237,6 @@ public partial class ThrottleStream : Stream
             snap?.Release();
         }
     }
-#endif
 
     public override void Write(byte[] buffer, int offset, int count)
     {
@@ -316,7 +314,6 @@ public partial class ThrottleStream : Stream
         }
     }
 
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP || NET5_0_OR_GREATER
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken token = default)
     {
         LogThrottleStreamWrite();
@@ -357,7 +354,6 @@ public partial class ThrottleStream : Stream
             }
         }
     }
-#endif
 
     protected override void Dispose(bool disposing)
     {
@@ -376,7 +372,6 @@ public partial class ThrottleStream : Stream
         base.Dispose(disposing);
     }
 
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP || NET5_0_OR_GREATER
     public override async ValueTask DisposeAsync()
     {
         if (_parentStream != null)
@@ -391,7 +386,6 @@ public partial class ThrottleStream : Stream
         }
         oldSnap?.Release();
     }
-#endif
 
     [LoggerMessage(LogLevel.Trace, "Throttle stream read")]
     partial void LogThrottleStreamRead();

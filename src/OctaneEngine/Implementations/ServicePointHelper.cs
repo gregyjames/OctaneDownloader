@@ -11,8 +11,6 @@ internal static class ServicePointHelper
         ServicePointManager.DefaultConnectionLimit = 10000;
         ServicePointManager.SetTcpKeepAlive(true, Int32.MaxValue,1);
         ServicePointManager.MaxServicePoints = numParts;
-        #if NET6_0_OR_GREATER
-            ServicePointManager.ReusePort = true;
-        #endif
+        ServicePointManager.ReusePort = true;
     }
 }

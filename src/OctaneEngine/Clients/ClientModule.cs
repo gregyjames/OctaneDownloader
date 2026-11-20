@@ -19,17 +19,14 @@ public static class ClientModule
             client.DefaultRequestHeaders.Add("User-Agent", "OctaneEngine/1.0");
             client.DefaultRequestHeaders.Add("Accept", "*/*");
             client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate, br");
-#if NET6_0_OR_GREATER
             client.DefaultRequestVersion = System.Net.HttpVersion.Version20;
             client.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
-#endif
         })
         .ConfigurePrimaryHttpMessageHandler(sp =>
         {
             var config = sp.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
             
-#if !NETSTANDARD
             var socketsHandler = new SocketsHttpHandler
             {
                 PreAuthenticate = true,
@@ -40,17 +37,11 @@ public static class ClientModule
                 PooledConnectionLifetime = TimeSpan.FromMinutes(30),
                 PooledConnectionIdleTimeout = TimeSpan.FromMinutes(10),
                 EnableMultipleHttp2Connections = true,
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
-#if NETCOREAPP3_0_OR_GREATER || NET5_0_OR_GREATER
-                                         | DecompressionMethods.Brotli
-#endif
-                ,
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
                 ConnectTimeout = TimeSpan.FromSeconds(15),
                 KeepAlivePingTimeout = TimeSpan.FromSeconds(30),
                 KeepAlivePingDelay = TimeSpan.FromSeconds(20),
-#if NET5_0_OR_GREATER
                 KeepAlivePingPolicy = HttpKeepAlivePingPolicy.WithActiveRequests,
-#endif
                 AllowAutoRedirect = true,
                 MaxAutomaticRedirections = 5
             };
@@ -117,24 +108,8 @@ public static class ClientModule
                 };
             }
             
-            var primaryHandler = (HttpMessageHandler)socketsHandler;
-#else
-            var handler = new HttpClientHandler
-            {
-                PreAuthenticate = true,
-                Proxy = config.Proxy,
-                UseProxy = config.UseProxy,
-                MaxConnectionsPerServer = Math.Min(Math.Max(config.Parts * 4, 100), 1000),
-                UseCookies = false,
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
-                AllowAutoRedirect = true,
-                MaxAutomaticRedirections = 5
-            };
-            var primaryHandler = (HttpMessageHandler)handler;
-#endif
-
             // Wrap with retry handler for resilience
-            return new RetryHandler(primaryHandler, loggerFactory, config.NumRetries, config.RetryCap);
+            return new RetryHandler(socketsHandler, loggerFactory, config.NumRetries, config.RetryCap);
         });
     }
 }
