@@ -89,10 +89,99 @@ public class DefaultClient : IClient
 
         await using var contentStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 
-        int bufferSize = _config.LowMemoryMode
-            ? Math.Min(_config.BufferSize, 64 * 1024)
-            : Math.Max(_config.BufferSize, 256 * 1024);
+        bool trackProgress = _config.ShowProgress && _pBar != null;
+        if (_config.LowMemoryMode)
+        {
+            await WriteLowMemoryAsync(contentStream, fileHandle, trackProgress, cancellationToken, pauseToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await WriteRegularAsync(contentStream, fileHandle, trackProgress, cancellationToken, pauseToken).ConfigureAwait(false);
+        }
+    }
 
+    private async Task WriteRegularAsync(
+        Stream contentStream,
+        SafeFileHandle fileHandle,
+        bool trackProgress,
+        CancellationToken cancellationToken,
+        PauseToken pauseToken)
+    {
+        int bufferSize = Math.Max(_config.BufferSize, 256 * 1024);
+        var readBuffer = GC.AllocateUninitializedArray<byte>(bufferSize, pinned: true);
+        var writeBuffer = GC.AllocateUninitializedArray<byte>(bufferSize, pinned: true);
+
+        long totalWritten = 0;
+        long lastProgressUpdate = 0;
+        long progressStep = Math.Max(bufferSize * 4L, 1024 * 1024L);
+
+        ValueTask pendingWrite = ValueTask.CompletedTask;
+        bool hasPendingWrite = false;
+
+        try
+        {
+            while (true)
+            {
+                if (pauseToken.IsPaused)
+                {
+                    await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
+                }
+
+                int bytesRead = await contentStream.ReadAsync(readBuffer.AsMemory(0, bufferSize), cancellationToken).ConfigureAwait(false);
+                if (bytesRead == 0)
+                {
+                    break;
+                }
+
+                if (hasPendingWrite)
+                {
+                    await pendingWrite.ConfigureAwait(false);
+                    hasPendingWrite = false;
+                }
+
+                (readBuffer, writeBuffer) = (writeBuffer, readBuffer);
+
+                pendingWrite = RandomAccess.WriteAsync(fileHandle, writeBuffer.AsMemory(0, bytesRead), totalWritten, cancellationToken);
+                hasPendingWrite = true;
+                totalWritten += bytesRead;
+
+                if (trackProgress && totalWritten - lastProgressUpdate >= progressStep)
+                {
+                    _pBar!.Tick();
+                    lastProgressUpdate = totalWritten;
+                }
+            }
+
+            if (hasPendingWrite)
+            {
+                await pendingWrite.ConfigureAwait(false);
+                hasPendingWrite = false;
+            }
+        }
+        finally
+        {
+            if (hasPendingWrite)
+            {
+                try
+                {
+                    await pendingWrite.ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Ensure in-flight write completes before releasing pinned buffers
+                }
+            }
+        }
+    }
+
+    private async Task WriteLowMemoryAsync(
+        Stream contentStream,
+        SafeFileHandle fileHandle,
+        bool trackProgress,
+        CancellationToken cancellationToken,
+        PauseToken pauseToken)
+    {
+        int bufferSize = Math.Min(_config.BufferSize, 64 * 1024);
         var buffer = ArrayPool<byte>.Shared.Rent(bufferSize);
         long totalWritten = 0;
         long lastProgressUpdate = 0;
@@ -116,9 +205,9 @@ public class DefaultClient : IClient
                 await RandomAccess.WriteAsync(fileHandle, buffer.AsMemory(0, bytesRead), totalWritten, cancellationToken).ConfigureAwait(false);
                 totalWritten += bytesRead;
 
-                if (_config.ShowProgress && _pBar != null && totalWritten - lastProgressUpdate >= progressStep)
+                if (trackProgress && totalWritten - lastProgressUpdate >= progressStep)
                 {
-                    _pBar.Tick();
+                    _pBar!.Tick();
                     lastProgressUpdate = totalWritten;
                 }
             }

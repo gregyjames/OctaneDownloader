@@ -99,4 +99,17 @@ public class PauseTokenTests
             source.Resume();
         }));
     }
+
+    [Test]
+    public void PauseToken_WhenNotPaused_ReturnsCompletedValueTask()
+    {
+        var source = new PauseTokenSource();
+        var token = source.Token;
+
+        ValueTask waitTask = token.WaitWhilePausedAsync();
+        Assert.That(waitTask.IsCompletedSuccessfully, Is.True);
+
+        ValueTask defaultWaitTask = default(PauseToken).WaitWhilePausedAsync();
+        Assert.That(defaultWaitTask.IsCompletedSuccessfully, Is.True);
+    }
 }

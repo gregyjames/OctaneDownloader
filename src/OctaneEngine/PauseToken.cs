@@ -21,6 +21,7 @@
  * SOFTWARE.
  */
 
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -31,7 +32,11 @@ public readonly struct PauseToken
 {
     private readonly PauseTokenSource _tokenSource;
     private readonly ILogger _log;
-    public bool IsPaused => _tokenSource?.IsPaused == true;
+    public bool IsPaused
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _tokenSource?.IsPaused == true;
+    }
 
     public PauseToken(PauseTokenSource source, ILogger log)
     {
@@ -39,17 +44,18 @@ public readonly struct PauseToken
         _log = log;
     }
 
-    public Task WaitWhilePausedAsync(CancellationToken token = default)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ValueTask WaitWhilePausedAsync(CancellationToken token = default)
     {
         if (_tokenSource == null || !_tokenSource.IsPaused)
-            return Task.CompletedTask;
+            return ValueTask.CompletedTask;
 
         var task = _tokenSource.WaitWhilePausedAsync();
-        
+
         // If there's no source, or the source returned a completed task (i.e. not paused)
         if (task == null || task.IsCompleted)
-            return Task.CompletedTask;
+            return ValueTask.CompletedTask;
 
-        return task.WaitAsync(token);
+        return new ValueTask(token.CanBeCanceled ? task.WaitAsync(token) : task);
     }
 }

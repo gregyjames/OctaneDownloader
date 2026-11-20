@@ -46,8 +46,11 @@ public partial class OctaneClient : IClient
     private readonly ILogger<IClient> _log;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ArrayPool<byte> _memPool = ArrayPool<byte>.Shared;
+    private readonly byte[]?[] _pinnedBuffers;
     private ProgressBar? _progressBar;
     private readonly long _tickStep;
+    private readonly int _regularBufferSize;
+    private readonly int _lowMemoryBufferSize;
 
     private static readonly ProgressBarOptions ChildProgressBarOptions = new()
     {
@@ -67,6 +70,40 @@ public partial class OctaneClient : IClient
         _progressBar = progressBar;
         _log = loggerFactory.CreateLogger<IClient>();
         _tickStep = Math.Max(_config.BufferSize * 2L, 1 * 1024 * 1024L);
+        _regularBufferSize = Math.Max(_config.BufferSize, 256 * 1024);
+        _lowMemoryBufferSize = Math.Min(_config.BufferSize, LowMemoryMaxBufferSize);
+        _pinnedBuffers = new byte[]?[Math.Max(_config.Parts * 2 + 4, 16)];
+    }
+
+    private byte[] RentPinnedBuffer(int size)
+    {
+        var pool = _pinnedBuffers;
+        for (int i = 0; i < pool.Length; i++)
+        {
+            if (Volatile.Read(ref pool[i]) != null)
+            {
+                var buf = Interlocked.Exchange(ref pool[i], null);
+                if (buf != null && buf.Length >= size)
+                {
+                    return buf;
+                }
+            }
+        }
+
+        return GC.AllocateUninitializedArray<byte>(size, pinned: true);
+    }
+
+    private void ReturnPinnedBuffer(byte[] buffer)
+    {
+        var pool = _pinnedBuffers;
+        for (int i = 0; i < pool.Length; i++)
+        {
+            if (Volatile.Read(ref pool[i]) == null &&
+                Interlocked.CompareExchange(ref pool[i], buffer, null) == null)
+            {
+                return;
+            }
+        }
     }
     
     public bool IsRangeSupported() => true;
@@ -130,9 +167,9 @@ public partial class OctaneClient : IClient
         PauseToken pauseToken,
         InFlightChunk? chunkProgress = null)
     {
-        var programBps = _config.BytesPerSecond / _config.Parts;
-        
-        long startTimestamp = Stopwatch.GetTimestamp();
+        bool logInfo = _log.IsEnabled(LogLevel.Information);
+        long startTimestamp = logInfo ? Stopwatch.GetTimestamp() : 0;
+
         if (message.IsSuccessStatusCode)
         {
             LogHttpRequestReturnedSuccessStatus((int)message.StatusCode, piece.start, piece.end);
@@ -142,9 +179,8 @@ public partial class OctaneClient : IClient
 
             if (_config.BytesPerSecond > 1)
             {
-                throttleStream = new ThrottleStream(_loggerFactory);
-                throttleStream.SetStreamParent(networkStream);
-                throttleStream.SetBps(programBps);
+                var programBps = _config.BytesPerSecond / _config.Parts;
+                throttleStream = new ThrottleStream(networkStream, programBps, _loggerFactory);
                 readStream = throttleStream;
             }
 
@@ -183,7 +219,7 @@ public partial class OctaneClient : IClient
             _progressBar?.Tick();
         }
 
-        if (_log.IsEnabled(LogLevel.Information))
+        if (logInfo)
         {
             long elapsedMs = (long)Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
             LogPieceExecutionTimeElapsedMilliseconds(NetworkAnalyzer.PrettySize(piece.start), NetworkAnalyzer.PrettySize(piece.end), elapsedMs);
@@ -199,10 +235,10 @@ public partial class OctaneClient : IClient
         PauseToken pauseToken,
         InFlightChunk? chunkProgress)
     {
-        int readBufferSize = Math.Max(_config.BufferSize, 256 * 1024);
+        int readBufferSize = _regularBufferSize;
         long pieceLength = piece.end - piece.start + 1;
-        var readBuffer = _memPool.Rent(readBufferSize);
-        var writeBuffer = _memPool.Rent(readBufferSize);
+        var readBuffer = RentPinnedBuffer(readBufferSize);
+        var writeBuffer = RentPinnedBuffer(readBufferSize);
 
         if (_log.IsEnabled(LogLevel.Debug))
         {
@@ -213,6 +249,7 @@ public partial class OctaneClient : IClient
         bool hasPendingWrite = false;
         long bytesCommitted = 0;
         int pendingBytes = 0;
+        long tickStep = _tickStep;
 
         try
         {
@@ -267,7 +304,7 @@ public partial class OctaneClient : IClient
 
                 bytesReadOverall += filled;
 
-                if (child != null && (bytesReadOverall - lastProgressUpdate >= _tickStep || bytesReadOverall >= pieceLength))
+                if (child != null && (bytesReadOverall - lastProgressUpdate >= tickStep || bytesReadOverall >= pieceLength))
                 {
                     child.Tick(bytesReadOverall);
                     lastProgressUpdate = bytesReadOverall;
@@ -298,8 +335,8 @@ public partial class OctaneClient : IClient
                 }
             }
 
-            _memPool.Return(readBuffer);
-            _memPool.Return(writeBuffer);
+            ReturnPinnedBuffer(readBuffer);
+            ReturnPinnedBuffer(writeBuffer);
             LogBufferReturnedToMemoryPool();
         }
     }
@@ -313,9 +350,10 @@ public partial class OctaneClient : IClient
         PauseToken pauseToken,
         InFlightChunk? chunkProgress)
     {
-        int readBufferSize = Math.Min(_config.BufferSize, LowMemoryMaxBufferSize);
+        int readBufferSize = _lowMemoryBufferSize;
         long pieceLength = piece.end - piece.start + 1;
         var readBuffer = _memPool.Rent(readBufferSize);
+        long tickStep = _tickStep;
 
         if (_log.IsEnabled(LogLevel.Debug))
         {
@@ -345,7 +383,7 @@ public partial class OctaneClient : IClient
                 bytesReadOverall += bytesRead;
                 chunkProgress?.ReportBytesCommitted(bytesReadOverall);
 
-                if (child != null && (bytesReadOverall - lastProgressUpdate >= _tickStep || bytesReadOverall >= pieceLength))
+                if (child != null && (bytesReadOverall - lastProgressUpdate >= tickStep || bytesReadOverall >= pieceLength))
                 {
                     child.Tick(bytesReadOverall);
                     lastProgressUpdate = bytesReadOverall;

@@ -149,5 +149,46 @@ namespace OctaneTestProject
             ts.Dispose();
             Assert.Throws<ObjectDisposedException>((Action)(() => ms.WriteByte(1)));
         }
+
+        [Test]
+        public async Task ReadAsync_Memory_UnthrottledAndConcurrentSetBps_ShouldBeThreadSafe()
+        {
+            var data = new byte[4096];
+            new Random(42).NextBytes(data);
+            using var ms = new MemoryStream(data);
+            using var ts = new ThrottleStream(ms, 0, _factory);
+
+            // Unthrottled fast-path read
+            var first = new byte[512];
+            int r1 = await ts.ReadAsync(first.AsMemory());
+            Assert.That(r1, Is.EqualTo(512));
+
+            // Concurrent SetBps updates while reading
+            using var cts = new CancellationTokenSource();
+            var updater = Task.Run(() =>
+            {
+                int i = 0;
+                while (!cts.IsCancellationRequested)
+                {
+                    ts.SetBps((i++ % 2 == 0) ? 1024 * 1024 : 0);
+                }
+            });
+
+            var rest = new byte[data.Length - 512];
+            int total = 0;
+            while (total < rest.Length)
+            {
+                int n = await ts.ReadAsync(rest.AsMemory(total));
+                if (n == 0) break;
+                total += n;
+            }
+
+            cts.Cancel();
+            await updater;
+
+            Assert.That(total, Is.EqualTo(rest.Length));
+            Assert.That(first, Is.EqualTo(data[..512]));
+            Assert.That(rest, Is.EqualTo(data[512..]));
+        }
     }
 }
