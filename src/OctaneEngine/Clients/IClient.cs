@@ -21,6 +21,7 @@
  * SOFTWARE.
  */
 
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -33,5 +34,5 @@ public interface IClient
 {
     public bool IsRangeSupported();
     public void SetProgressbar(ProgressBar bar);
-    internal Task Download(string url, (long start, long end) piece, SafeFileHandle fileHandle, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken);
+    internal Task Download(Uri uri, (long start, long end) piece, SafeFileHandle fileHandle, Dictionary<string, string> headers, CancellationToken cancellationToken, PauseToken pauseToken);
 }

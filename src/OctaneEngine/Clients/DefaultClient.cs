@@ -52,7 +52,7 @@ public class DefaultClient : IClient
         _pBar = bar;
     }
 
-    public async Task Download(string url, (long, long) piece, SafeFileHandle fileHandle, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
+    public async Task Download(Uri uri, (long, long) piece, SafeFileHandle fileHandle, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         ArgumentNullException.ThrowIfNull(fileHandle);
 
@@ -61,7 +61,7 @@ public class DefaultClient : IClient
             await pauseToken.WaitWhilePausedAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url))
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri)
         {
             Version = _config.HttpVersion ?? System.Net.HttpVersion.Version11,
             VersionPolicy = _config.HttpVersionPolicy,

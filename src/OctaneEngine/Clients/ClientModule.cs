@@ -36,6 +36,7 @@ public static class ClientModule
                 PooledConnectionLifetime = TimeSpan.FromMinutes(30),
                 PooledConnectionIdleTimeout = TimeSpan.FromMinutes(10),
                 EnableMultipleHttp2Connections = true,
+                InitialHttp2StreamWindowSize = 16 * 1024 * 1024, // 16 MB for high-BDP links
                 AutomaticDecompression = DecompressionMethods.None,
                 ConnectTimeout = TimeSpan.FromSeconds(15),
                 KeepAlivePingTimeout = TimeSpan.FromSeconds(30),

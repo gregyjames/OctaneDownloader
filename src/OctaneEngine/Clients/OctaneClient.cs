@@ -105,7 +105,7 @@ public partial class OctaneClient : IClient
         return response;
     }
     
-    public async Task Download(string url, (long start, long end) piece, SafeFileHandle fileHandle, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
+    public async Task Download(Uri uri, (long start, long end) piece, SafeFileHandle fileHandle, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
     {
         ArgumentNullException.ThrowIfNull(fileHandle);
 
@@ -115,7 +115,6 @@ public partial class OctaneClient : IClient
         }
 
         LogSendingRequestForRangePieces(piece.start, piece.end);
-        var uri = new Uri(url, UriKind.Absolute);
         using var message = await SendRangeRequestAsync(uri, piece, headers, cancellationToken).ConfigureAwait(false);
         
         var programBps = _config.BytesPerSecond / _config.Parts;

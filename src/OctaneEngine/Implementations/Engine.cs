@@ -148,10 +148,10 @@ public partial class Engine: IEngine, IDisposable
         Normal
     }
     
-    private async Task<(long, ClientType)> getFileSizeAndRangeSupport(string url)
+    private async Task<(long, ClientType)> getFileSizeAndRangeSupport(Uri uri)
     {
         var client = _clientFactory.CreateClient("OctaneClient");
-        using var request = new HttpRequestMessage(HttpMethod.Head, url)
+        using var request = new HttpRequestMessage(HttpMethod.Head, uri)
         {
             Version = _config.HttpVersion ?? System.Net.HttpVersion.Version11,
             VersionPolicy = _config.HttpVersionPolicy,
@@ -212,19 +212,17 @@ public partial class Engine: IEngine, IDisposable
             var octaneClient = _client ?? new OctaneClient(_config, client, _factory);
             var defaultClient = _defaultClient ?? new DefaultClient(client, _config);
 
-            (var length, clientType) = await getFileSizeAndRangeSupport(request.Url).ConfigureAwait(false);
+            var uri = new Uri(request.Url, UriKind.Absolute);
+            (var length, clientType) = await getFileSizeAndRangeSupport(uri).ConfigureAwait(false);
             
             #region Varible Initilization
-            filename = request.OutFile ?? Path.GetFileName(new Uri(request.Url).LocalPath);
+            filename = request.OutFile ?? Path.GetFileName(uri.LocalPath);
             var cancellation_token = token;
             var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
             int tasksDone = 0;
             #endregion
             
-            #region ServicePoint Configuration
-                LogServerFileNameFilename(filename);
-                ServicePointHelper.ConfigureServicePoint(_config.Parts);
-            #endregion
+            LogServerFileNameFilename(filename);
             
             if (_logger.IsEnabled(LogLevel.Information))
             {
@@ -269,7 +267,7 @@ public partial class Engine: IEngine, IDisposable
                     {
                         await Parallel.ForEachAsync(pieces, options, async (piece, token) =>
                         {
-                            await octaneClient.Download(request.Url, piece, fileHandle, request.Headers ?? [], cancellation_token, pause_token.Token);
+                            await octaneClient.Download(uri, piece, fileHandle, request.Headers ?? [], cancellation_token, pause_token.Token);
 
                             int completed = Interlocked.Increment(ref tasksDone);
                                 
@@ -295,7 +293,7 @@ public partial class Engine: IEngine, IDisposable
                     LogUsingDefaultClientToDownloadFile();
                     try
                     {
-                        await defaultClient.Download(request.Url, (0, length), fileHandle, request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);
+                        await defaultClient.Download(uri, (0, length), fileHandle, request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);
                         success = true;
                     }
                     catch (Exception)
