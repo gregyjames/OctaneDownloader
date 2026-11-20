@@ -30,10 +30,14 @@ namespace OctaneEngineCore;
 
 public class OctaneConfiguration
 {
+    internal static int DefaultParts => Math.Clamp(Environment.ProcessorCount, 4, 8);
+
     /// <summary>
     ///     The number of parts (concurrent workers) to download in parallel.
+    ///     Defaults to <c>Math.Clamp(Environment.ProcessorCount, 4, 8)</c> to maximize throughput
+    ///     without triggering origin rate limits or TCP congestion collapse on high-core machines.
     /// </summary>
-    public int Parts { get; set; } = Environment.ProcessorCount;
+    public int Parts { get; set; } = DefaultParts;
 
     /// <summary>
     ///     Minimum byte size per chunk. Small files won't be split into chunks smaller than this threshold.

@@ -85,7 +85,7 @@ public partial class Engine: IEngine, IDisposable
         
         // Normalize config values just like EngineBuilder does
         if (_config.Parts <= 0)
-            _config.Parts = Environment.ProcessorCount;
+            _config.Parts = OctaneConfiguration.DefaultParts;
         if (_config.BufferSize <= 0)
             _config.BufferSize = 8192;
         if (_config.NumRetries < 0)
@@ -128,7 +128,7 @@ public partial class Engine: IEngine, IDisposable
         var networkLatency = await NetworkAnalyzer.NetworkAnalyzer.GetNetworkLatency(new PingService());
         int chunkSize = (int)Math.Ceiling(Math.Sqrt((double)networkSpeed * networkLatency));
         int numParts = (int)Math.Ceiling((double)size_of_file / chunkSize);
-        numParts = Math.Min(numParts, Environment.ProcessorCount);
+        numParts = Math.Min(numParts, OctaneConfiguration.DefaultParts);
         return numParts;
     }
         

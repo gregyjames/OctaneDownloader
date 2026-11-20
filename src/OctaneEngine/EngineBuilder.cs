@@ -85,7 +85,7 @@ public class EngineBuilder
     {
         // Validate and fix configuration values
         if (_configuration.Parts <= 0)
-            _configuration.Parts = Environment.ProcessorCount;
+            _configuration.Parts = OctaneConfiguration.DefaultParts;
         
         if (_configuration.BufferSize <= 0)
             _configuration.BufferSize = 8192;

@@ -631,5 +631,24 @@ namespace OctaneTestProject
             Assert.That(sw.ElapsedMilliseconds, Is.LessThan(2000), "Tail steal should beat the 5s stall");
             Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
         }
+
+        [Test]
+        public void Configuration_DefaultParts_IsClampedBetween4And8_AndAllowsOverride()
+        {
+            var defaultConfig = new OctaneConfiguration();
+            Assert.That(defaultConfig.Parts, Is.InRange(4, 8));
+            Assert.That(defaultConfig.Parts, Is.EqualTo(Math.Clamp(Environment.ProcessorCount, 4, 8)));
+
+            // Explicit user override above 8 should be preserved
+            using var mockClient = Helpers.GetMockHttpClient(_mockData);
+            var customConfig = new OctaneConfiguration { Parts = 16 };
+            using var engine = new Engine(customConfig, mockClient, _factory);
+            Assert.That(customConfig.Parts, Is.EqualTo(16));
+
+            // Non-positive Parts should normalize to DefaultParts
+            var invalidConfig = new OctaneConfiguration { Parts = 0 };
+            using var normalizedEngine = new Engine(invalidConfig, mockClient, _factory);
+            Assert.That(invalidConfig.Parts, Is.InRange(4, 8));
+        }
     }
 }
