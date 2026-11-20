@@ -105,7 +105,10 @@ public partial class OctaneClient : IClient
         return response;
     }
     
-    public async Task Download(Uri uri, (long start, long end) piece, SafeFileHandle fileHandle, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
+    public Task Download(Uri uri, (long start, long end) piece, SafeFileHandle fileHandle, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken)
+        => Download(uri, piece, fileHandle, headers, cancellationToken, pauseToken, chunkProgress: null);
+
+    internal async Task Download(Uri uri, (long start, long end) piece, SafeFileHandle fileHandle, Dictionary<string, string>? headers, CancellationToken cancellationToken, PauseToken pauseToken, InFlightChunk? chunkProgress)
     {
         ArgumentNullException.ThrowIfNull(fileHandle);
 
@@ -116,7 +119,7 @@ public partial class OctaneClient : IClient
 
         LogSendingRequestForRangePieces(piece.start, piece.end);
         using var message = await SendRangeRequestAsync(uri, piece, headers, cancellationToken).ConfigureAwait(false);
-        await WriteResponseAsync(message, piece, fileHandle, cancellationToken, pauseToken).ConfigureAwait(false);
+        await WriteResponseAsync(message, piece, fileHandle, cancellationToken, pauseToken, chunkProgress).ConfigureAwait(false);
     }
 
     internal async Task WriteResponseAsync(
@@ -124,7 +127,8 @@ public partial class OctaneClient : IClient
         (long start, long end) piece,
         SafeFileHandle fileHandle,
         CancellationToken cancellationToken,
-        PauseToken pauseToken)
+        PauseToken pauseToken,
+        InFlightChunk? chunkProgress = null)
     {
         var programBps = _config.BytesPerSecond / _config.Parts;
         
@@ -153,11 +157,11 @@ public partial class OctaneClient : IClient
 
                 if (_config.LowMemoryMode)
                 {
-                    await LowMemoryDownload(piece, fileHandle, cancellationToken, readStream, child, pauseToken).ConfigureAwait(false);
+                    await LowMemoryDownload(piece, fileHandle, cancellationToken, readStream, child, pauseToken, chunkProgress).ConfigureAwait(false);
                 }
                 else
                 {
-                    await RegularDownload(piece, fileHandle, cancellationToken, readStream, child, pauseToken).ConfigureAwait(false);
+                    await RegularDownload(piece, fileHandle, cancellationToken, readStream, child, pauseToken, chunkProgress).ConfigureAwait(false);
                 }
             }
             finally
@@ -192,7 +196,8 @@ public partial class OctaneClient : IClient
         CancellationToken cancellationToken,
         Stream sourceStream,
         ChildProgressBar? child,
-        PauseToken pauseToken)
+        PauseToken pauseToken,
+        InFlightChunk? chunkProgress)
     {
         int readBufferSize = Math.Max(_config.BufferSize, 256 * 1024);
         long pieceLength = piece.end - piece.start + 1;
@@ -206,6 +211,8 @@ public partial class OctaneClient : IClient
 
         ValueTask pendingWrite = ValueTask.CompletedTask;
         bool hasPendingWrite = false;
+        long bytesCommitted = 0;
+        int pendingBytes = 0;
 
         try
         {
@@ -246,6 +253,8 @@ public partial class OctaneClient : IClient
                 {
                     await pendingWrite.ConfigureAwait(false);
                     hasPendingWrite = false;
+                    bytesCommitted += pendingBytes;
+                    chunkProgress?.ReportBytesCommitted(bytesCommitted);
                 }
 
                 // Swap buffers so the next network read overlaps with this disk write
@@ -253,6 +262,7 @@ public partial class OctaneClient : IClient
 
                 long writeOffset = piece.start + bytesReadOverall;
                 pendingWrite = RandomAccess.WriteAsync(fileHandle, writeBuffer.AsMemory(0, filled), writeOffset, cancellationToken);
+                pendingBytes = filled;
                 hasPendingWrite = true;
 
                 bytesReadOverall += filled;
@@ -268,6 +278,8 @@ public partial class OctaneClient : IClient
             {
                 await pendingWrite.ConfigureAwait(false);
                 hasPendingWrite = false;
+                bytesCommitted += pendingBytes;
+                chunkProgress?.ReportBytesCommitted(bytesCommitted);
             }
         }
         finally
@@ -277,6 +289,8 @@ public partial class OctaneClient : IClient
                 try
                 {
                     await pendingWrite.ConfigureAwait(false);
+                    bytesCommitted += pendingBytes;
+                    chunkProgress?.ReportBytesCommitted(bytesCommitted);
                 }
                 catch
                 {
@@ -296,7 +310,8 @@ public partial class OctaneClient : IClient
         CancellationToken cancellationToken,
         Stream sourceStream,
         ChildProgressBar? child,
-        PauseToken pauseToken)
+        PauseToken pauseToken,
+        InFlightChunk? chunkProgress)
     {
         int readBufferSize = Math.Min(_config.BufferSize, LowMemoryMaxBufferSize);
         long pieceLength = piece.end - piece.start + 1;
@@ -328,6 +343,7 @@ public partial class OctaneClient : IClient
 
                 await RandomAccess.WriteAsync(fileHandle, readBuffer.AsMemory(0, bytesRead), piece.start + bytesReadOverall, cancellationToken).ConfigureAwait(false);
                 bytesReadOverall += bytesRead;
+                chunkProgress?.ReportBytesCommitted(bytesReadOverall);
 
                 if (child != null && (bytesReadOverall - lastProgressUpdate >= _tickStep || bytesReadOverall >= pieceLength))
                 {

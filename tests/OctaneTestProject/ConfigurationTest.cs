@@ -492,5 +492,144 @@ namespace OctaneTestProject
             Assert.That(sw.ElapsedMilliseconds, Is.LessThan(2000), "Hedged download should beat the 5s stall");
             Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
         }
+
+        private sealed class PartialThenStallHandler : HttpMessageHandler
+        {
+            private readonly byte[] _data;
+            private readonly int _stallAfterBytes;
+            private int _stalledOnce;
+            private long _stalledChunkStart = -1;
+            private long _stalledChunkEnd = -1;
+            public long StolenRangeStart { get; private set; } = -1;
+
+            public PartialThenStallHandler(byte[] data, int stallAfterBytes)
+            {
+                _data = data;
+                _stallAfterBytes = stallAfterBytes;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                long start = 0;
+                long end = _data.Length - 1;
+                if (request.Headers.Range?.Ranges.GetEnumerator() is var e && e.MoveNext())
+                {
+                    start = e.Current.From ?? 0;
+                    end = Math.Min(e.Current.To ?? (_data.Length - 1), _data.Length - 1);
+                }
+
+                long length = end - start + 1;
+
+                // Stall the first non-zero chunk halfway through its stream
+                if (start > 0 && Interlocked.CompareExchange(ref _stalledOnce, 1, 0) == 0)
+                {
+                    Volatile.Write(ref _stalledChunkStart, start);
+                    Volatile.Write(ref _stalledChunkEnd, end);
+
+                    var stallingStream = new PartialStallStream(_data, (int)start, (int)length, _stallAfterBytes);
+                    var resp = new HttpResponseMessage(HttpStatusCode.PartialContent)
+                    {
+                        Content = new StreamContent(stallingStream)
+                    };
+                    resp.Content.Headers.ContentLength = length;
+                    resp.Content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(start, end, _data.Length);
+                    return Task.FromResult(resp);
+                }
+
+                // Record if this is a tail-steal request for the stalled chunk
+                long stalledStart = Volatile.Read(ref _stalledChunkStart);
+                long stalledEnd = Volatile.Read(ref _stalledChunkEnd);
+                if (stalledStart > 0 && start > stalledStart && end == stalledEnd)
+                {
+                    StolenRangeStart = start;
+                }
+
+                var slice = new byte[length];
+                Array.Copy(_data, start, slice, 0, length);
+                var ok = new HttpResponseMessage(HttpStatusCode.PartialContent)
+                {
+                    Content = new ByteArrayContent(slice)
+                };
+                ok.Content.Headers.ContentLength = length;
+                ok.Content.Headers.ContentRange = new System.Net.Http.Headers.ContentRangeHeaderValue(start, end, _data.Length);
+                return Task.FromResult(ok);
+            }
+
+            private sealed class PartialStallStream : Stream
+            {
+                private readonly byte[] _data;
+                private readonly int _baseOffset;
+                private readonly int _length;
+                private readonly int _stallAfterBytes;
+                private int _pos;
+
+                public PartialStallStream(byte[] data, int baseOffset, int length, int stallAfterBytes)
+                {
+                    _data = data;
+                    _baseOffset = baseOffset;
+                    _length = length;
+                    _stallAfterBytes = stallAfterBytes;
+                }
+
+                public override bool CanRead => true;
+                public override bool CanSeek => false;
+                public override bool CanWrite => false;
+                public override long Length => _length;
+                public override long Position { get => _pos; set => throw new NotSupportedException(); }
+                public override void Flush() { }
+                public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+                public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+                public override void SetLength(long value) => throw new NotSupportedException();
+                public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+                public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+                {
+                    if (_pos >= _length) return 0;
+
+                    if (_pos < _stallAfterBytes)
+                    {
+                        int toCopy = Math.Min(buffer.Length, _stallAfterBytes - _pos);
+                        _data.AsSpan(_baseOffset + _pos, toCopy).CopyTo(buffer.Span);
+                        _pos += toCopy;
+                        return toCopy;
+                    }
+
+                    await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                    int remaining = Math.Min(buffer.Length, _length - _pos);
+                    _data.AsSpan(_baseOffset + _pos, remaining).CopyTo(buffer.Span);
+                    _pos += remaining;
+                    return remaining;
+                }
+            }
+        }
+
+        [Test]
+        public void TailHedging_StealsOnlyRemainingTailBytes_WhenSlowChunkHasPartialProgress()
+        {
+            const string url = @"https://mockurl.com/file.png";
+            using var handler = new PartialThenStallHandler(_mockData, stallAfterBytes: 8 * 1024);
+            using var client = new HttpClient(handler);
+
+            var config = new OctaneConfiguration
+            {
+                Parts = 4,
+                BufferSize = 8192,
+                MinPartSize = 4 * 1024,
+                MaxChunkSize = 16 * 1024,
+                LowMemoryMode = true, // Commits every 8 KB buffer immediately
+                EnableTailHedging = true,
+                TailHedgeDelayMs = 80,
+                ShowProgress = false
+            };
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var engine = new Engine(config, client, _factory);
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
+            sw.Stop();
+
+            Assert.That(handler.StolenRangeStart, Is.GreaterThan(0), "Expected idle worker to steal only the uncommitted tail bytes");
+            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(2000), "Tail steal should beat the 5s stall");
+            Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
+        }
     }
 }
