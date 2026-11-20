@@ -401,5 +401,39 @@ namespace OctaneTestProject
             Assert.That(dynamicGetCount, Is.EqualTo(7));
             Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
         }
+
+        [Test]
+        public void FastStart_EliminatesHeadRequest_ForRangeAndNonRangeServers()
+        {
+            const string url = @"https://mockurl.com/file.png";
+
+            // Range-supported server (206 Partial Content): 0 HEAD requests
+            using var rangeHandler = new CapturingDelegatingHandler(new MockHttpMessageHandler(_mockData, supportsRange: true));
+            using var rangeClient = new HttpClient(rangeHandler);
+            var rangeConfig = new OctaneConfiguration
+            {
+                Parts = 4,
+                BufferSize = 8192,
+                MinPartSize = 4 * 1024,
+                MaxChunkSize = 32 * 1024,
+                ShowProgress = false
+            };
+
+            var rangeEngine = new Engine(rangeConfig, rangeClient, _factory);
+            rangeEngine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
+
+            Assert.That(rangeHandler.Captured, Has.None.Matches<(HttpMethod Method, Version, HttpVersionPolicy)>(e => e.Method == HttpMethod.Head));
+            Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
+
+            // Non-range server (200 OK): 0 HEAD requests and exactly 1 GET request
+            using var nonRangeHandler = new CapturingDelegatingHandler(new MockHttpMessageHandler(_mockData, supportsRange: false));
+            using var nonRangeClient = new HttpClient(nonRangeHandler);
+            var nonRangeEngine = new Engine(rangeConfig, nonRangeClient, _factory);
+            nonRangeEngine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
+
+            Assert.That(nonRangeHandler.Captured, Has.None.Matches<(HttpMethod Method, Version, HttpVersionPolicy)>(e => e.Method == HttpMethod.Head));
+            Assert.That(nonRangeHandler.Captured.Count, Is.EqualTo(1));
+            Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
+        }
     }
 }

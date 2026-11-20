@@ -62,11 +62,17 @@ public class MockHttpMessageHandler : HttpMessageHandler
             var range = request.Headers.Range;
             if (range != null && _supportsRange)
             {
+                if (_fileData.Length == 0)
+                {
+                    response.StatusCode = HttpStatusCode.RequestedRangeNotSatisfiable;
+                    return response;
+                }
+
                 var item = range.Ranges.GetEnumerator();
                 item.MoveNext();
                 var rangeItem = item.Current;
                 long start = rangeItem.From ?? 0;
-                long end = rangeItem.To ?? (_fileData.Length - 1);
+                long end = Math.Min(rangeItem.To ?? (_fileData.Length - 1), _fileData.Length - 1);
 
                 long length = end - start + 1;
                 var chunk = new byte[length];

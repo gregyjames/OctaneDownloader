@@ -12,7 +12,8 @@ public static partial class Helpers
         int parts,
         ILogger logger,
         long minPartSize = 1 * 1024 * 1024,
-        long maxChunkSize = 8 * 1024 * 1024)
+        long maxChunkSize = 8 * 1024 * 1024,
+        long startOffset = 0)
     {
         if (parts <= 0) throw new ArgumentException("Parts must be positive", nameof(parts));
         if (responseLength <= 0) throw new ArgumentException("Response length must be positive", nameof(responseLength));
@@ -50,7 +51,7 @@ public static partial class Helpers
         }
 
         long remainder = responseLength % chunkCount;
-        long start = 0;
+        long start = startOffset;
         bool traceEnabled = logger.IsEnabled(LogLevel.Trace);
 
         for (int i = 0; i < chunkCount; i++)

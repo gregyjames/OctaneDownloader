@@ -76,6 +76,15 @@ public class DefaultClient : IClient
 
         using var message = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
+        await WriteResponseAsync(message, fileHandle, cancellationToken, pauseToken).ConfigureAwait(false);
+    }
+
+    internal async Task WriteResponseAsync(
+        HttpResponseMessage message,
+        SafeFileHandle fileHandle,
+        CancellationToken cancellationToken,
+        PauseToken pauseToken)
+    {
         message.EnsureSuccessStatusCode();
 
         await using var contentStream = await message.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);

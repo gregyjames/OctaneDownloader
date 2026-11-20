@@ -73,7 +73,7 @@ public partial class OctaneClient : IClient
 
     public void SetProgressbar(ProgressBar bar) => _progressBar = bar;
 
-    private async ValueTask<HttpResponseMessage> SendRangeRequestAsync(
+    internal async ValueTask<HttpResponseMessage> SendRangeRequestAsync(
         Uri uri, 
         (long start, long end) piece, 
         Dictionary<string, string>? headers, 
@@ -116,7 +116,16 @@ public partial class OctaneClient : IClient
 
         LogSendingRequestForRangePieces(piece.start, piece.end);
         using var message = await SendRangeRequestAsync(uri, piece, headers, cancellationToken).ConfigureAwait(false);
-        
+        await WriteResponseAsync(message, piece, fileHandle, cancellationToken, pauseToken).ConfigureAwait(false);
+    }
+
+    internal async Task WriteResponseAsync(
+        HttpResponseMessage message,
+        (long start, long end) piece,
+        SafeFileHandle fileHandle,
+        CancellationToken cancellationToken,
+        PauseToken pauseToken)
+    {
         var programBps = _config.BytesPerSecond / _config.Parts;
         
         long startTimestamp = Stopwatch.GetTimestamp();

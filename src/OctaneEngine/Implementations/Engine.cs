@@ -148,21 +148,6 @@ public partial class Engine: IEngine, IDisposable
         Normal
     }
     
-    private async Task<(long, ClientType)> getFileSizeAndRangeSupport(Uri uri)
-    {
-        var client = _clientFactory.CreateClient("OctaneClient");
-        using var request = new HttpRequestMessage(HttpMethod.Head, uri)
-        {
-            Version = _config.HttpVersion ?? System.Net.HttpVersion.Version11,
-            VersionPolicy = _config.HttpVersionPolicy,
-        };
-        using var response = await client.SendAsync(request).ConfigureAwait(false);
-        var responseLength = response.Content.Headers.ContentLength ?? 0;
-        var rangeSupported = response.Headers.AcceptRanges.Contains("bytes");
-        LogRangeSupportedRange(rangeSupported);
-        return (responseLength, rangeSupported ? ClientType.Octane : ClientType.Normal);
-    }
-
     /// <summary>
     /// Sets the progress callback for when the progress bar isn't being used.
     /// </summary>
@@ -189,7 +174,7 @@ public partial class Engine: IEngine, IDisposable
     {
         _config.Proxy = proxy;
     }
-    
+
     /// <summary>
     ///     The core octane download function. 
     /// </summary>
@@ -213,24 +198,55 @@ public partial class Engine: IEngine, IDisposable
             var defaultClient = _defaultClient ?? new DefaultClient(client, _config);
 
             var uri = new Uri(request.Url, UriKind.Absolute);
-            (var length, clientType) = await getFileSizeAndRangeSupport(uri).ConfigureAwait(false);
-            
-            #region Varible Initilization
             filename = request.OutFile ?? Path.GetFileName(uri.LocalPath);
             var cancellation_token = token;
             var pause_token = pauseTokenSource ?? new PauseTokenSource(_factory);
-            int tasksDone = 0;
-            #endregion
-            
+            var headers = request.Headers ?? [];
+
             LogServerFileNameFilename(filename);
-            
+
+            if (pause_token.Token.IsPaused)
+            {
+                await pause_token.Token.WaitWhilePausedAsync(cancellation_token).ConfigureAwait(false);
+            }
+
+            stopwatch.Start();
+
+            // 1-RTT Fast Start: probe with GET Range: bytes=0-<firstChunkEnd> instead of a separate HEAD round-trip.
+            long probeChunkSize = _config.MaxChunkSize > 0
+                ? _config.MaxChunkSize
+                : (_config.MinPartSize > 0 ? _config.MinPartSize : 8L * 1024 * 1024);
+
+            using var initialResponse = await octaneClient
+                .SendRangeRequestAsync(uri, (0, probeChunkSize - 1), headers, cancellation_token)
+                .ConfigureAwait(false);
+
+            if (initialResponse.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable)
+            {
+                // Empty 0-byte file
+                using (File.OpenHandle(filename, FileMode.Create, FileAccess.Write, FileShare.None)) { }
+                success = true;
+                stopwatch.Stop();
+                LogFileDownloadedSuccessfullyInStopwatchelapsedmillisecondsMs(stopwatch.ElapsedMilliseconds);
+                return;
+            }
+
+            initialResponse.EnsureSuccessStatusCode();
+
+            bool rangeSupported = initialResponse.StatusCode == HttpStatusCode.PartialContent
+                                  && initialResponse.Content.Headers.ContentRange?.Length is > 0;
+            clientType = rangeSupported ? ClientType.Octane : ClientType.Normal;
+            LogRangeSupportedRange(rangeSupported);
+
+            long length = rangeSupported
+                ? initialResponse.Content.Headers.ContentRange!.Length!.Value
+                : (initialResponse.Content.Headers.ContentLength ?? 0);
+
             if (_logger.IsEnabled(LogLevel.Information))
             {
                 LogTotalSizeLength(NetworkAnalyzer.NetworkAnalyzer.PrettySize(length));
             }
-                
-            stopwatch.Start();
-            
+
             using (SafeFileHandle fileHandle = File.OpenHandle(
                        filename,
                        FileMode.Create,
@@ -244,37 +260,80 @@ public partial class Engine: IEngine, IDisposable
                     RandomAccess.SetLength(fileHandle, length);
                 }
 
-                //Check if range is supported
                 if (clientType == ClientType.Octane)
                 {
-                    var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger, _config.MinPartSize, _config.MaxChunkSize);
+                    long firstEnd = initialResponse.Content.Headers.ContentRange!.To
+                                    ?? Math.Min(probeChunkSize - 1, length - 1);
+                    long remainingOffset = firstEnd + 1;
+                    long remainingLength = length - remainingOffset;
+
+                    var remainingPieces = remainingLength > 0
+                        ? Helpers.CreatePartsList(remainingLength, _config.Parts, _logger, _config.MinPartSize, _config.MaxChunkSize, startOffset: remainingOffset)
+                        : [];
+
+                    int totalChunks = 1 + remainingPieces.Count;
+                    int tasksDone = 0;
+
                     LogUsingOctaneClientToDownloadFile();
-                    var options = new ParallelOptions()
-                    {
-                        MaxDegreeOfParallelism = Math.Min(_config.Parts, pieces.Count),
-                        CancellationToken = cancellation_token,
-                    };
                     ProgressBar? pbar = null;
-                    
+
                     if (_config.ShowProgress)
                     {
-                        pbar = new ProgressBar(pieces.Count * 2, "Downloading file...");
+                        pbar = new ProgressBar(totalChunks * 2, "Downloading file...");
                         octaneClient.SetProgressbar(pbar);
                         defaultClient.SetProgressbar(pbar);
                     }
 
                     try
                     {
-                        await Parallel.ForEachAsync(pieces, options, async (piece, token) =>
-                        {
-                            await octaneClient.Download(uri, piece, fileHandle, request.Headers ?? [], cancellation_token, pause_token.Token);
+                        int workerCount = Math.Max(1, Math.Min(_config.Parts, totalChunks));
+                        int nextPieceIndex = -1;
 
-                            int completed = Interlocked.Increment(ref tasksDone);
-                                
-                            pbar?.Tick();
-                            _config?.ProgressCallback?.Invoke((double)completed / pieces.Count);
-                        }).ConfigureAwait(false);
-                            
+                        var workerTasks = new Task[workerCount];
+                        for (int w = 0; w < workerCount; w++)
+                        {
+                            bool handleInitialChunk = (w == 0);
+                            workerTasks[w] = Task.Run(async () =>
+                            {
+                                if (handleInitialChunk)
+                                {
+                                    await octaneClient.WriteResponseAsync(
+                                        initialResponse,
+                                        (0, firstEnd),
+                                        fileHandle,
+                                        cancellation_token,
+                                        pause_token.Token).ConfigureAwait(false);
+
+                                    int done = Interlocked.Increment(ref tasksDone);
+                                    pbar?.Tick();
+                                    _config?.ProgressCallback?.Invoke((double)done / totalChunks);
+                                }
+
+                                while (true)
+                                {
+                                    cancellation_token.ThrowIfCancellationRequested();
+                                    int idx = Interlocked.Increment(ref nextPieceIndex);
+                                    if (idx >= remainingPieces.Count)
+                                    {
+                                        break;
+                                    }
+
+                                    await octaneClient.Download(
+                                        uri,
+                                        remainingPieces[idx],
+                                        fileHandle,
+                                        headers,
+                                        cancellation_token,
+                                        pause_token.Token).ConfigureAwait(false);
+
+                                    int done = Interlocked.Increment(ref tasksDone);
+                                    pbar?.Tick();
+                                    _config?.ProgressCallback?.Invoke((double)done / totalChunks);
+                                }
+                            }, cancellation_token);
+                        }
+
+                        await Task.WhenAll(workerTasks).ConfigureAwait(false);
                         success = true;
                     }
                     catch (AggregateException aggEx)
@@ -287,13 +346,17 @@ public partial class Engine: IEngine, IDisposable
                     {
                         throw;
                     }
+                    finally
+                    {
+                        pbar?.Dispose();
+                    }
                 }
                 else
                 {
                     LogUsingDefaultClientToDownloadFile();
                     try
                     {
-                        await defaultClient.Download(uri, (0, length), fileHandle, request.Headers ?? [], cancellation_token, pause_token.Token).ConfigureAwait(false);
+                        await defaultClient.WriteResponseAsync(initialResponse, fileHandle, cancellation_token, pause_token.Token).ConfigureAwait(false);
                         success = true;
                     }
                     catch (Exception)
