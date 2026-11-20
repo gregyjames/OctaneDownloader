@@ -31,9 +31,22 @@ namespace OctaneEngineCore;
 public class OctaneConfiguration
 {
     /// <summary>
-    ///     The number of parts to download in parallel.
+    ///     The number of parts (concurrent workers) to download in parallel.
     /// </summary>
     public int Parts { get; set; } = Environment.ProcessorCount;
+
+    /// <summary>
+    ///     Minimum byte size per chunk. Small files won't be split into chunks smaller than this threshold.
+    ///     Defaults to 1 MB. Set to 0 or less to disable the minimum size threshold.
+    /// </summary>
+    public long MinPartSize { get; set; } = 1 * 1024 * 1024; // 1 MB
+
+    /// <summary>
+    ///     Maximum byte size per dynamic work chunk. Large files are split into chunks of at most this size
+    ///     and dynamically pulled by concurrent workers to eliminate straggler tail latency.
+    ///     Defaults to 8 MB. Set to 0 or less to use static division by <see cref="Parts"/>.
+    /// </summary>
+    public long MaxChunkSize { get; set; } = 8 * 1024 * 1024; // 8 MB
 
     /// <summary>
     ///     Determines whether to use a single small buffer per part (lowest memory usage)

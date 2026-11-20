@@ -249,11 +249,11 @@ public partial class Engine: IEngine, IDisposable
                 //Check if range is supported
                 if (clientType == ClientType.Octane)
                 {
-                    var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger);
+                    var pieces = Helpers.CreatePartsList(length, _config.Parts, _logger, _config.MinPartSize, _config.MaxChunkSize);
                     LogUsingOctaneClientToDownloadFile();
                     var options = new ParallelOptions()
                     {
-                        MaxDegreeOfParallelism = _config.Parts,
+                        MaxDegreeOfParallelism = Math.Min(_config.Parts, pieces.Count),
                         CancellationToken = cancellation_token,
                     };
                     ProgressBar? pbar = null;
@@ -271,10 +271,10 @@ public partial class Engine: IEngine, IDisposable
                         {
                             await octaneClient.Download(request.Url, piece, fileHandle, request.Headers ?? [], cancellation_token, pause_token.Token);
 
-                            Interlocked.Increment(ref tasksDone);
+                            int completed = Interlocked.Increment(ref tasksDone);
                                 
                             pbar?.Tick();
-                            _config?.ProgressCallback?.Invoke((double)tasksDone / _config.Parts);
+                            _config?.ProgressCallback?.Invoke((double)completed / pieces.Count);
                         }).ConfigureAwait(false);
                             
                         success = true;

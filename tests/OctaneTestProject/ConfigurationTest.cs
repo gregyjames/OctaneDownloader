@@ -349,5 +349,57 @@ namespace OctaneTestProject
                 Assert.That(entry.Policy, Is.EqualTo(HttpVersionPolicy.RequestVersionOrHigher));
             }
         }
+
+        [Test]
+        public void Configuration_DynamicChunking_RespectsMinPartSizeAndMaxChunkSize()
+        {
+            const string url = @"https://mockurl.com/file.png";
+            using var capturingHandler = new CapturingDelegatingHandler(new MockHttpMessageHandler(_mockData));
+            using var mockClient = new HttpClient(capturingHandler);
+
+            // 100 KB file with default MinPartSize = 1 MB should issue 1 GET (not 8)
+            var smallConfig = new OctaneConfiguration
+            {
+                Parts = 8,
+                BufferSize = 8192,
+                ShowProgress = false,
+                LowMemoryMode = false
+            };
+
+            var smallEngine = new Engine(smallConfig, mockClient, _factory);
+            smallEngine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
+
+            int smallGetCount = 0;
+            foreach (var entry in capturingHandler.Captured)
+            {
+                if (entry.Method == HttpMethod.Get) smallGetCount++;
+            }
+            Assert.That(smallGetCount, Is.EqualTo(1));
+            Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
+
+            // 100 KB file with MinPartSize = 4 KB and MaxChunkSize = 16 KB should split into ceil(100/16) = 7 chunks
+            using var chunkHandler = new CapturingDelegatingHandler(new MockHttpMessageHandler(_mockData));
+            using var chunkClient = new HttpClient(chunkHandler);
+            var chunkConfig = new OctaneConfiguration
+            {
+                Parts = 4,
+                BufferSize = 8192,
+                MinPartSize = 4 * 1024,
+                MaxChunkSize = 16 * 1024,
+                ShowProgress = false,
+                LowMemoryMode = false
+            };
+
+            var chunkEngine = new Engine(chunkConfig, chunkClient, _factory);
+            chunkEngine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
+
+            int dynamicGetCount = 0;
+            foreach (var entry in chunkHandler.Captured)
+            {
+                if (entry.Method == HttpMethod.Get) dynamicGetCount++;
+            }
+            Assert.That(dynamicGetCount, Is.EqualTo(7));
+            Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
+        }
     }
 }
