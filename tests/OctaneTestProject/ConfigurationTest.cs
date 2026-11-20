@@ -375,7 +375,7 @@ namespace OctaneTestProject
             {
                 if (entry.Method == HttpMethod.Get) smallGetCount++;
             }
-            Assert.That(smallGetCount, Is.EqualTo(1));
+            Assert.That(smallGetCount, Is.EqualTo(2));
             Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
 
             // 100 KB file with MinPartSize = 4 KB and MaxChunkSize = 16 KB should split into ceil(100/16) = 7 chunks
@@ -399,7 +399,7 @@ namespace OctaneTestProject
             {
                 if (entry.Method == HttpMethod.Get) dynamicGetCount++;
             }
-            Assert.That(dynamicGetCount, Is.EqualTo(7));
+            Assert.That(dynamicGetCount, Is.EqualTo(8));
             Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
         }
 
@@ -725,7 +725,7 @@ namespace OctaneTestProject
             engine.DownloadFile(new OctaneRequest(originalUrl, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
 
             Assert.That(handler.OriginalHostRequests, Is.EqualTo(1), "Only the initial fast-start request should hit the redirector");
-            Assert.That(handler.RedirectedHostRequests, Is.EqualTo(6), "Remaining 6 chunks should go directly to the redirected CDN URI");
+            Assert.That(handler.RedirectedHostRequests, Is.EqualTo(7), "Remaining 7 chunks should go directly to the redirected CDN URI");
             Assert.That(File.ReadAllBytes(_outFile), Is.EqualTo(_mockData));
         }
         [Test]
@@ -826,7 +826,7 @@ namespace OctaneTestProject
                 int len = (int)(end - start + 1);
                 Stream stream;
 
-                if (reqNum == 1)
+                if (reqNum == 2)
                 {
                     // Deliver >50% immediately, then wait for gate before sending the rest
                     stream = new GatedChunkStream(_data, (int)start, len, splitOffset: len * 3 / 4, _chunk1Gate);
@@ -838,7 +838,7 @@ namespace OctaneTestProject
 
                 var content = new TrackingStreamContent(stream, () =>
                 {
-                    if (reqNum >= 2)
+                    if (reqNum >= 3)
                     {
                         SecondResponseDisposed = true;
                     }
@@ -852,7 +852,7 @@ namespace OctaneTestProject
                     RequestMessage = request
                 };
 
-                if (reqNum >= 2)
+                if (reqNum >= 3)
                 {
                     _secondRequestStarted.TrySetResult();
                 }

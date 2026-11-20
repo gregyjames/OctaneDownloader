@@ -218,7 +218,7 @@ public partial class Engine: IEngine, IDisposable
                 : (_config.MinPartSize > 0 ? _config.MinPartSize : 8L * 1024 * 1024);
 
             using var initialResponse = await octaneClient
-                .SendRangeRequestAsync(uri, (0, probeChunkSize - 1), headers, cancellation_token)
+                .SendRangeRequestAsync(uri, (0, 0), headers, cancellation_token)
                 .ConfigureAwait(false);
 
             if (initialResponse.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable)

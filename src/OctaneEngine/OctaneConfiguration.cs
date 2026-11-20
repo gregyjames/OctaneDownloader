@@ -30,7 +30,7 @@ namespace OctaneEngineCore;
 
 public class OctaneConfiguration
 {
-    internal static int DefaultParts => Math.Clamp(Environment.ProcessorCount, 4, 8);
+    internal static int DefaultParts => Math.Clamp(Environment.ProcessorCount, 8, 16);
 
     /// <summary>
     ///     The number of parts (concurrent workers) to download in parallel.
@@ -50,7 +50,7 @@ public class OctaneConfiguration
     ///     and dynamically pulled by concurrent workers to eliminate straggler tail latency.
     ///     Defaults to 8 MB. Set to 0 or less to use static division by <see cref="Parts"/>.
     /// </summary>
-    public long MaxChunkSize { get; set; } = 8 * 1024 * 1024; // 8 MB
+    public long MaxChunkSize { get; set; } = 0;
 
     /// <summary>
     ///     Enables speculative tail hedging: when the chunk queue is drained and workers become idle,
