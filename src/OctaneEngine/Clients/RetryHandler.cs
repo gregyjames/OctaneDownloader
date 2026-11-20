@@ -46,40 +46,57 @@ internal partial class RetryHandler : DelegatingHandler
         LogRetryHandlerCreatedWithMaxRetriesRetriesWithAMaxCapOfRetryCap(_maxRetries, _retryCap <= -1 ? "[DISABLED]" : _retryCap + "s");
     }
 
-    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
-        HttpResponseMessage? response = null;
-        for (var i = 0; i < _maxRetries; i++)
+        if (_maxRetries <= 0)
         {
-            response = await base.SendAsync(request, cancellationToken);
-            if (response.IsSuccessStatusCode)
-                return response;
-            
-            var status = (int)response.StatusCode;
-
-            // I consider these transient HTTP error codes
-            bool shouldRetryWithBackoff = status is 408 or 429 or 500 or 502 or 503 or 504;
-            
-            LogClientFailedSendingRequestRetryingAttemptAttemptMaxRetriesStatusStatusCode(i + 1, _maxRetries, response.StatusCode);
-
-            if (shouldRetryWithBackoff)
-            {
-                response.Dispose();
-                response = null;
-                
-                var delayTime = _retryCap <= -1 ? Math.Pow(2, i) : Math.Min(Math.Pow(2, i), _retryCap);
-                LogTransientStatusOfStatusCodeWaitingDelaySBeforeTryingAgain(status, delayTime);
-                var delay = TimeSpan.FromSeconds(delayTime);
-                await Task.Delay(delay, cancellationToken);
-            }
+            return base.SendAsync(request, cancellationToken);
         }
 
-        Debug.Assert(response != null, nameof(response) + " != null");
+        var firstAttempt = base.SendAsync(request, cancellationToken);
+        if (firstAttempt.IsCompletedSuccessfully && firstAttempt.Result.IsSuccessStatusCode)
+        {
+            return firstAttempt;
+        }
 
-        if (!response.IsSuccessStatusCode) LogHttpResponseCodeUnsuccessful();
+        return SendWithRetryAsync(request, firstAttempt, cancellationToken);
+    }
 
-        return response;
+    private async Task<HttpResponseMessage> SendWithRetryAsync(
+        HttpRequestMessage request,
+        Task<HttpResponseMessage> firstAttempt,
+        CancellationToken cancellationToken)
+    {
+        for (var i = 0; i < _maxRetries; i++)
+        {
+            var response = i == 0
+                ? await firstAttempt.ConfigureAwait(false)
+                : await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+            {
+                return response;
+            }
+
+            var status = (int)response.StatusCode;
+            bool isTransient = status is 408 or 429 or 500 or 502 or 503 or 504;
+
+            if (!isTransient || i == _maxRetries - 1)
+            {
+                LogHttpResponseCodeUnsuccessful();
+                return response;
+            }
+
+            LogClientFailedSendingRequestRetryingAttemptAttemptMaxRetriesStatusStatusCode(i + 1, _maxRetries, response.StatusCode);
+            response.Dispose();
+
+            var delayTime = _retryCap <= -1 ? Math.Pow(2, i) : Math.Min(Math.Pow(2, i), _retryCap);
+            LogTransientStatusOfStatusCodeWaitingDelaySBeforeTryingAgain(status, delayTime);
+            await Task.Delay(TimeSpan.FromSeconds(delayTime), cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new UnreachableException();
     }
 
     [LoggerMessage(LogLevel.Debug, "Retry handler created with {maxRetries} retries, with a max cap of {retryCap}.")]

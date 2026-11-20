@@ -20,7 +20,6 @@ public class EngineBuilder
     private ILoggerFactory _loggerFactory;
     private ProgressBar _progressBar;
     private HttpClient _client;
-    private IHttpClientFactory _clientFactory;
 
     /// <summary>
     /// Creates a new EngineBuilder instance
@@ -96,26 +95,31 @@ public class EngineBuilder
         if (_configuration.BytesPerSecond <= 0)
             _configuration.BytesPerSecond = 1;
         
-        // Create standard IHttpClientFactory using a local service collection
-        var services = new ServiceCollection();
-        services.AddSingleton(Microsoft.Extensions.Options.Options.Create(_configuration));
-        services.AddSingleton(_loggerFactory);
-        services.AddClient();
-        
-        var serviceProvider = services.BuildServiceProvider();
-        _clientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
-        
-        var clientToUse = _client ?? _clientFactory.CreateClient("OctaneClient");
+        HttpClient clientToUse;
+        IHttpClientFactory clientFactory;
         if (_client != null)
         {
-            _clientFactory = new SingleHttpClientFactory(_client);
+            clientToUse = _client;
+            clientFactory = new SingleHttpClientFactory(_client);
+        }
+        else
+        {
+            // Create standard IHttpClientFactory using a local service collection
+            var services = new ServiceCollection();
+            services.AddSingleton(Microsoft.Extensions.Options.Options.Create(_configuration));
+            services.AddSingleton(_loggerFactory);
+            services.AddClient();
+
+            var serviceProvider = services.BuildServiceProvider();
+            clientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+            clientToUse = clientFactory.CreateClient("OctaneClient");
         }
         
         var octaneClient = new OctaneClient(_configuration, clientToUse, _loggerFactory, _progressBar);
         var defaultClient = new DefaultClient(clientToUse, _configuration);
 
         // Create engine
-        return new Engine(octaneClient, defaultClient, _clientFactory, _configuration, _loggerFactory);
+        return new Engine(octaneClient, defaultClient, clientFactory, _configuration, _loggerFactory);
     }
 
     /// <summary>

@@ -1,7 +1,6 @@
 using System;
 using System.Net;
 using System.Net.Http;
-using System.Net.Sockets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,6 +20,7 @@ public static class ClientModule
             client.DefaultRequestVersion = config.HttpVersion ?? System.Net.HttpVersion.Version11;
             client.DefaultVersionPolicy = config.HttpVersionPolicy;
         })
+        .RemoveAllLoggers()
         .ConfigurePrimaryHttpMessageHandler(sp =>
         {
             var config = sp.GetRequiredService<IOptions<OctaneConfiguration>>().Value;
@@ -31,7 +31,7 @@ public static class ClientModule
                 PreAuthenticate = true,
                 Proxy = config.Proxy,
                 UseProxy = config.UseProxy,
-                MaxConnectionsPerServer = Math.Min(Math.Max(config.Parts * 4, 100), 1000),
+                MaxConnectionsPerServer = Math.Clamp(config.Parts * 4, 100, 1000),
                 UseCookies = false,
                 PooledConnectionLifetime = TimeSpan.FromMinutes(30),
                 PooledConnectionIdleTimeout = TimeSpan.FromMinutes(10),
@@ -46,65 +46,9 @@ public static class ClientModule
                 MaxAutomaticRedirections = 5
             };
 
-            if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsIOS())
-            {
-                byte[]? windowsKeepAliveSettings = null;
-
-                if (OperatingSystem.IsWindows())
-                {
-                    windowsKeepAliveSettings = new byte[12];
-                    BitConverter.GetBytes((uint)1).CopyTo(windowsKeepAliveSettings, 0); // Enable
-                    BitConverter.GetBytes((uint)30000).CopyTo(windowsKeepAliveSettings, 4); // Time (ms)
-                    BitConverter.GetBytes((uint)1000).CopyTo(windowsKeepAliveSettings, 8); // Interval (ms)
-                }
-
-                socketsHandler.ConnectCallback = async (context, cancellationToken) =>
-                {
-                    Socket? socket = null;
-
-                    try
-                    {
-                        socket = new Socket(SocketType.Stream, ProtocolType.Tcp)
-                        {
-                            NoDelay = true,
-                            LingerState = new LingerOption(false, 0)
-                        };
-
-                        try
-                        {
-                            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseUnicastPort, true);
-                            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-                        }
-                        catch (SocketException) {}
-                        catch (PlatformNotSupportedException) {}
-                        
-                        socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
-                        
-                        if (OperatingSystem.IsWindows() && windowsKeepAliveSettings != null)
-                        {
-                            socket.IOControl(IOControlCode.KeepAliveValues, windowsKeepAliveSettings, null);
-                        }
-
-                        await socket.ConnectAsync(context.DnsEndPoint, cancellationToken).ConfigureAwait(false);
-                        return new NetworkStream(socket, ownsSocket: true);
-                    }
-                    catch
-                    {
-                        try
-                        {
-                            socket?.Dispose();
-                        }
-                        catch
-                        {
-                            // Ignore
-                        }
-
-                        throw;
-                    }
-                };
-            }
-            
-            // Wrap with retry handler for resilience
+            // Rely on SocketsHttpHandler's built-in Happy Eyeballs (RFC 8305) connect logic
+            // across macOS, Linux, and Windows instead of a custom ConnectCallback that
+            // serializes DNS addresses and disables IPv4/IPv6 racing.
             return new RetryHandler(socketsHandler, loggerFactory, config.NumRetries, config.RetryCap);
         });
     }
