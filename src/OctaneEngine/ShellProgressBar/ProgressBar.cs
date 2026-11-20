@@ -27,7 +27,11 @@ namespace OctaneEngineCore.ShellProgressBar
 		private Timer _timer;
 		private int _visibleDescendants = 0;
 		private readonly AutoResetEvent _displayProgressEvent;
+		private readonly ManualResetEventSlim _disposeEvent;
 		private readonly Task _displayProgress;
+		private int _pendingRender;
+		private long _lastRenderMs;
+		private const int MinRenderIntervalMs = 100;
 
 		public ProgressBar(int maxTicks, string message, ConsoleColor color)
 			: this(maxTicks, message, new ProgressBarOptions {ForegroundColor = color})
@@ -69,16 +73,28 @@ namespace OctaneEngineCore.ShellProgressBar
 				}, null, 0, 1000);
 
 			_displayProgressEvent = new AutoResetEvent(false);
+			_disposeEvent = new ManualResetEventSlim(false);
+			_lastRenderMs = Environment.TickCount64 - MinRenderIntervalMs;
 			_displayProgress = Task.Run(() =>
 			{
-				while (_isDisposed == 0)
+				while (Volatile.Read(ref _isDisposed) == 0)
 				{
 					if (!_displayProgressEvent.WaitOne(TimeSpan.FromSeconds(10)))
 						continue;
-					if (_isDisposed > 0) return;
+					if (Volatile.Read(ref _isDisposed) != 0) return;
+
+					long sinceLast = Environment.TickCount64 - Volatile.Read(ref _lastRenderMs);
+					if (sinceLast < MinRenderIntervalMs)
+					{
+						_disposeEvent.Wait((int)(MinRenderIntervalMs - sinceLast));
+						if (Volatile.Read(ref _isDisposed) != 0) return;
+					}
+
+					Interlocked.Exchange(ref _pendingRender, 0);
 					try
 					{
 						UpdateProgress();
+						Volatile.Write(ref _lastRenderMs, Environment.TickCount64);
 					}
 					catch
 					{
@@ -269,7 +285,16 @@ namespace OctaneEngineCore.ShellProgressBar
 			Console.ForegroundColor = indentation[depth - 1].ConsoleColor;
 		}
 
-		protected override void DisplayProgress() => _displayProgressEvent.Set();
+		protected override void DisplayProgress()
+		{
+			if (Volatile.Read(ref _isDisposed) != 0)
+				return;
+
+			if (Interlocked.Exchange(ref _pendingRender, 1) == 0)
+			{
+				_displayProgressEvent.Set();
+			}
+		}
 
 		private readonly ConcurrentQueue<ConsoleOutLine> _stickyMessages = new ConcurrentQueue<ConsoleOutLine>();
 
@@ -476,8 +501,11 @@ namespace OctaneEngineCore.ShellProgressBar
 			_timer = null;
 
 			// make sure background task is stopped before we clean up
+			_disposeEvent.Set();
 			_displayProgressEvent.Set();
 			_displayProgress.Wait();
+			_displayProgressEvent.Dispose();
+			_disposeEvent.Dispose();
 
 			// update one last time - needed because background task might have
 			// been already in progress before Dispose was called and it might

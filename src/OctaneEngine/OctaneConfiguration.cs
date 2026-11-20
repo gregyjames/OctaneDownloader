@@ -68,9 +68,9 @@ public class OctaneConfiguration
 
     /// <summary>
     ///     Determines whether to use a single small buffer per part (lowest memory usage)
-    ///     or double-buffered overlapped I/O (maximum throughput).
+    ///     or double-buffered overlapped I/O (maximum throughput). Defaults to <c>false</c>.
     /// </summary>
-    public bool LowMemoryMode { get; set; } = true;
+    public bool LowMemoryMode { get; set; } = false;
 
     /// <summary>
     ///     The memory buffer size to use, default 8192.
