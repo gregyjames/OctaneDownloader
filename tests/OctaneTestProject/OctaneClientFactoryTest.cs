@@ -50,6 +50,30 @@ namespace OctaneTestProject
             Assert.That(client, Is.InstanceOf<HttpClient>());
             Assert.That(client.Timeout, Is.EqualTo(TimeSpan.FromMinutes(30)));
             Assert.That(client.DefaultRequestHeaders.Contains("User-Agent"), Is.True);
+            Assert.That(client.DefaultRequestVersion, Is.EqualTo(System.Net.HttpVersion.Version11));
+            Assert.That(client.DefaultVersionPolicy, Is.EqualTo(HttpVersionPolicy.RequestVersionOrLower));
+        }
+
+        [Test]
+        public void CreateClient_UsesConfiguredHttpVersionAndPolicy()
+        {
+            var services = new ServiceCollection();
+            var config = new OctaneConfiguration
+            {
+                HttpVersion = System.Net.HttpVersion.Version20,
+                HttpVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher
+            };
+
+            services.AddSingleton(Options.Create(config));
+            services.AddSingleton<ILoggerFactory>(LoggerFactory.Create(builder => { }));
+            services.AddClient();
+
+            using var provider = services.BuildServiceProvider();
+            var factory = provider.GetRequiredService<IHttpClientFactory>();
+            var client = factory.CreateClient("OctaneClient");
+
+            Assert.That(client.DefaultRequestVersion, Is.EqualTo(System.Net.HttpVersion.Version20));
+            Assert.That(client.DefaultVersionPolicy, Is.EqualTo(HttpVersionPolicy.RequestVersionOrHigher));
         }
 
         [Test]

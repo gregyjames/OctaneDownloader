@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using OctaneEngineCore;
@@ -274,6 +277,76 @@ namespace OctaneTestProject
                 
                 engine.DownloadFile(new OctaneRequest(url, testFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
                 Assert.That(doneCalled, Is.True);
+            }
+        }
+
+        private sealed class CapturingDelegatingHandler : DelegatingHandler
+        {
+            public ConcurrentBag<(HttpMethod Method, Version Version, HttpVersionPolicy Policy)> Captured { get; } = new();
+
+            public CapturingDelegatingHandler(HttpMessageHandler innerHandler) : base(innerHandler) { }
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                Captured.Add((request.Method, request.Version, request.VersionPolicy));
+                return base.SendAsync(request, cancellationToken);
+            }
+        }
+
+        [Test]
+        public void Configuration_DefaultHttpVersion_UsesHttp11AndRequestVersionOrLower()
+        {
+            const string url = @"https://mockurl.com/file.png";
+            using var capturingHandler = new CapturingDelegatingHandler(new MockHttpMessageHandler(_mockData));
+            using var mockClient = new HttpClient(capturingHandler);
+
+            var config = new OctaneConfiguration
+            {
+                Parts = 4,
+                BufferSize = 8192,
+                ShowProgress = false,
+                LowMemoryMode = false
+            };
+
+            Assert.That(config.HttpVersion, Is.EqualTo(HttpVersion.Version11));
+            Assert.That(config.HttpVersionPolicy, Is.EqualTo(HttpVersionPolicy.RequestVersionOrLower));
+
+            var engine = new Engine(config, mockClient, _factory);
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
+
+            Assert.That(capturingHandler.Captured, Is.Not.Empty);
+            foreach (var entry in capturingHandler.Captured)
+            {
+                Assert.That(entry.Version, Is.EqualTo(HttpVersion.Version11));
+                Assert.That(entry.Policy, Is.EqualTo(HttpVersionPolicy.RequestVersionOrLower));
+            }
+        }
+
+        [Test]
+        public void Configuration_CustomHttpVersion_PropagatesToRequests()
+        {
+            const string url = @"https://mockurl.com/file.png";
+            using var capturingHandler = new CapturingDelegatingHandler(new MockHttpMessageHandler(_mockData));
+            using var mockClient = new HttpClient(capturingHandler);
+
+            var config = new OctaneConfiguration
+            {
+                Parts = 4,
+                BufferSize = 8192,
+                ShowProgress = false,
+                LowMemoryMode = false,
+                HttpVersion = HttpVersion.Version20,
+                HttpVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher
+            };
+
+            var engine = new Engine(config, mockClient, _factory);
+            engine.DownloadFile(new OctaneRequest(url, _outFile), _pauseTokenSource, _cancelTokenSource.Token).Wait();
+
+            Assert.That(capturingHandler.Captured, Is.Not.Empty);
+            foreach (var entry in capturingHandler.Captured)
+            {
+                Assert.That(entry.Version, Is.EqualTo(HttpVersion.Version20));
+                Assert.That(entry.Policy, Is.EqualTo(HttpVersionPolicy.RequestVersionOrHigher));
             }
         }
     }
