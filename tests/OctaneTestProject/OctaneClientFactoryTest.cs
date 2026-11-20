@@ -50,6 +50,7 @@ namespace OctaneTestProject
             Assert.That(client, Is.InstanceOf<HttpClient>());
             Assert.That(client.Timeout, Is.EqualTo(TimeSpan.FromMinutes(30)));
             Assert.That(client.DefaultRequestHeaders.Contains("User-Agent"), Is.True);
+            Assert.That(client.DefaultRequestHeaders.Contains("Accept-Encoding"), Is.False);
             Assert.That(client.DefaultRequestVersion, Is.EqualTo(System.Net.HttpVersion.Version11));
             Assert.That(client.DefaultVersionPolicy, Is.EqualTo(HttpVersionPolicy.RequestVersionOrLower));
         }

@@ -18,7 +18,6 @@ public static class ClientModule
             client.Timeout = TimeSpan.FromMinutes(30); // Reasonable timeout for large downloads
             client.DefaultRequestHeaders.Add("User-Agent", "OctaneEngine/1.0");
             client.DefaultRequestHeaders.Add("Accept", "*/*");
-            client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate, br");
             client.DefaultRequestVersion = config.HttpVersion ?? System.Net.HttpVersion.Version11;
             client.DefaultVersionPolicy = config.HttpVersionPolicy;
         })
@@ -37,7 +36,7 @@ public static class ClientModule
                 PooledConnectionLifetime = TimeSpan.FromMinutes(30),
                 PooledConnectionIdleTimeout = TimeSpan.FromMinutes(10),
                 EnableMultipleHttp2Connections = true,
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
+                AutomaticDecompression = DecompressionMethods.None,
                 ConnectTimeout = TimeSpan.FromSeconds(15),
                 KeepAlivePingTimeout = TimeSpan.FromSeconds(30),
                 KeepAlivePingDelay = TimeSpan.FromSeconds(20),
@@ -48,8 +47,6 @@ public static class ClientModule
 
             if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsIOS())
             {
-                int receiveBufferSize = Math.Max(1024 * 1024, config.BufferSize * 128); // 1MB minimum
-                int sendBufferSize = 512 * 1024; // 512 KB
                 byte[]? windowsKeepAliveSettings = null;
 
                 if (OperatingSystem.IsWindows())
@@ -69,8 +66,6 @@ public static class ClientModule
                         socket = new Socket(SocketType.Stream, ProtocolType.Tcp)
                         {
                             NoDelay = true,
-                            ReceiveBufferSize = receiveBufferSize,
-                            SendBufferSize = sendBufferSize,
                             LingerState = new LingerOption(false, 0)
                         };
 
